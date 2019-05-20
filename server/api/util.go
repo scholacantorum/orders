@@ -1,19 +1,20 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+
+	"scholacantorum.org/orders/db"
 )
 
 // NotFoundError returns a 404 Not Found.
-func NotFoundError(tx *sql.Tx, w http.ResponseWriter) {
+func NotFoundError(tx db.Tx, w http.ResponseWriter) {
 	tx.Rollback()
 	http.Error(w, "404 Not Found", http.StatusNotFound)
 }
 
 // BadRequestError returns a 400 Bad Request error.
-func BadRequestError(tx *sql.Tx, w http.ResponseWriter, reason string) {
+func BadRequestError(tx db.Tx, w http.ResponseWriter, reason string) {
 	tx.Rollback()
 	if reason != "" {
 		http.Error(w, "400 Bad Request: "+reason, http.StatusBadRequest)
@@ -36,7 +37,7 @@ func toJSON(v interface{}) string {
 }
 
 // commit commits the transaction.
-func commit(tx *sql.Tx) {
+func commit(tx db.Tx) {
 	if err := tx.Commit(); err != nil {
 		panic(err)
 	}

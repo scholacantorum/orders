@@ -22,31 +22,42 @@ func Open(path string) (dbh *sql.DB) {
 	return dbh
 }
 
-// Time is a wrapper around time.Time that stores in the database as integer
-// seconds since epoch.
+// Time is a wrapper around time.Time that stores in the database as a string.
+// go-sqlite3 would do that for us, but it stores the timestamps with
+// fractional seconds and a time zone indicator.  Ours stores them as integral
+// seconds and no time zone indicator (local time assumed).  This makes the
+// database easier to work with manually.  Note that when applying sqlite3 date
+// and time functions to these columns, one must add the 'localtime' modifier to
+// them, otherwise SQLite will assume they are in UTC.
 type Time time.Time
 
-// Value converts the time to integer-seconds-since-epoch, for storage into the
-// database.
+// Value converts the time to a string, for storage into the database.
 func (t Time) Value() (driver.Value, error) {
 	if time.Time(t).IsZero() {
-		return int64(0), nil
+		return "", nil
 	}
-	return time.Time(t).Unix(), nil
+	return time.Time(t).In(time.Local).Format("2006-01-02 15:04:05"), nil
 }
 
-// Scan converts the integer-seconds-since-epoch from the database into a Time.
+// Scan converts the string from the database into a Time.
 func (t *Time) Scan(value interface{}) error {
-	tt, ok := value.(int64)
+	tt, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("scanning %T into db.Time, should be int64", value)
+		tb, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("scanning %T into db.Time, should be string", value)
+		}
+		tt = string(tb)
 	}
-	if tt == 0 {
+	if tt == "" {
 		*t = Time(time.Time{})
-	} else {
-		*t = Time(time.Unix(tt, 0).In(time.Local))
+		return nil
 	}
-	return nil
+	ft, err := time.Parse("2006-01-02 15:04:05", tt)
+	if err == nil {
+		*t = Time(ft.In(time.Local))
+	}
+	return err
 }
 
 // ID is a wrapper around int that stores 0 in the database as NULL.
@@ -71,4 +82,78 @@ func (id *ID) Scan(value interface{}) error {
 		return fmt.Errorf("scanning %T into db.ID, should be int64 or nil", value)
 	}
 	return nil
+}
+
+// IDStr is a wrapper around string that stores "" in the database as NULL.
+type IDStr string
+
+// Value converts the ID to database format.
+func (id IDStr) Value() (driver.Value, error) {
+	if id == "" {
+		return nil, nil
+	}
+	return string(id), nil
+}
+
+// Scan converts the ID from database format.
+func (id *IDStr) Scan(value interface{}) error {
+	switch value := value.(type) {
+	case nil:
+		*id = ""
+	case string:
+		*id = IDStr(value)
+	default:
+		return fmt.Errorf("scanning %T into db.IDStr, should be string or nil", value)
+	}
+	return nil
+}
+
+// Tx is a wrapper around sql.Tx that implements all of the database package
+// functions for access to our tables.
+type Tx struct {
+	tx *sql.Tx
+}
+
+// Begin starts a transaction, returning our Tx wrapper instead of a raw sql.Tx.
+func Begin(db *sql.DB) (tx Tx, err error) {
+	tx.tx, err = db.Begin()
+	return tx, err
+}
+
+// Commit commits a transaction.
+func (tx Tx) Commit() error { return tx.tx.Commit() }
+
+// Rollback rolls back a transaction.
+func (tx Tx) Rollback() error { return tx.tx.Rollback() }
+
+func panicOnError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func panicOnExecError(_ sql.Result, err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func panicOnNoRows(res sql.Result, err error) {
+	var rows int64
+
+	if err != nil {
+		panic(err)
+	}
+	if rows, err = res.RowsAffected(); err != nil {
+		panic(err)
+	}
+	if rows == 0 {
+		panic("affected no rows")
+	}
+}
+
+func lastInsertID(res sql.Result) int {
+	nid, err := res.LastInsertId()
+	panicOnError(err)
+	return int(nid)
 }

@@ -1,18 +1,17 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
 
 	"scholacantorum.org/orders/auth"
+	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
-	"scholacantorum.org/orders/stripe"
 )
 
 // CreateProduct handles POST /api/product requests.
-func CreateProduct(tx *sql.Tx, w http.ResponseWriter, r *http.Request) {
+func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
 		session   *model.Session
 		product   *model.Product
@@ -26,8 +25,12 @@ func CreateProduct(tx *sql.Tx, w http.ResponseWriter, r *http.Request) {
 		BadRequestError(tx, w, err.Error())
 		return
 	}
-	if product.ID != 0 || product.StripeID == "" || product.Name == "" || product.TicketCount < 0 {
+	if product.ID == "" || product.Name == "" || product.Type == "" || product.TicketCount < 0 {
 		BadRequestError(tx, w, "invalid parameters")
+		return
+	}
+	if tx.FetchProduct(product.ID) != nil {
+		BadRequestError(tx, w, "duplicate product ID")
 		return
 	}
 	if product.TicketCount > 0 {
@@ -41,24 +44,61 @@ func CreateProduct(tx *sql.Tx, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	for _, eid := range product.Events {
-		if seenEvent[eid] {
+	for _, event := range product.Events {
+		if event.ID == "" {
+			BadRequestError(tx, w, "invalid event")
+			return
+		}
+		if seenEvent[event.ID] {
 			BadRequestError(tx, w, "duplicate event")
 			return
 		}
-		if model.FetchEvent(tx, eid) == nil {
+		if tx.FetchEvent(event.ID) == nil {
 			BadRequestError(tx, w, "nonexistent event")
 			return
 		}
-		seenEvent[eid] = true
+		seenEvent[event.ID] = true
 	}
-	if !stripe.ValidateProduct(product.StripeID) {
-		BadRequestError(tx, w, "invalid Stripe product ID")
-		return
+	for i, sku := range product.SKUs {
+		if sku.Price < 0 || (!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
+			BadRequestError(tx, w, "invalid SKU parameters")
+			return
+		}
+		for j := 0; j < i; j++ {
+			prev := product.SKUs[j]
+			if prev.MembersOnly == sku.MembersOnly && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
+				BadRequestError(tx, w, "overlapping SKUs")
+				return
+			}
+		}
 	}
-	product.Save(tx)
+	tx.SaveProduct(product)
 	commit(tx)
 	log.Printf("%s CREATE PRODUCT %s", session.Username, toJSON(product))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(product)
+}
+
+// overlappingDates returns true if the SalesStart..SalesEnd ranges of the two
+// SKUs overlap.
+func overlappingDates(sku1, sku2 *model.SKU) bool {
+	if sku1.SalesStart.IsZero() {
+		if sku1.SalesEnd.IsZero() {
+			return true
+		}
+		return sku2.SalesStart.Before(sku1.SalesEnd)
+	}
+	if sku1.SalesEnd.IsZero() {
+		return sku2.SalesEnd.IsZero() || sku2.SalesEnd.After(sku1.SalesStart)
+	}
+	if sku2.SalesStart.IsZero() {
+		return sku2.SalesEnd.IsZero() || sku2.SalesEnd.After(sku1.SalesStart)
+	}
+	if sku2.SalesEnd.IsZero() {
+		return sku2.SalesStart.Before(sku1.SalesEnd)
+	}
+	if sku1.SalesStart.Before(sku2.SalesStart) {
+		return sku1.SalesEnd.After(sku2.SalesStart)
+	}
+	return sku2.SalesEnd.After(sku1.SalesStart)
 }

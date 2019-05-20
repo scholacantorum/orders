@@ -16,16 +16,16 @@ import (
 	"net/http/cgi"
 	"os"
 	"path"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/db"
-	"scholacantorum.org/orders/model"
 )
 
 var (
-	txh *sql.Tx
+	txh db.Tx
 )
 
 func main() {
@@ -56,11 +56,9 @@ func main() {
 	// closed by the handler.
 	defer func() {
 		if panicked := recover(); panicked != nil {
-			if txh != nil {
-				txh.Rollback()
-			}
-			log.SetFlags(log.Ldate | log.Ltime | log.Llongfile)
+			txh.Rollback()
 			log.Printf("PANIC: %v", panicked)
+			fmt.Fprint(logfile, string(debug.Stack()))
 			fmt.Print("Status: 500 Internal Server Error\nContent-Type: text/plain\n\nInternal Server Error\n")
 			os.Exit(1)
 		} else {
@@ -72,7 +70,7 @@ func main() {
 
 	// Next, open the database and start a transaction.
 	dbh = db.Open("orders.db")
-	if txh, err = dbh.Begin(); err != nil {
+	if txh, err = db.Begin(dbh); err != nil {
 		panic(err)
 	}
 
@@ -86,8 +84,8 @@ func router(w http.ResponseWriter, r *http.Request) {
 	case "api":
 		switch shiftPath(r) {
 		case "event":
-			switch productID := shiftPathID(r); model.ProductID(productID) {
-			case 0:
+			switch eventID := shiftPath(r); eventID {
+			case "":
 				switch r.Method {
 				case http.MethodGet:
 					notImplementedError(txh, w) // TODO
@@ -112,12 +110,10 @@ func router(w http.ResponseWriter, r *http.Request) {
 				default:
 					api.NotFoundError(txh, w)
 				}
-			case -1:
-				api.NotFoundError(txh, w)
 			}
 		case "product":
-			switch productID := shiftPathID(r); productID {
-			case 0:
+			switch productID := shiftPath(r); productID {
+			case "":
 				switch r.Method {
 				case http.MethodGet:
 					notImplementedError(txh, w) // TODO
@@ -127,53 +123,16 @@ func router(w http.ResponseWriter, r *http.Request) {
 					methodNotAllowedError(txh, w)
 				}
 			default:
-				switch shiftPath(r) {
-				case "":
-					switch r.Method {
-					case http.MethodGet:
-						notImplementedError(txh, w) // TODO
-					case http.MethodPut:
-						notImplementedError(txh, w) // TODO
-					case http.MethodDelete:
-						notImplementedError(txh, w) // TODO
-					default:
-						methodNotAllowedError(txh, w)
-					}
-				case "sku":
-					switch skuID := shiftPathID(r); model.SKUID(skuID) {
-					case 0:
-						switch r.Method {
-						case http.MethodGet:
-							notImplementedError(txh, w) // TODO
-						case http.MethodPost:
-							api.CreateSKU(txh, w, r, model.ProductID(productID))
-						default:
-							methodNotAllowedError(txh, w)
-						}
-					default:
-						switch shiftPath(r) {
-						case "":
-							switch r.Method {
-							case http.MethodGet:
-								notImplementedError(txh, w) // TODO
-							case http.MethodPut:
-								notImplementedError(txh, w) // TODO
-							case http.MethodDelete:
-								notImplementedError(txh, w) // TODO
-							default:
-								methodNotAllowedError(txh, w)
-							}
-						default:
-							api.NotFoundError(txh, w)
-						}
-					case -1:
-						api.NotFoundError(txh, w)
-					}
+				switch r.Method {
+				case http.MethodGet:
+					notImplementedError(txh, w) // TODO
+				case http.MethodPut:
+					notImplementedError(txh, w) // TODO
+				case http.MethodDelete:
+					notImplementedError(txh, w) // TODO
 				default:
-					api.NotFoundError(txh, w)
+					methodNotAllowedError(txh, w)
 				}
-			case -1:
-				api.NotFoundError(txh, w)
 			}
 		default:
 			api.NotFoundError(txh, w)
@@ -229,14 +188,14 @@ func shiftPathID(r *http.Request) int {
 
 // methodNotAllowedError returns an error for a request to a valid URL with an
 // invalid method.
-func methodNotAllowedError(tx *sql.Tx, w http.ResponseWriter) {
+func methodNotAllowedError(tx db.Tx, w http.ResponseWriter) {
 	tx.Rollback()
 	http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 }
 
 // notImplementedError returns an error for a request to a valid URL with a
 // valid method that hasn't been implemented yet.
-func notImplementedError(tx *sql.Tx, w http.ResponseWriter) {
+func notImplementedError(tx db.Tx, w http.ResponseWriter) {
 	tx.Rollback()
 	http.Error(w, "500 Internal Server Error: method not implemented", http.StatusInternalServerError)
 }

@@ -1,308 +1,230 @@
 # Redesigning the Schola Ordering System
 
-Moving into the 2019–20 season, we want to abandon all use of paper ticketing,
-and we want to track actual ticket usage.  Our current ordering system,
-instituted at the beginning of the 2018–19 season, cannot be readily extended to
-meet these new goals.
+Moving into the 2019–20 season, we want to make three major changes to our
+ordering system:
 
-## Why Track Ticket Usage?
+* We want to abandon all use of paper ticketing.
 
-The key issue is the tracking of ticket usage.  There are several reasons to
-want it:
+  This will save us hundreds of dollars each year in ticket printing and mailing
+  costs, and bring us in line with other arts organizations that have done the
+  same.
 
-* We want to prevent multiple people from entering using the same email order
-  confirmation (for an individual ticket).  This is the most frequently cited
-  reason, but actually the least persuasive since we have no reason to believe
-  such ticket fraud is happening.  (Indeed, per Dan, "it would be a nice
-  problem to have.")
+* We want to track actual ticket usage.
 
-* When we go paperless for multi-use tickets like Flex Passes for season
-  subscriptions and Summer Sings, we again want to prevent ticket fraud by
-  preventing the ticket from being used more times than it's good for.  Again,
-  we have no evidence of ticket fraud, but with multiple-use tickets the
-  potential loss is higher, and the possibility of *accidental* misuse is also
-  higher, so this is a stronger reason.
+  This will reduce the (admittedly already low) chance of ticket fraud, enable
+  us to prevent overselling a limited event like the gala, and most importantly,
+  give us better analytics of ticket usage, both statistically (e.g. which
+  seatings are more popular?) and individually (which concerts did this donor
+  attend?).
 
-* We have some events (e.g. this past gala, or Elijah if we stay at one seating)
-  that have realistic chances of selling out.  We should be counting tickets
-  sold and stopping sales before we overbook.  We have no provision for that
-  today.
+* We want to use Stripe rather than Square for at-the-door credit card sales.
 
-* We would like to do better analytics of ticket usage, both statistically (e.g.
-  which seatings are more popular?) and individually (which concerts did this
-  particular donor attend?).  Right now we have good analytics on ticket *sales*
-  but poor analytics on ticket *usage*, and no correlation between them.
+  This allows us to do all of our credit card processing through a single
+  processor, which simplifies bookkeeping and management.  We also are less
+  comfortable with Square after it lost all of our at-the-door sales for the
+  November 3, 2018 concert.
 
-## Why Redesign?
+Our current ordering system, instituted at the beginning of the 2018–19 season,
+cannot be readily extended to meet these goals.  This is primarily because it
+has no underlying database that we control.  It records all purchases in Stripe
+and in a Google Docs spreadsheet, but neither of these records are suitable for
+ticket usage tracking.  Stripe's database is also limited to purchases made
+through Stripe; it cannot be used to track cash or check sales.
 
-Our current ordering system has no underlying database that we control.  When
-online purchases are made, the purchases are recorded in Stripe and in a Google
-Docs spreadsheet.  But neither of these records are suitable for ticket usage
-tracking.  Stripe's database is limited to online purchases through Stripe only,
-and doesn't have a flexible schema that could handle usage tracking.  The Google
-Docs spreadsheet does not support database-style usage; it's effectively a
-write-only archive.  To do ticket usage tracking, we will need to track all
-ticket sales in a real database, and our current software can't do that.
+Another problem is that Stripe introduced a new API to handle card-present sales
+(e.g. at-the-door sales).  The new API can be used for all types of sales, and
+for simplicity we probably should.  But the new API does not support tracking of
+products, SKUs, and order details; it only deals in charges.  So order and
+inventory tracking will need to be added to our code.
 
-Of course, before writing custom software, the first thing to do is look for
-off-the-shelf alternatives.  The current scholacantorum.org is designed to be
-easy for someone besides me to maintain.  A custom ordering system with ticket
-usage tracking would necessarily be an order of magnitude more difficult.
+It should be noted that I looked for, but not found, off-the-shelf software or
+commercial services that would do what we want.  We will either need to change
+our practices (e.g. by eliminating Flex Passes and adding per-purchase service
+fees), or we will need to implement our own system.  I choose the latter.
 
-Unfortunately, I haven't found any off-the-shelf alternative that meets our
-needs.  To use any of the OTS services, like Brown Paper Tickets or Eventbrite,
-we would need to change our ticketing policies considerably.  We would need to
-abandon the Flex Pass concept; I haven't seen any OTS service that can support
-that.  And the OTS services are all expensive, so we would probably have to pass
-their ticket service charges onto our patrons.  That would drive more sales
-offline, which would greatly degrade our usage data since we can't capture good
-analytics for at-the-door sales.
+## Types of Sales
 
-Bottom line, I don't think we have a choice.  If we want paperless tickets and
-good usage tracking, it's going to be a custom design, and we'll have to accept
-the long-term maintenance cost.
+Our ordering system has to deal with a number of different sales paths and
+product ordering styles.  These include:
+
+* Public web site:
+  * One-off donations:  card not present, immediate charge, variable amount.
+  * Recurring donations:  card not present, delayed charge, variable amount.
+  * Individual event ticket:  card not present, immediate charge, fixed amount,
+    single use, multiple quantity.
+  * Flex Pass ticket (to season or summer sings):  card not present,
+    immediate charge, fixed amount, multiple use, multiple quantity.
+* Members web site:
+  * Concert recording:  card not present, immediate charge, fixed amount,
+    perpetual use.
+  * Sheet music:  card not present, immediate charge, fixed amount.
+* Gala software:
+  * Registration:  card not present *or* card present, immediate charge but save
+    card for delayed charges, fixed amount, multiple quantity.
+  * Fund-a-Need:  card present, card not present/immediate charge, or card not
+    present/delayed charge; fixed amount, multipile quantity.
+  * Auction item: card present, card not present/immediate charge, or card not
+    present/delayed charge; variable amount.
+* Order management web site:
+  * All of the above (except recurring donation), paid via cash or check or
+    other.
+* Door sales app:
+  * Individual event ticket: cash, check, or card present, immediate charge,
+    fixed amount, single use, multiple quantity.
+  * Flex Pass ticket: cash, check, or card present, immediate charge, fixed
+    amount, multiple use, multiple quantity.
+
+Therefore, it has to handle:
+
+* Payment by cash, check, card, or other (office note).
+* For cards, payment with card present, card not present, or saved card.
+* For cards, save for later use or not.
+* Fixed and variable amount products.
+* Single use and multiple use products.
+* Quantity-always-1 and variable-quantity products.
 
 ## Back End Technology Choices
 
-The ordering system will need to have a database, and server code to manage it.
-Up-front design choices include the authentication and authorization model, the
-database type, the web server technology, the hosting domain, and the
-implementation language.
+**Authentication and Authorization Model**  
+We need username and password storage with encryption, password quality
+enforcement, profile management for changing passwords, "forgot my password"
+recovery functionality, automatic lockout after successive failed attempts, etc.
+The members web site already has all of this, and I see no value in
+reimplementing it.  On the other hand, I don't want to couple the two sites
+together very closely by having them share a database or share code.  So my plan
+is that the ordering system will delegate authentication and authorization to
+the members site via APIs.
 
-> **TL;DR** back end written in Go using SQLite database and CGI protocol,
-hosted on a subdomain of scholacantorum.org, delegating authentication and
-authorization to the existing Schola members site.
+**Database**  
+All of the existing Schola sites use SQLite 3, so that's what I plan to use for
+the ordering system.  MySQL is another alternative, but it offers nothing
+additional that we need and nothing that would justify the maintenance cost of
+using two different database systems.
 
-### Authentication and Authorization Model
+**Hosting Domain**  
+I plan to host the ordering system on orders.scholacantorum.org, which is part
+of Schola's free web hosting account at Dreamhost.  It doesn't allow constantly
+running servers, so the ordering system will be invoked as CGI scripts, but our
+system will be very low usage so that shouldn't be a problem.  I'm not hosting
+it on the main scholacantorum.org because that is a static site generated by
+Hugo and it's not trivial to introduce CGI scripts to it.  I'm not hosting it on
+scholacantorummembers.org (or a subdomain of that), because that domain is part
+of my personal web hosting account at Dreamhost, and it doesn't seem appropriate
+to put Schola's order processing there.
 
-Some parts of the ordering / ticketing system will need user authentication and
-authorization.  For example, cash sales should only be recorded by at-the-door
-sales staff, and analytics should only be available to the office staff.  A
-proper implementation of authentication requires username and password storage
-with encryption, password quality enforcement, profile management for changing
-passwords, "forgot my password" recovery functionality, automatic lockout after
-successive failed attempts, and "remember me on this computer" functionality.
+**Implementation Language**  
+All of the existing Schola sites have their back end code written in Go, so
+that's what I plan to use for the ordering system.  PHP and Python would be
+viable alternatives, but they don't provide any additional functionality that we
+need, and there's nothing to justify the maintenance cost of using multiple
+back-end languages.
 
-Schola already has one implementation of these features, in its members web
-site.  The ordering / ticketing system will either need to implement them
-separately, or it will need to leverage them from the members site.  Leveraging
-from the members site would reduce effort and maintenance cost.  It would also
-avoid giving the office staff yet another username/password combination to
-remember.
+**Stripe API Usage**  
+We have to use Stripe's new `PaymentIntent` and `PaymentMethod` objects to
+process card-present transactions.  Since those work for all types of
+transactions, I plan to use them for all transactions.  The alternative would be
+to continue to use the older `Source` objects for card-not-present transactions,
+but that just makes the code more complex.  Note that we will be abandoning use
+of Stripe's tracking of `Order`, `Product` and `SKU` objects, which
+`PaymentIntent` and `PaymentMethod` don't support.  But we're going to need to
+track our orders, products, and SKUs on our own server anyway, to encompass
+non-credit-card orders, so that's not a bit loss.
 
-Leverage could be achieved by sharing the data and code, or it could be done by
-delegation.  For example, the ordering / ticketing system could validate a user
-by looking it up in the same database that the members site uses, perhaps even
-sharing the same code to do so.  Or, the ordering / ticketing system could
-validate a user by sending a request to the members site and asking it to do so.
-
-Sharing the data and code would tie the two systems together unnecessarily; it
-would violate basic software architecture principles.  Also, it would dictate
-the answers to most of the other technology choices:  SQLite database,
-continuously running web server hosted on scholacantorummembers.org, written in
-Go.  There is no reason to accept those constraints.  Therefore, I believe the
-best option is to leverage the members site's authentication and authorization
-models via delegation.
-
-### Database
-
-The nature of the application calls for a traditional SQL-based relational
-database, as opposed to a NoSQL alternative like a document store, object store,
-or graph database.  Within the execution environment provided by our web host,
-the available relational databases are MySQL and SQLite.
-
-MySQL is a full-featured database server.  The database server is separate from
-the web server; both are maintained by our web hosting company.  Access to the
-database from the back end code is via a remote network connection.  This adds
-quite a bit of overhead, although our traffic is low enough that it might not
-matter.  It also adds potential failure modes (e.g. the web server is up but it
-can't talk to the database server).  One advantage of MySQL is that it can be
-accessed remotely by software running someplace other than our web server, if we
-so choose.
-
-SQLite is an embedded database: it is a library that becomes part of our back
-end code, rather than running as a separate server.  It stores its data in the
-file system of the web server, so the data are accessible only by code running
-on the web server.  It is lightning fast and very low overhead.  It does not
-implement the full SQL standard, but the parts it leaves out are not critical.
-Since the data are stored in the file system, a separate mechanism is needed to
-ensure the files get backed up.  Its locking mechanisms are coarse grained, and
-not really suitable for handling highly concurrent workloads, but our workloads
-are not demanding in that regard.
-
-Either database system would serve our needs.  I believe SQLite is the better
-choice for us, for two reasons.  First, whenever choosing between third party
-software packages, I always lean towards the smallest and least complex one that
-will serve the need, and SQLite is far simpler than MySQL.  Second, SQLite is
-what the members and gala sites use, so there would be less of a maintenance
-burden of needing to understand multiple database systems.
-
-### Web Server Protocol
-
-In this context, the three web server protocol choices are CGI, continuous
-HTTPS, or continuous HTTPS with web sockets.
-
-Web sockets allow continuous, asynchronous, two-way communications between
-client and server.  They are finicky, and not too many people know how to work
-with them, so they add significantly to the maintenance burden.  The gala
-software needed that asynchronous communication, and it uses web sockets.
-However, I don't antipate that the ordering / ticketing system would need that,
-and maintenance issues are more critical for it, so I would argue against using
-web sockets for it.
-
-CGI systems start up a new instance of the web server software for each
-incoming request.  A continuous HTTPS server is needed when the overhead of
-each startup, multiplied by the volume of incoming requests, is too high to
-provide adequate user response time.  Schola's members site uses a continuous
-HTTPS server because it maintains an in-memory cache of most of its data, and
-filling that cache on startup is an expensive operation.  Schola's public site
-uses a CGI server because it runs on a web host that does not allow continuous
-HTTPS servers.
-
-One can never be certain in advance of actual measurements, but I have no reason
-to think that either the startup overhead or the request volume for our ordering
-/ ticketing system will be high enough to matter.  I would use a continuous
-HTTPS server anyway if it is an option, just on general efficiency principles.
-But a CGI server would also meet our needs.
-
-### Hosting Domain
-
-I see no reason to create a new top-level domain, so our choices for hosting are
-scholacantorum.org, scholacantorummembers.org, or a subdomain of one of those.
-Both of those are hosted by Dreamhost, but in different accounts with different
-hosting plans.
-
-scholacantorum.org and its subdomains are hosted in a free hosting plan in
-Schola Cantorum's name.  (It's free because Schola is a non-profit.)  The free
-plan has one limitation that's relevant in this context:  it does not allow
-continuously running server code.  Only CGI servers are supported.  However, as
-noted above, that's probably OK for our ordering / ticketing system.
-
-scholacantorummembers.org and its subdomains are hosted in a paid hosting
-account under my name.  This is for exactly the reason mentioned above: it needs
-a continuously running server for performance, and Schola's free plan didn't
-allow it.  (I don't charge Schola for this hosting account; I was paying for it
-anyway, to host other non-Schola domains, so adding Schola to it didn't cost me
-anything more.)  I hosted the Gala software at gala.scholacantorummembers.org
-for the same reason, but stronger: it uses web sockets, so it *had* to have a
-continuously running server.
-
-I recommend hosting the ordering / ticketing system on a new subdomain of
-scholacantorum.org called orders.scholacantorum.org.  It seems to belong better
-on the public side conceptually, since it's mostly a public-facing system rather
-than a member-facing system.  And it seems better to have our ordering data in a
-hosting account in Schola's name.  The fact that it forces us to use a CGI
-server is unfortunate but tolerable.
-
-### Implementation Language
-
-All of our existing back end code, for the public, members, and gala sites, is
-in Go.  Go is a compiled, multi-threaded, type-safe language, so it is
-dramatically faster and slightly safer than the more commonly used web server
-languages like PHP, Python, and Ruby, all of which are interpreted,
-single-threaded, and untyped.  Ruby has the additional disadvantage that it is
-not readily available in our web hosting environment.
-
-In an effort to minimize the number of languages needed to maintain Schola's
-suite of web sites, I believe the back end of the ordering / ticketing system
-should also be in Go.
+**Stripe Customer Tracking**  
+Transactions with delayed charges, such as recurring donations or gala auction
+purchases, must be associated with a Stripe `Customer` object, where the payment
+method is stored until we decide to charge it.  My plan is to use Stripe
+`Customer` objects only for those transactions, and do all other customer
+tracking in our own database.  We're going to need to track customers in our own
+database anyway, so there's little value in doing it redundantly in Stripe,
+except for the few cases where it's required.
 
 ## Front End Technology Choices
 
-Depending on how you count them, we have six front ends to consider:
+For the ordering system, we will need five new front ends.
 
-* Public web site: patrons place online orders there.
-* Members web site: members place online orders there (e.g. concert recordings).
-* Gala web site: gala staff charges credit cards there.
-* Office web site: office staff record offline orders there, and review analytics there.
-* Phone app for door sales: staff charge credit cards and record cash receipts there.
-* Phone app for ticket scanning: staff record ticket usage there.
+**Order Management Web Site**  
+Used by the office staff to record offline orders and review analytics.  This
+will be a single-page application using the Nuxt framework.
 
-These could be merged in some cases (e.g. the office web site could be
-implemented as a protected part of the members web site, or the two phone apps
-could be implemented as one phone app).
+**Order Dialog**  
+Customer-facing dialog form for entering and confirming order details; the
+various Schola web sites will bring up this dialog in an `<iframe>` to handle
+order placement.  This will be a Vue-based webapp.
 
-Client code that runs in a browser (e.g., the four web sites above) must be
-written in Javascript; that is the only supported language.  The small amounts
-of existing Javascript code on the Schola public web site are written natively
-without any framework.  The much larger bodies of Javascript code on the members
-and gala web sites are written using the Vue framework.  The Vue framework
-allows one to write UIs in a declarative fashion rather than a procedural one,
-which can greatly simplify coding, at the cost of needing to learn that
-framework.  React is a similar (and more commonly used) framework.
+**Ticket Summary**  
+Customers who scan the QR code on their ticket will be shown this site, which
+will give details of the ticket and the order through which it was purchased.
+This will be a static page served by the back end.
 
-For client code on a phone, there are three choices:
+**Door Sales App**  
+Used by the front-of-house staff at a concert to record at-the-door ticket
+sales, both cash and credit card.  In order to handle card-present transactions,
+this will be implemented as a React Native application and run on an iOS device.
+(Android support is coming but not available yet.)
 
-* a webapp, written in JavaScript, possibly with the Vue or React framework,
-  that's run in a browser on the phone
-* a native app, written in the language used by the phone OS (Swift for iOS,
-  Java for Android)
-* a native app, written in JavaScript with the Vue Native or React Native
-  framework, and cross-compiled into the language used by the phone OS
-
-Any of these choices can read QR codes using the phone's camera, and any of them
-can process credit cards using a Swipe card reader.  (Note, however, that the
-necessary card reader is $60 for the native apps and $300 for the webapp.)
-Steve H. has existing code for reading QR codes using the phone's camera, which
-he said is written in JavaScript, but I don't know whether that's run in
-JavaScript as a webapp or run natively after cross-compilation.
-
-I am inclined to exclude the middle choice, writing in Swift or Java.  I don't
-know Swift, and I dislike Java.  More to the point, we should minimize the
-number of languages that maintainers of this code need to know, and since they
-will already need to know JavaScript, there is little value in adding another
-language to the list.  The middle choice also has the disadvantage of needing
-two separate implementations if we want to support both iOS and Android.
-
-Between the remaining choices, I lean towards a webapp running in JavaScript.
-That is less tightly integrated into the phone UI, and produces a subtly less
-desirable user experience, than a native app.  But since the users of the webapp
-would be our own staff and ticket takers, I don't think that matters too much.
-Meanwhile, the native app brings in a huge number of new technologies, and
-greatly increases the complexity of the app and its maintenance burden.  Also,
-distribution of a native app requires submitting it to the Apple and/or Google
-App stores, which is a tedious and sometimes costly process.
-
-Before considering this choice final, I want to do some prototyping to verify
-that I really can read a QR code, with adequate performance, from a webapp on a
-phone.  So this should be considered tentative.
+**Ticket Taking App**  
+Used by the front-of-house staff at a concert to scan the QR codes on tickets,
+validate them, and mark them as used.  This needs to run on a mobile phone, to
+use the camera.  It will probably be implemented as a Vue-based webapp.  But if
+it turns out to be convenient to include it in the same React Native application
+used for door sales, I will do that instead.
 
 ## Block Diagram
 
 ```x
-┌────────┐   ┌─────────┐   ┌───────────┐   ┌──────────┐   ┌─────────────┐
-│ sc.org │   │ scm.org │   │ g.scm.org │   │ o.sc.org ├───┤ Card Reader │
-└──┬──┬──┘   └──┬───┬──┘   └───┬───┬───┘   └──┬───┬───┘   └──────┬──────┘
-   │  └─────────│───┴──────────│───┴──────────│───┴──────────────┤
-   └────────────┴───────┬──────┴──────────────┘                  │
-┌───────────────────────┴───────────────────┬──────────┐         │
-│               Back End Software           │ Database │         │
-└───┬───────────────┬────────────────────┬──┴──────────┘         │
-┌───┴───┐   ┌───────┴──────┐          ┌──┴───────────────────────┴──────┐
-│ Email │   │ Google Sheet │          │             Stripe              │
-└───────┘   └──────────────┘          └─────────────────────────────────┘
+┌───────────────┐   ┌──────────────────┐   ┌─────────────────┐   ┌──────────────────┐
+│ Gala Software │   │ Order Management │   │ Public Web Site │   │ Members Web Site │
+└──────┬─┬──────┘   └───────┬──┬───────┘   └────────┬────────┘   └─────────┬────────┘
+       │ └──────────────────│──┴──────────────────┬─┴──────────────────────┘
+       └────────┐ ┌─────────┘                     │
+┌────────────┐  │ │  ┌────────────────┐   ┌───────┴──────┐   ┌────────────────┐   ┌─────────────┐
+│ Ticket App │  │ │  │ Ticket Summary │   │ Order Dialog │   │ Door Sales App ├───┤ Card Reader │
+└──────┬─────┘  │ │  └────────┬───────┘   └─────┬──┬─────┘   └──────┬──┬──────┘   └──────┬──────┘
+       │        │ │           │                 │  └────────────────│──┴──┬──────────────┘
+       └────────┴─┴───────┬───┴─────────────────┴───────────────────┘     │
+┌─────────────────────────┴─────────────────────────┬──────────┐          │
+│                 Back End Software                 │ Database │          │
+└───┬───────────────┬────────────────────────────┬──┴──────────┘          │
+┌───┴───┐   ┌───────┴──────┐              ┌──────┴────────────────────────┴─────────────────────┐
+│ Email │   │ Google Sheet │              │                        Stripe                       │
+└───────┘   └──────────────┘              └─────────────────────────────────────────────────────┘
 ```
 
-The four client applications that take orders (scholacantorum.org,
-scholacantorummembers.org, gala.scholacantorummembers.org, and
-orders.scholacantorum.org) each communicate with the back end software and also
-with Stripe.  orders.scholacantorum.org, which hosts the phone interface for
-at-the-door sales, also communicates with the card reader, which communicates
-with Stripe.  The back end software contains the database, and communicates with
-Stripe; it culminates with updating the Google sheet and sending emails.
-
-The Stripe communications deserve a bit more detail.  When one of our web sites
+The Stripe communications deserve a bit more detail.  When the order dialog
 shows a credit card entry field, that field is not actually coming from our site
 code at all; it is in an IFRAME tag, and is coming from Stripe's own servers.
 Anything the user types in it is sent directly to Stripe and is never seen by
 our code.  What Stripe gives our site's code is a "token" that represents the
-user input without exposing it.  Our site's code passes that to our back end
-code, which in turn passes it to Stripe's API.  Stripe then finds the real card
-data associated with the token, and charges that card.  A similar process
-happens with the phone app and the card reader: the card reader sends the card
-data directly to Stripe, and gives the corresponding token to our phone app.
+user input without exposing it.  The order dialog passes that to the back end,
+which in turn passes it to Stripe's API.  Stripe then finds the real card data
+associated with the token, and charges that card.  A similar process happens
+with the door sales app and the card reader: the card reader sends the card data
+directly to Stripe, and gives the corresponding token to our phone app.
 
-## Database Schema
+## Data Model and Database Schema
+
+```x
+              ┌───────────────────────┐      ? = zero or one
+              │        order          │      * = zero or more
+              └───┬────────────────┬──┘      1 = exactly one
+                 +│               *│         + = one or more
+           ┌──────┴─────┐     ┌────┴────┐
+           │ order_line │     │ payment │
+           └──┬───┬───┬─┘     └────┬────┘
+   *┌─────────┘   │1  └──────┐*   +│
+┌───┴────┐  ┌─────┴────┐  ┌──┴─────┴─────┐
+│ ticket │  │ product  │  │ payment_line │
+└───┬────┘  └─┬─────┬──┘  └──────────────┘
+   ?│         │    +│
+┌───┴────┐    │  ┌──┴──┐
+│ event  │    │  │ sku │
+└───┬────┘    │  └─────┘
+   +│        *│
+┌───┴─────────┴─┐              ┌─────────┐
+│ product_event │              │ session │
+└───────────────┘              └─────────┘
+```
 
 There are database tables for order management and for ticket usage tracking.
 (There are also tables for auditing and logging, but those are not detailed

@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"database/sql"
 	"net/http"
 
+	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
@@ -13,7 +13,7 @@ import (
 // privileges.)  If so, GetSession returns the session details.  If not,
 // GetSession emits an appropriate error, rolls back the transaction, and
 // returns nil.
-func GetSession(tx *sql.Tx, w http.ResponseWriter, r *http.Request, priv model.Privilege) (session *model.Session) {
+func GetSession(tx db.Tx, w http.ResponseWriter, r *http.Request, priv model.Privilege) (session *model.Session) {
 	// TODO
 	return &model.Session{Username: "guest", Privileges: 0xFF}
 }

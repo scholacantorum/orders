@@ -1,5 +1,6 @@
 package api
 
+/*
 import (
 	"database/sql"
 	"encoding/json"
@@ -270,3 +271,4 @@ func validateCustomer(c *model.Customer) bool {
 	}
 	return true
 }
+*/

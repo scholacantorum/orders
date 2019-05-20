@@ -1,75 +1,98 @@
 -- Database schema for orders.scholacantorum.org.
 
--- The customer table lists customers who have placed orders from us (including
--- our own singers).  When a new order is placed, an existing customer entry
--- will be reused if (a) either the names are the same or one of the names is
--- empty; (b) either the emails are the same or one of the emails is empty; and
--- (c) the memberIDs are the same.  Otherwise, a new customer will be created
--- (both in this database and in Stripe).
-CREATE TABLE customer (
+-- The orderT table tracks all Schola Cantorum orders.  (The "T" suffix is used
+-- to work around the fact that "order" is a reserved word in SQL.)  There is
+-- one row in this table for each order that has been placed (successfully or
+-- unsuccessfully) or is in the process of being placed.
+CREATE TABLE orderT (
 
-    -- Unique identifier of the customer.
+    -- Unique identifier of the order.  This is public, referred to as the
+    -- "Schola Order Number" in customer communications.
+    id integer PRIMARY KEY, -- autoincrement
+
+    -- Information about the customer who placed the order.  Any of these fields
+    -- may be empty.  However, if any of address, city, state, and zip are
+    -- non-empty, they must all be non-empty.
+    name     text    NOT NULL DEFAULT '',
+    email    text    NOT NULL DEFAULT '',
+    address  text    NOT NULL DEFAULT '',
+    city     text    NOT NULL DEFAULT '',
+    state    text    NOT NULL DEFAULT '', -- two-letter code, upper case
+    zip      text    NOT NULL DEFAULT '', -- 5-digit or 9-digit code
+    phone    text    NOT NULL DEFAULT '', -- ###-###-####(x#*)?
+    customer text    NOT NULL DEFAULT '', -- Stripe customer ID if any
+    member   integer NOT NULL DEFAULT 0,  -- Schola member ID if any
+
+    -- Creation time of the order.
+    created text NOT NULL,
+
+    -- Bitmask of order type and status flags.  See model/order.go for values.
+    flags integer NOT NULL,
+
+    -- Office notes about the order.
+    note text NOT NULL DEFAULT '',
+
+    -- Coupon code supplied by the customer (empty if none).
+    coupon text NOT NULL DEFAULT '',
+
+    -- Date on which this order should stop recurring, in seconds after the Unix
+    -- epoch.  If zero, the order does not recur.  Otherwise, the order will
+    -- recur on the first of every month until this date is reached.
+    repeat integer NOT NULL DEFAULT 0
+);
+CREATE INDEX order_name_email_index ON orderT (name, email);
+CREATE INDEX order_email_index      ON orderT (email);
+CREATE INDEX order_repeat_index     ON orderT (repeat) WHERE repeat != 0;
+
+-- The order_line table tracks lines of Schola Cantorum orders.  Every order has
+-- at least one line.
+CREATE TABLE order_line (
+
+    -- Unique identifier of the line
     id integer PRIMARY KEY,
 
-    -- Stripe ID for the customer.  This will be populated only if the customer
-    -- paid for an order through Stripe.
-    stripeID text UNIQUE,
+    -- Identifier of the order containing the line.
+    orderid integer NOT NULL REFERENCES orderT ON DELETE CASCADE,
 
-    -- Member ID for the customer.  This will be non-zero only if the customer
-    -- is a member of Schola, in which case it will map to the user.id column in
-    -- the scholacantorummembers.org database.
-    memberID integer NOT NULL DEFAULT 0,
+    -- The product ordered on this line.
+    product text NOT NULL REFERENCES product,
 
-    -- Name of the customer.  This may be empty for in-person sales where no
-    -- name is given.
-    name text NOT NULL DEFAULT '' COLLATE NOCASE,
+    -- The quantity of the product ordered on this line.  For non-quantifiable
+    -- products (e.g. donation), this is 1.
+    quantity integer NOT NULL,
 
-    -- Email address of the customer.  This may be empty.
-    email text NOT NULL DEFAULT '' COLLATE NOCASE,
+    -- The unique alphanumeric token assigned to the group of tickets ordered on
+    -- this line (or NULL if this line did not purchase tickets).  This token is
+    -- what's encoded in the barcode of the ticket email they receive.
+    token text UNIQUE,
 
-    -- Other contact information for the customer.  These columns may be empty.
-    address text NOT NULL DEFAULT '',
-    city    text NOT NULL DEFAULT '',
-    state   text NOT NULL DEFAULT '',
-    zip     text NOT NULL DEFAULT '',
-    phone   text NOT NULL DEFAULT ''
+    -- The price per unit for the product ordered on this line, in cents.  Note
+    -- that the total cost for the line is always quantity*price.
+    price  integer NOT NULL
 );
-CREATE INDEX customer_name_email_index ON customer (name, email, memberID);
-CREATE INDEX customer_email_index      ON customer (email, memberID);
+CREATE INDEX order_line_order_index   ON order_line (orderid);
+CREATE INDEX order_line_product_index ON order_line (product);
 
--- The event table lists all events to which we sell tickets.
-CREATE TABLE event (
-
-    -- Unique identifier of the event.
-    id integer PRIMARY KEY,
-
-    -- Identifier of the event in the event table of the
-    -- scholacantorummembers.org database.
-    membersID integer UNIQUE,
-
-    -- Name of the event (as it should be shown to a customer on a receipt).  Do
-    -- not include the date in the name.
-    name text NOT NULL,
-
-    -- Start time of the event (in seconds since the Unix epoch).
-    start integer NOT NULL,
-
-    -- Seating capacity of the event.  Zero means unlimited.
-    capacity integer NOT NULL DEFAULT 0
-);
-
--- The product table lists all products that have been, are, or will be for
--- sale.  (See also the "sku" table.)
+-- The product table describes products that can be ordered.  See also the sku
+-- table, which describes the various pricing schemes by which these products
+-- can be ordered.  A product represents what the customer gets in return for
+-- their order; a SKU represents the pricing scheme by which they ordered it.
 CREATE TABLE product (
 
-    -- Unique identifier of the product.
-    id integer PRIMARY KEY,
+    -- Unique identifier.  A text identifier is used so that it can be
+    -- hard-coded in purchase forms when appropriate.
+    id text PRIMARY KEY,
 
-    -- Stripe ID for the product.
-    stripeID text NOT NULL UNIQUE,
-
-    -- Name of the product (as it should appear on customer receipts).
+    -- Name of the product, as it should appear on the order form and receipt.
     name text NOT NULL,
+
+    -- Product type.  This selects various type-specific code including ticket
+    -- tracking, receipt generation, etc.  See model/product.go for values.
+    type text NOT NULL,
+
+    -- Text associated with the product on the receipt.  Only used by some
+    -- product types.
+    receipt text NOT NULL DEFAULT '',
 
     -- Number of tickets that should be issued for each unit of this product.
     -- For non-ticket products, this will be zero.  For individual event
@@ -83,6 +106,73 @@ CREATE TABLE product (
     ticket_class text NOT NULL DEFAULT ''
 );
 
+-- The sku table lists all of the SKUs that have been, are, or will be for sale.
+-- Each product in the product table has one or more SKUs in the sku table,
+-- representing different price points or purchase methods for the product.  A
+-- product represents what the customer gets in return for their order; a SKU
+-- represents the pricing scheme by which they ordered it.
+--
+-- Although not expressed in SQL, the code enforces a uniqueness constraint on
+-- this table:  for any given combination of product, coupon, and members_only
+-- flag, there cannot be overlapping sales_start..sales_end ranges.  Thus, when
+-- an order for a product is placed, there are at most four matching SKUs:
+--   - matching coupon code and members_only flag set
+--   - empty coupon code    and members_only flag set
+--   - matching coupon code and members_only flag clear
+--   - empty coupon code    and members_only flag clear
+-- The first one of those that applies to the purchase is the one used.
+CREATE TABLE sku (
+
+    -- Identifier of the product that can be purchased with this SKU.
+    product text NOT NULL REFERENCES product ON DELETE CASCADE,
+
+    -- Coupon code for this SKU.  In order to place an order with this SKU, the
+    -- customer must specify this coupon code.  Each product should have a SKU
+    -- with an empty coupon code, which is used when the customer doesn't
+    -- specify a recognized coupon code.
+    coupon text NOT NULL DEFAULT '' COLLATE NOCASE,
+
+    -- Start and end times for the time frame during which this SKU can be
+    -- purchased by regular customers.  These restrictions do not apply to
+    -- orders placed by privileged users.  Empty values indicate no limit.
+    sales_start text NOT NULL DEFAULT '',
+    sales_end   text NOT NULL DEFAULT '',
+
+    -- Flag indicating that this SKU can only be used by a logged-in Schola
+    -- member placing an order through scholacantorummembers.org.
+    members_only boolean NOT NULL DEFAULT 0,
+
+    -- Price to purchase the product using this SKU, in cents.  Depending on the
+    -- product type, a zero value may mean that the product is free when
+    -- purchased with this SKU, or it may mean that the product's price is
+    -- variable and will be specified at the time of order (e.g. a donation).
+    price integer NOT NULL
+);
+CREATE INDEX sku_product_index ON sku (product);
+
+-- The event table lists all events to which we sell tickets.
+CREATE TABLE event (
+
+    -- Unique identifier of the event.  This is usually the YYYY-MM-DD form of
+    -- the event date.  When there are multiple events on the same date, it may
+    -- have an additional suffix for uniqueness.
+    id text PRIMARY KEY,
+
+    -- Identifier of the event in the event table of the
+    -- scholacantorummembers.org database.
+    members_id integer UNIQUE,
+
+    -- Name of the event (as it should be shown to a customer on a receipt).  Do
+    -- not include the date in the name.
+    name text NOT NULL,
+
+    -- Start time of the event.
+    start text NOT NULL,
+
+    -- Seating capacity of the event.  Zero means unlimited.
+    capacity integer NOT NULL DEFAULT 0
+);
+
 -- The product_event table specifies which products grant admission to which
 -- events.  A non-ticket product will have no entries in this table.  An
 -- individual event ticket product will have a single entry in this table.  A
@@ -91,72 +181,79 @@ CREATE TABLE product (
 CREATE TABLE product_event (
 
     -- Identifier of the product.
-    product integer NOT NULL REFERENCES product ON DELETE CASCADE,
+    product text NOT NULL REFERENCES product ON DELETE CASCADE,
 
     -- Identifier of the event.
-    event integer NOT NULL REFERENCES event ON DELETE CASCADE,
+    event text NOT NULL REFERENCES event ON DELETE CASCADE,
     PRIMARY KEY (product, event)
 );
 CREATE INDEX product_event_event_index ON product_event (event);
 
--- The sale table lists all sales.
-CREATE TABLE sale (
+-- The ticket table lists all tickets that have been sold.  Each ticket is a
+-- single admission to a single event.
+CREATE TABLE ticket (
 
-    -- Unique identifier of the sale.  This is customer visible, as the "Schola
-    -- order number".
+    -- Unique identifier of the ticket.
     id integer PRIMARY KEY,
 
-    -- Stripe ID of the corresponding Stripe order, if the sale was paid through
-    -- Stripe.
-    stripeID text UNIQUE,
+    -- Identifier of the order line on which this ticket was sold.
+    order_line integer NOT NULL REFERENCES order_line ON DELETE CASCADE,
 
-    -- Identifier of the sale customer.
-    customer integer NOT NULL REFERENCES customer,
+    -- Identifier of the event at which this ticket was used, or must be used.
+    -- If the ticket is valid at multiple future events, this is NULL.
+    event integer REFERENCES event,
 
-    -- Source of the sale.  Possible values:
-    --   - 'P' scholacantorum.org public site
-    --   - 'M' scholacantorummembers.org site
-    --   - 'G' gala.scholacantorummembers.org site
-    --   - 'O' offline order processed by office staff
-    --   - 'D' at-the-door or other in-person sale
-    source text NOT NULL CHECK (source IN ('D','G','M','O','P')),
-
-    -- Timestamp of the sale (in seconds since the Unix epoch).
-    timestamp integer NOT NULL,
-
-    -- Payment method for the sale.  If the sale was paid through Stripe, this
-    -- will be a description of the card used (e.g. "Visa 5023").  Otherwise,
-    -- this is a free-form text field with an office-supplied description.
-    payment text NOT NULL CHECK (payment != ''),
-
-    -- Office-supplied notes about the sale.
-    note text NOT NULL DEFAULT ''
+    -- Timestamp when this ticket was used, or empty if it has not yet been
+    -- used.
+    used text NOT NULL DEFAULT ''
 );
-CREATE INDEX sale_customer_index ON sale (customer);
+CREATE INDEX ticket_event_index      ON ticket (event);
+CREATE INDEX ticket_order_line_index ON ticket (order_line);
 
--- The sale_line table lists the specific line items in each sale.
-CREATE TABLE sale_line (
+-- The payment table tracks payments for Schola Cantorum orders.  Note that
+-- this includes refunds, which are treated as negative payments.
+CREATE TABLE payment (
 
-    -- Unique identifier of the sale line.
+    -- Unique identifier of the payment.
     id integer PRIMARY KEY,
 
-    -- Identifier of the sale to which this sale line belongs.
-    sale integer NOT NULL REFERENCES sale ON DELETE CASCADE,
+    -- Identifier of the order to which this payment is associated.
+    orderid integer NOT NULL REFERENCES orderT,
 
-    -- Identifier of the SKU sold on this sale line.
-    sku integer NOT NULL REFERENCES sku,
+    -- Text description of the payment method.  For Stripe payments, this is
+    -- autogenerated (e.g. "Visa 1234").  For other payment methods, this is
+    -- manual entry.
+    method text NOT NULL,
 
-    -- The number of units of the underlying product sold on this sale line.
-    qty integer NOT NULL CHECK (qty > 0),
+    -- Stripe charge ID or refund ID, if the payment was processed through
+    -- Stripe.  (Otherwise empty.)
+    stripe text NOT NULL DEFAULT '',
 
-    -- The total amount charged for this sale line, in cents.  This will usually
-    -- be qty * sku.price, but it may be different if the SKU has a variable
-    -- price (e.g. a donation) or if the SKU's price has changed since the
-    -- sale was processed.
-    amount  integer NOT NULL CHECK (amount >= 0)
+    -- Timestamp of the payment.
+    created text NOT NULL,
+
+    -- Bitmask of flags indicating the status of the payment.  See
+    -- model/payment.go for values.
+    flags integer NOT NULL
 );
-CREATE INDEX sale_line_sale_index ON sale_line (sale);
-CREATE INDEX sale_line_sku_index  ON sale_line (sku);
+CREATE INDEX payment_order_index ON payment (orderid);
+
+-- The payment_line table indicates how much of each payment should get
+-- attributed to each line of the underlying order.
+CREATE TABLE payment_line (
+
+    -- Identifier of the payment to which this entry belongs.
+    payment integer NOT NULL REFERENCES payment ON DELETE CASCADE,
+
+    -- Identifier of the order line to which this entry belongs.
+    order_line integer NOT NULL REFERENCES order_line,
+
+    -- Amount of the payment associated with this line of the order, in cents.
+    amount integer NOT NULL,
+
+    -- Lines are uniquely identified by a paymentid and an order line.
+    PRIMARY KEY (payment, order_line)
+);
 
 -- The session table lists all active user sessions.  User authentication and
 -- authorization are delegated to scholacantorummembers.org.
@@ -170,90 +267,16 @@ CREATE TABLE session (
     -- the scholacantorummembers.org database.
     username text NOT NULL,
 
-    -- The expiration date and time of the session (in seconds since the Unix
-    -- epoch).  After this time, the user must log in again.
-    expires integer NOT NULL,
+    -- The expiration date and time of the session.  After this time, the user
+    -- must log in again.
+    expires text NOT NULL,
+
+    -- The user ID of the session user, in the user table of the
+    -- scholacantorummembers.org table.
+    member integer NOT NULL,
 
     -- The privileges granted to this user and therefore to this session (a
     -- bitmask).  These are derived from the user.roles column in the
     -- scholacantorummembers.org database.
     privileges integer NOT NULL
 );
-
--- The sku table lists all of the SKUs that have been, are, or will be for sale.
--- Each product in the product table has one or more SKUs in the sku table,
--- representing different price points or purchase methods for the product.
--- Generally speaking, the product is what the customer receives in return for
--- their money; the SKU represents the sales arrangements for the purchase.
---
--- Although not expressed in SQL, the code enforces a uniqueness constraint on
--- this table:  for any given combination of product, coupon, and members_only
--- flag, there cannot be overlapping sales_start..sales_end ranges.  Thus, when
--- an order for a product is placed, there are at most four matching SKUs:
---   - matching coupon code and members_only flag set
---   - empty coupon code    and members_only flag set
---   - matching coupon code and members_only flag clear
---   - empty coupon code    and members_only flag clear
--- The first one of those that applies to the purchase is the one used.
-CREATE TABLE sku (
-
-    -- Unique identifier of the SKU.
-    id integer PRIMARY KEY,
-
-    -- Stripe ID for the SKU.
-    stripeID text NOT NULL UNIQUE,
-
-    -- Identifier of the product that can be purchased with this SKU.
-    product integer NOT NULL REFERENCES product,
-
-    -- Coupon code for this SKU.  In order to place an order with this SKU, the
-    -- customer must specify this coupon code.  Each product should have a SKU
-    -- with an empty coupon code, which is used when the customer doesn't
-    -- specify a recognized coupon code.
-    coupon text NOT NULL DEFAULT '' COLLATE NOCASE,
-
-    -- Start and end times for the time frame during which this SKU can be
-    -- purchased by regular customers (as seconds since the Unix epoch).  These
-    -- restrictions do not apply to orders placed by privileged users.  Zero
-    -- values indicate no limit.
-    sales_start integer NOT NULL DEFAULT 0,
-    sales_end   integer NOT NULL DEFAULT 0,
-
-    -- Flag indicating that this SKU can only be used by a logged-in Schola
-    -- member placing an order through scholacantorummembers.org.
-    members_only boolean NOT NULL DEFAULT 0,
-
-    -- Price to purchase the product using this SKU, in cents.  A zero value may
-    -- mean that the product is free when purchased with this SKU, or it may
-    -- mean that the product's price is variable and will be specified at the
-    -- time of order (e.g. a donation).
-    price integer NOT NULL CHECK (price >= 0)
-);
-CREATE INDEX sku_product_index ON sku (product);
-
--- The ticket table lists all tickets that have been sold.  Each ticket is a
--- single admission to a single event.
-CREATE TABLE ticket (
-
-    -- Unique identifier of the ticket.
-    id integer PRIMARY KEY,
-
-    -- Token representing the set of interchangeable tickets purchased with this
-    -- one (i.e., all tickets purchased with the same sale_line have the same
-    -- token).  This is a random alphanumeric string.
-    token text NOT NULL,
-
-    -- Identifier of the sale line on which this ticket was sold.
-    sale_line integer NOT NULL REFERENCES sale_line,
-
-    -- Identifier of the event at which this ticket was used, or must be used.
-    -- If the ticket is valid at multiple future events, this is NULL.
-    event integer REFERENCES event,
-
-    -- Timestamp when this ticket was used (in seconds past the Unix epoch), or
-    -- zero if it has not yet been used.
-    used integer NOT NULL DEFAULT 0 CHECK (used=0 OR event IS NOT NULL)
-);
-CREATE INDEX ticket_event_index     ON ticket (event);
-CREATE INDEX ticket_sale_line_index ON ticket (sale_line);
-CREATE INDEX ticket_token_index     ON ticket (token, used);
