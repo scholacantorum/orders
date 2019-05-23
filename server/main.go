@@ -31,7 +31,6 @@ var (
 func main() {
 	var (
 		logfile *os.File
-		dbh     *sql.DB
 		err     error
 	)
 	// First, change working directory to orders.scholacantorum.org/data.
@@ -69,10 +68,8 @@ func main() {
 	}()
 
 	// Next, open the database and start a transaction.
-	dbh = db.Open("orders.db")
-	if txh, err = db.Begin(dbh); err != nil {
-		panic(err)
-	}
+	db.Open("orders.db")
+	txh = db.Begin()
 
 	// Finally, handle the request.
 	cgi.Serve(http.HandlerFunc(router))
@@ -110,6 +107,22 @@ func router(w http.ResponseWriter, r *http.Request) {
 				default:
 					api.NotFoundError(txh, w)
 				}
+			}
+		case "order":
+			switch orderID := shiftPathID(r); orderID {
+			case 0:
+				switch r.Method {
+				case http.MethodGet:
+					api.CalculateOrder(txh, w, r)
+				case http.MethodPost:
+					api.PlaceOrder(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				notImplementedError(txh, w) // TODO
+			case -1:
+				api.NotFoundError(txh, w)
 			}
 		case "product":
 			switch productID := shiftPath(r); productID {

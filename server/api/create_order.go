@@ -1,274 +1,394 @@
 package api
 
-/*
 import (
-	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
-	"mime"
+	"math/rand"
 	"net/http"
 	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
 	"scholacantorum.org/orders/auth"
+	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
-// CreateSale handles POST /api/sale requests.
-func CreateSale(tx *sql.Tx, w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Source              string            `json:"source"`
-		Customer            model.Customer    `json:"customer"`
-		StripePaymentSource string            `json:"stripePaymentSource"`
-		Payment             string            `json:"payment"`
-		Note                string            `json:"note"`
-		Lines               []*model.SaleLine `json:"lines"`
-	}
-	var (
-		session  *model.Session
-		bodyType string
-		sale     model.Sale
-		customer *model.Customer
-		sku      *model.SKU
-		total    int
-		err      error
-	)
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
+// PlaceOrder handles POST /api/order requests.
+func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+	var (
+		session *model.Session
+		order   *model.Order
+		privs   model.Privilege
+		err     error
+	)
 	// Get current session data, if any.
 	if auth.HasSession(r) {
-		if session = auth.GetSession(tx, w, r, model.PrivSetup); session == nil {
+		if session = auth.GetSession(tx, w, r, 0); session == nil {
 			return
 		}
+		privs = session.Privileges
 	}
-
-	// Get the request data.  It may be provided as an HTTP POST form or via
-	// JSON.
-	bodyType, _, _ = mime.ParseMediaType(r.Header.Get("Content-Type"))
-	switch bodyType {
-	case "multipart/form-data", "application/x-www-form-urlencoded":
-		body.Source = r.FormValue("source")
-		body.Customer.Name = r.FormValue("name")
-		body.Customer.Email = r.FormValue("email")
-		body.Customer.Address = r.FormValue("address")
-		body.Customer.City = r.FormValue("city")
-		body.Customer.State = r.FormValue("state")
-		body.Customer.Zip = r.FormValue("zip")
-		body.Customer.Phone = r.FormValue("phone")
-		body.StripePaymentSource = r.FormValue("stripePaymentSource")
-		body.Payment = r.FormValue("payment")
-		body.Note = r.FormValue("note")
-		for i := 0; ; i++ {
-			k := strconv.Itoa(i)
-			if r.FormValue("sku"+k) == "" {
-				break
-			}
-			var sl model.SaleLine
-			sl.SKU, _ = strconv.Atoi(r.FormValue("sku" + k))
-			sl.Qty, _ = strconv.Atoi(r.FormValue("qty" + k))
-			if sl.Amount, err = strconv.Atoi(r.FormValue("amount" + k)); err != nil {
-				sl.Amount = -1
-			}
-			body.Lines = append(body.Lines, &sl)
-		}
-	case "application/json":
-		if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
-			BadRequestError(tx, w, err.Error())
-			return
-		}
-	default:
-		tx.Rollback()
-		http.Error(w, "415 Unsupported Media Type", http.StatusUnsupportedMediaType)
+	// Read the order details from the request.
+	if err = json.NewDecoder(r.Body).Decode(&order); err != nil {
+		BadRequestError(tx, w, err.Error())
 		return
 	}
-
-	switch body.Source {
-	case "D":
-		if session == nil || session.Privileges&model.PrivSell == 0 {
-			ForbiddenError(tx, w)
-			return
-		}
-	case "G":
-		panic("not implemented")
-	case "M":
-		panic("not implemented")
-	case "O":
-		if session == nil || session.Privileges&model.PrivHandleOrders == 0 {
-			ForbiddenError(tx, w)
-			return
-		}
-	case "P":
-		break
-	default:
-		BadRequestError(tx, w, "invalid sale source code")
+	// Validate the order source and permissions.
+	if !validateOrderSourcePermissions(order, session) {
+		ForbiddenError(tx, w)
 		return
 	}
-
-	sale.Source = body.Source
-	if sale.Customer = resolveSaleCustomer(tx, &body.Customer, body.StripePaymentSource != ""); sale.Customer == 0 {
+	// Resolve the products and SKUs and validate the prices.
+	if !resolveSKUs(tx, order, privs, true) {
+		BadRequestError(tx, w, "invalid products or prices")
+		return
+	}
+	// Validate the customer data.
+	if !validateCustomer(tx, order, session) {
 		BadRequestError(tx, w, "invalid customer data")
 		return
 	}
-	switch body.Source {
-	case "D", "G", "M", "O":
-		tx.Rollback()
-		http.Error(w, "500 Internal Server Error: source not implemented", http.StatusInternalServerError)
-		return
-	case "P":
-		if body.StripePaymentSource != "" || body.Payment != "" || body.Note != "" ||
-			(body.Customer.ID == 0 && (body.Customer.Name == "" || body.Customer.Email == "")) ||
-			body.Customer.StripeID != "" || body.Customer.MemberID != 0 {
-			BadRequestError(tx, w, "invalid parameters")
-			return
-		}
-	default:
-		BadRequestError(tx, w, "invalid source")
+	// Make sure the rest of the order details are OK.
+	if !validateOrderDetails(tx, order, privs) {
+		BadRequestError(tx, w, "invalid parameters")
 		return
 	}
-	if body.Customer.ID != 0 {
-		if customer = model.FetchCustomer(tx, body.Customer.ID); customer == nil {
-			BadRequestError(tx, w, "no such customer")
-			return
-		}
-		if (body.Customer.Name != "" && !strings.EqualFold(body.Customer.Name, customer.Name)) ||
-			(body.Customer.Email != "" && !strings.EqualFold(body.Customer.Email, customer.Email)) {
-			BadRequestError(tx, w, "customer name or email mismatch")
-			return
-		}
-		mergeCustomer(customer, &body.Customer)
-	}
-	if !validateCustomer(customer) {
-		BadRequestError(tx, w, "invalid customer data")
+	// Calculate the order total and verify the payment.
+	if !validatePayment(order) {
+		BadRequestError(tx, w, "invalid payment")
 		return
 	}
-	if len(body.Lines) == 0 {
-		BadRequestError(tx, w, "no sale lines")
-		return
+	// Process the Stripe payment if any.
+	if len(order.Payments) != 0 && order.Payments[0].Type != model.PaymentOther {
+		// Commit the transaction; we don't want to hold it open (and
+		// block other traffic) while talking to Stripe.  We'll start a
+		// new one after we're done with Stripe.
+		commit(tx)
+		// TODO
+		// Open a new transaction to continue.
+		tx = db.Begin()
 	}
-	for _, l := range body.Lines {
-		if l.ID != 0 || l.Sale != 0 || l.Qty <= 0 || l.Amount < 0 {
-			BadRequestError(tx, w, "invalid sale line parameters")
-			return
-		}
-		if sku = model.FetchSKU(tx, l.SKU); sku == nil {
-			BadRequestError(tx, w, "no such SKU")
-			return
-		}
-		if sku.Price != 0 {
-			if l.Amount != 0 && l.Amount != sku.Price*l.Qty {
-				BadRequestError(tx, w, "wrong sale line amount")
-				return
-			}
-			l.Amount = sku.Price * l.Qty
-		}
-		total += l.Amount
-	}
-	sale.Source = body.Source
-	sale.Timestamp = time.Now()
-	if body.StripePaymentSource != "" {
-
-	} else {
-		sale.Payment = body.Payment
-	}
-	sale.Note = body.Note
-	sale.Lines = body.Lines
-
-	// if event.ID != 0 || event.MembersID < 0 || event.Name == "" || event.Start.IsZero() || event.Capacity < 0 {
-	// 	BadRequestError(tx, w, "invalid parameters")
-	// 	return
-	// }
-	// if event.MembersID != 0 && model.FetchEventWithMembersID(tx, event.MembersID) != nil {
-	// 	BadRequestError(tx, w, "membersID already in use")
-	// 	return
-	// }
-	customer.Save(tx)
-	// event.Save(tx)
+	// Assign a token to the order (after the new transaction is opened, to
+	// ensure uniqueness).
+	order.Token = newOrderToken(tx)
+	// Generate tickets if needed.
+	generateTickets(tx, order)
+	// Save and return the order.
+	tx.SaveOrder(order)
 	commit(tx)
-	log.Printf("%s CREATE SALE %s", session.Username, toJSON(sale))
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sale)
-}
-
-// resolveSaleCustomer returns the customer ID for a sale being created.  If
-// forStripe is true, it ensures that the customer is created in Stripe and has
-// the data needed to process credit cards.  If any error or invalid data occur,
-// it returns 0.
-func resolveSaleCustomer(tx *sql.Tx, in *model.Customer, forStripe bool) model.CustomerID {
-	var customer *model.Customer
-
-	if in.ID != 0 {
-		if customer = model.FetchCustomer(tx, in.ID); customer == nil {
-			return 0
-		}
-		if (in.Name != "" && !strings.EqualFold(in.Name, customer.Name)) ||
-			(in.Email != "" && !strings.EqualFold(in.Email, customer.Email)) {
-			return 0
-		}
-		mergeCustomer(customer, in)
+	if session != nil {
+		log.Printf("%s PLACE ORDER %s", session.Username, toJSON(order))
 	} else {
-		customer = in
+		log.Printf("- PLACE ORDER %s", toJSON(order))
 	}
-	if !validateCustomer(customer) {
-		return 0
-	}
-	if forStripe && customer.StripeID != "" {
-		// find or create customer in Stripe
-		// TODO don't trust the Stripe ID in the request body.
-	}
-	customer.Save(tx)
-	return customer.ID
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(order)
+	emitReceipt(order)
 }
 
-// mergeCustomer updates c1 with the values of any non-empty fields of c2.
-func mergeCustomer(c1, c2 *model.Customer) {
-	if c2.StripeID != "" {
-		c1.StripeID = c2.StripeID
-	}
-	if c2.MemberID != 0 {
-		c1.MemberID = c2.MemberID
-	}
-	if c2.Name != "" {
-		c1.Name = c2.Name
-	}
-	if c2.Email != "" {
-		c1.Email = c2.Email
-	}
-	if c2.Address != "" {
-		c1.Address = c2.Address
-	}
-	if c2.City != "" {
-		c1.City = c2.City
-	}
-	if c2.State != "" {
-		c1.State = c2.State
-	}
-	if c2.Zip != "" {
-		c1.Zip = c2.Zip
-	}
-	if c2.Phone != "" {
-		c1.Phone = c2.Phone
-	}
-}
-
-var emailRE = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
-var zipRE = regexp.MustCompile(`^\d{5}(?:-\d{4})?$`)
-
-// validateCustomer returns whether the customer has valid data.
-func validateCustomer(c *model.Customer) bool {
-	if c.MemberID < 0 {
-		return false
-	}
-	if c.Email != "" && !emailRE.MatchString(c.Email) {
-		return false
-	}
-	if (c.Address != "" || c.City != "" || c.State != "" || c.Zip != "") &&
-		(c.Address == "" || c.City == "" || c.State == "" || c.Zip == "") {
-		return false
-	}
-	if c.Zip != "" && !zipRE.MatchString(c.Zip) {
+// validateOrderSourcePermissions returns whether the order has a valid source
+// and the caller has permission to create it.  It also fills in the customer
+// member ID when appropriate.
+func validateOrderSourcePermissions(order *model.Order, session *model.Session) bool {
+	switch order.Source {
+	case model.OrderFromPublic:
+		// Public site orders must not have a member ID or a session.
+		return order.Member == 0 && session == nil
+	case model.OrderFromMembers:
+		// Members site orders must have a session, and if a member ID
+		// is specified, it must match that of the session.
+		if session == nil || (order.Member != 0 && order.Member != session.Member) {
+			return false
+		}
+		order.Member = session.Member
+	case model.OrderFromGala:
+		// Gala site orders are not implemented yet.
+		return false // TODO
+	case model.OrderFromOffice:
+		// Office orders must have a session with appropriate privilege.
+		if session == nil || session.Privileges&model.PrivHandleOrders == 0 || order.Member < 0 {
+			return false
+		}
+		if order.Member == 0 {
+			order.Member = session.Member
+		}
+	case model.OrderInPerson:
+		// In-person orders must have a session with appropriate
+		// privilege, and no member ID.
+		if session == nil || session.Privileges&model.PrivSell == 0 || order.Member != 0 {
+			return false
+		}
+	default:
 		return false
 	}
 	return true
 }
-*/
+
+var emailRE = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+var stateRE = regexp.MustCompile(`^[A-Z][A-Z]$`)
+var zipRE = regexp.MustCompile(`^\d{5}(?:-\d{4})?$`)
+var customerRE = regexp.MustCompile(`^cus_[A-Za-z0-9]+$`)
+
+// validateCustomer returns whether the customer data in the order are valid.
+func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool {
+
+	// A name is needed for all orders except in-person sales.
+	if order.Name == "" && order.Source != model.OrderInPerson {
+		return false
+	}
+
+	// Ditto for email.  Email must also be a valid email address according
+	// to the regular expression above (which is the same RE used by
+	// <input type="email"> in HTML5).
+	if order.Email != "" && !emailRE.MatchString(order.Email) {
+		return false
+	}
+	if order.Email == "" && order.Source != model.OrderInPerson {
+		return false
+	}
+
+	// An address is needed for donations.  If any of the address fields is
+	// set, they must all be set, and they need to match the appropriate
+	// regular expressions.
+	if (order.Address != "" || order.City != "" || order.State != "" || order.Zip != "") &&
+		(order.Address == "" || order.City == "" || order.State == "" || order.Zip == "") {
+		return false
+	}
+	if order.State != "" && !stateRE.MatchString(order.State) {
+		return false
+	}
+	if order.Zip != "" && !zipRE.MatchString(order.Zip) {
+		return false
+	}
+	if order.Customer != "" && !customerRE.MatchString(order.Customer) {
+		return false
+	}
+	for _, line := range order.Lines {
+		if line.Product.Type == model.ProdDonation && order.Address == "" {
+			return false
+		}
+	}
+
+	// A Stripe customer ID is allowed only for gala sales.  TODO
+	if order.Customer != "" {
+		return false
+	}
+
+	// A member ID is required for sheet music or concert recording sales.
+	for _, line := range order.Lines {
+		if line.Product.Type == model.ProdRecording || line.Product.Type == model.ProdSheetMusic {
+			if order.Member == 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+var methodRE = regexp.MustCompile(`^pm_[A-Za-z0-9]+$`)
+
+// validateOrderDetails returns whether the order details are valid.  Note that
+// this does not check authorization.  It also doesn't check anything specific
+// to the product type or the order type.
+func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) bool {
+
+	// New orders should not have an ID or a created timestamp, and must
+	// have at least one line.  Orders with repeat aren't supported yet.
+	if order.ID != 0 || order.Token != "" || !order.Created.IsZero() || !order.Repeat.IsZero() || len(order.Lines) == 0 {
+		return false
+	}
+	order.Created = time.Now()
+
+	// Office notes are allowed only by office staff.
+	if order.ONote != "" && privs&model.PrivHandleOrders == 0 {
+		return false
+	}
+
+	// Remove any lines with zero quantity.  Make sure there's at least one
+	// line left.
+	var j = 0
+	for i := range order.Lines {
+		if order.Lines[i].Quantity < 0 {
+			return false
+		}
+		if order.Lines[i].Quantity != 0 {
+			order.Lines[j] = order.Lines[i]
+			j++
+		}
+	}
+	order.Lines = order.Lines[:j]
+	if len(order.Lines) == 0 {
+		return false
+	}
+
+	// Check the validity of each order line.
+	for _, line := range order.Lines {
+
+		// Lines must not have IDs or tickets.
+		if line.ID != 0 || len(line.Tickets) != 0 {
+			return false
+		}
+
+		// Additional constraints by product type:
+		switch line.Product.Type {
+		case model.ProdAuctionItem:
+			// Auction items aren't supported yet.
+			return false // TODO
+		case model.ProdDonation, model.ProdRecording, model.ProdSheetMusic:
+			// Donations, concert recordings, and sheet music must
+			// have a quantity of 1.
+			if line.Quantity != 1 || line.Used != 0 || line.UsedAt != "" {
+				return false
+			}
+		case model.ProdFlexPass, model.ProdTicket:
+			if line.Used == 0 && line.UsedAt != "" {
+				return false
+			}
+			if line.Used < 0 || line.Used > line.Quantity {
+				return false
+			}
+			if line.Used != 0 {
+				var found bool
+				for _, e := range line.Product.Events {
+					if e.ID == line.UsedAt {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// validatePayment returns whether the order payment is valid for the order type
+// and has the correct amount.
+func validatePayment(order *model.Order) bool {
+	var total int
+
+	// Calculate the order total.
+	for _, ol := range order.Lines {
+		total += ol.Quantity * ol.Price
+	}
+	// If this is a free order, there shouldn't be any payment.
+	if total == 0 {
+		return len(order.Payments) == 0
+	}
+	// Otherwise, there should be exactly one payment.
+	if len(order.Payments) != 1 {
+		return false
+	}
+	// And it should not have an ID, a Stripe ID, a created timestamp, or
+	// any flags, and it should have the correct amount.
+	var pmt = order.Payments[0]
+	if pmt.ID != 0 || pmt.Stripe != "" || !pmt.Created.IsZero() || pmt.Flags != 0 || pmt.Amount != total {
+		return false
+	}
+	// It also needs to have a type and method consistent with the order
+	// source.
+	switch order.Source {
+	case model.OrderFromPublic, model.OrderFromMembers:
+		if pmt.Type != model.PaymentCard || !methodRE.MatchString(pmt.Method) {
+			return false
+		}
+	case model.OrderFromGala:
+		return false // TODO not implemented
+	case model.OrderFromOffice:
+		switch pmt.Type {
+		case model.PaymentCard:
+			if !methodRE.MatchString(pmt.Method) {
+				return false
+			}
+		case model.PaymentOther:
+			if pmt.Method == "" {
+				return false
+			}
+		default:
+			return false
+		}
+	case model.OrderInPerson:
+		switch pmt.Type {
+		case model.PaymentCardPresent:
+			if pmt.Method != "" {
+				return false
+			}
+		case model.PaymentOther:
+			if pmt.Method == "" {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	pmt.Created = order.Created
+	return true
+}
+
+// generateTickets creates tickets as needed for the new order.
+func generateTickets(tx db.Tx, order *model.Order) {
+	var (
+		event *model.Event
+		found bool
+	)
+	// Walk through all of the order lines.
+	for _, ol := range order.Lines {
+		// We only care about lines on which tickets are sold.
+		if ol.Product.TicketCount == 0 {
+			continue
+		}
+		// Figure out whether this ticket is dedicated to a particular
+		// event, either because it's an individual event ticket...
+		if len(ol.Product.Events) == 1 {
+			event = ol.Product.Events[0]
+		} else {
+			// ... or because it's a multiple-event ticket but only
+			// one of those events is in the future.  We put an
+			// hour's slop on "future" to allow for at-the-door
+			// sales after an event has started.
+			for _, e := range ol.Product.Events {
+				// One hour slop to allow for at-the-door sales
+				// after curtain.
+				if e.Start.After(time.Now().Add(-time.Hour)) {
+					if found {
+						event = nil // multiple matches
+					} else {
+						found = true
+						event = e
+					}
+				}
+			}
+		}
+		// Create the ticket objects.
+		for i := 0; i < ol.Product.TicketCount; i++ {
+			var tick = model.Ticket{Event: event}
+			if ol.Used > 0 {
+				tick.Event = &model.Event{ID: ol.UsedAt}
+				tick.Used = order.Created
+				ol.Used--
+			}
+			ol.Tickets = append(ol.Tickets, &tick)
+		}
+	}
+}
+
+// newOrderToken generates a token for a new order, retrying until it has one
+// that's unique.
+func newOrderToken(tx db.Tx) (token string) {
+	var tval int
+
+RETRY_UNIQUE:
+	tval = rand.Intn(1000000000000)
+	token = fmt.Sprintf("%04d-%04d-%04d", tval/100000000, tval/10000%10000, tval%10000)
+	if o := tx.FetchOrderByToken(token); o != nil {
+		goto RETRY_UNIQUE
+	}
+	return token
+}

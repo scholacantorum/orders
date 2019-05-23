@@ -23,6 +23,12 @@ func BadRequestError(tx db.Tx, w http.ResponseWriter, reason string) {
 	}
 }
 
+// ForbiddenError returns a 403 Forbidden error.
+func ForbiddenError(tx db.Tx, w http.ResponseWriter) {
+	tx.Rollback()
+	http.Error(w, "403 Forbidden", http.StatusForbidden)
+}
+
 // toJSON renders the supplied object as a JSON string.  This is primarily used
 // for audit logging.
 func toJSON(v interface{}) string {

@@ -9,8 +9,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Open opens the database and returns a handle to it.
-func Open(path string) (dbh *sql.DB) {
+var dbh *sql.DB
+
+// Open opens the database.
+func Open(path string) {
 	var (
 		url string
 		err error
@@ -19,7 +21,6 @@ func Open(path string) (dbh *sql.DB) {
 	if dbh, err = sql.Open("sqlite3", url); err != nil {
 		panic(err)
 	}
-	return dbh
 }
 
 // Time is a wrapper around time.Time that stores in the database as a string.
@@ -115,9 +116,13 @@ type Tx struct {
 }
 
 // Begin starts a transaction, returning our Tx wrapper instead of a raw sql.Tx.
-func Begin(db *sql.DB) (tx Tx, err error) {
-	tx.tx, err = db.Begin()
-	return tx, err
+func Begin() (tx Tx) {
+	var err error
+
+	if tx.tx, err = dbh.Begin(); err != nil {
+		panic(err)
+	}
+	return tx
 }
 
 // Commit commits a transaction.
