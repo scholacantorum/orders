@@ -50,7 +50,7 @@ func emitReceipt(order *model.Order) {
 	for _, ol := range order.Lines {
 		switch ol.Product.Type {
 		case model.ProdDonation:
-			if typename != "" {
+			if typename == "" {
 				typename = "Donation"
 			}
 		case model.ProdFlexPass, model.ProdTicket:

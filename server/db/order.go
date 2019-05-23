@@ -146,3 +146,10 @@ func (tx Tx) SaveOrder(o *model.Order) {
 		}
 	}
 }
+
+// DeleteOrder deletes an order from the database.  Generally this is done only
+// if the order was not processed successfully.
+func (tx Tx) DeleteOrder(o *model.Order) {
+	panicOnExecError(tx.tx.Exec(`DELETE FROM payment WHERE orderid=?`, o.ID))
+	panicOnNoRows(tx.tx.Exec(`DELETE FROM orderT WHERE id=?`, o.ID))
+}

@@ -12,6 +12,7 @@ import (
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
+	"scholacantorum.org/orders/stripe"
 )
 
 func init() {
@@ -24,6 +25,8 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		session *model.Session
 		order   *model.Order
 		privs   model.Privilege
+		success bool
+		message string
 		err     error
 	)
 	// Get current session data, if any.
@@ -63,24 +66,38 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		BadRequestError(tx, w, "invalid payment")
 		return
 	}
-	// Process the Stripe payment if any.
-	if len(order.Payments) != 0 && order.Payments[0].Type != model.PaymentOther {
-		// Commit the transaction; we don't want to hold it open (and
-		// block other traffic) while talking to Stripe.  We'll start a
-		// new one after we're done with Stripe.
-		commit(tx)
-		// TODO
-		// Open a new transaction to continue.
-		tx = db.Begin()
-	}
 	// Assign a token to the order (after the new transaction is opened, to
 	// ensure uniqueness).
 	order.Token = newOrderToken(tx)
 	// Generate tickets if needed.
 	generateTickets(tx, order)
-	// Save and return the order.
+	// If we don't have to charge a card through Stripe, the order is now
+	// complete.
+	if len(order.Payments) == 0 || order.Payments[0].Type == model.PaymentOther {
+		order.Flags |= model.OrderValid
+	}
+	// Save the order to the database.
 	tx.SaveOrder(order)
 	commit(tx)
+	// If we do have to charge a card through Stripe, do it now.
+	if len(order.Payments) == 1 && order.Payments[0].Type == model.PaymentCard {
+		success, message = stripe.ChargeCard(order, order.Payments[0])
+		tx = db.Begin()
+		if !success {
+			tx.DeleteOrder(order)
+			commit(tx)
+			if message == "" {
+				message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"error": message})
+			return
+		}
+		order.Flags |= model.OrderValid
+		tx.SaveOrder(order)
+		commit(tx)
+	}
+	// Log and return the completed order.
 	if session != nil {
 		log.Printf("%s PLACE ORDER %s", session.Username, toJSON(order))
 	} else {
@@ -98,7 +115,7 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 	switch order.Source {
 	case model.OrderFromPublic:
 		// Public site orders must not have a member ID or a session.
-		return order.Member == 0 && session == nil
+		return order.Member == 0 // && session == nil TODO
 	case model.OrderFromMembers:
 		// Members site orders must have a session, and if a member ID
 		// is specified, it must match that of the session.
@@ -190,7 +207,7 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 	return true
 }
 
-var methodRE = regexp.MustCompile(`^pm_[A-Za-z0-9]+$`)
+var methodRE = regexp.MustCompile(`^pm_[A-Za-z0-9_]+$`)
 
 // validateOrderDetails returns whether the order details are valid.  Note that
 // this does not check authorization.  It also doesn't check anything specific

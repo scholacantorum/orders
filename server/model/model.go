@@ -54,6 +54,13 @@ type OrderID int
 
 type OrderFlags byte
 
+const (
+	// OrderValid indicates that the order is valid.  If this flag is not
+	// set, the payment processing for the order is still in progress (or
+	// failed), and the order should not be considered "real".
+	OrderValid OrderFlags = 1 << iota
+)
+
 type OrderSource string
 
 const (
