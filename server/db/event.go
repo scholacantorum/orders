@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"strings"
+	"time"
 
 	"scholacantorum.org/orders/model"
 )
@@ -81,4 +82,46 @@ func (tx Tx) FetchEventByMembersID(membersID int) (e *model.Event) {
 	default:
 		panic(err)
 	}
+}
+
+// FetchEvents returns a list of all events.
+func (tx Tx) FetchEvents() (events []*model.Event) {
+	var (
+		q    strings.Builder
+		rows *sql.Rows
+		err  error
+	)
+	q.WriteString(`SELECT `)
+	q.WriteString(eventColumns)
+	q.WriteString(` FROM event ORDER BY start`)
+	rows, err = tx.tx.Query(q.String())
+	panicOnError(err)
+	for rows.Next() {
+		var e model.Event
+		panicOnError(tx.scanEvent(rows, &e))
+		events = append(events, &e)
+	}
+	panicOnError(rows.Err())
+	return events
+}
+
+// FetchFutureEvents returns a list of future events, in chronological order.
+func (tx Tx) FetchFutureEvents() (events []*model.Event) {
+	var (
+		q    strings.Builder
+		rows *sql.Rows
+		err  error
+	)
+	q.WriteString(`SELECT `)
+	q.WriteString(eventColumns)
+	q.WriteString(` FROM event WHERE start > ? ORDER BY start`)
+	rows, err = tx.tx.Query(q.String(), time.Now().Format("2006-01-02"))
+	panicOnError(err)
+	for rows.Next() {
+		var e model.Event
+		panicOnError(tx.scanEvent(rows, &e))
+		events = append(events, &e)
+	}
+	panicOnError(rows.Err())
+	return events
 }

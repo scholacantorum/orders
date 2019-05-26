@@ -1,10 +1,12 @@
 package api
 
 import (
-	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
@@ -29,7 +31,7 @@ func CalculateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		privs = session.Privileges
 	}
 	// Read the order details from the request.
-	if err = json.NewDecoder(r.Body).Decode(&order); err != nil {
+	if order, err = parseCalculateOrder(r.Body); err != nil {
 		BadRequestError(tx, w, err.Error())
 		return
 	}
@@ -41,7 +43,42 @@ func CalculateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	// Send the result back.
 	commit(tx)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(order)
+	emitCalculatedOrder(w, order)
+}
+
+// parseCalculateOrder parses the input order incompletely: just enough to be
+// able to calculate the order amounts.
+func parseCalculateOrder(r io.Reader) (o *model.Order, err error) {
+	var jr = json.NewReader(r)
+
+	o = new(model.Order)
+	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
+		switch key {
+		case "coupon":
+			return json.StringHandler(func(s string) { o.Coupon = s })
+		case "lines":
+			return json.ArrayHandler(func() json.Handlers {
+				var ol model.OrderLine
+				o.Lines = append(o.Lines, &ol)
+				return json.ObjectHandler(func(key string) json.Handlers {
+					switch key {
+					case "product":
+						return json.StringHandler(func(s string) {
+							ol.Product = &model.Product{ID: model.ProductID(s)}
+						})
+					case "quantity":
+						return json.IntHandler(func(i int) { ol.Quantity = i })
+					default:
+						return json.IgnoreHandler()
+					}
+
+				})
+			})
+		default:
+			return json.IgnoreHandler()
+		}
+	}))
+	return o, err
 }
 
 // resolveSKUs walks through each line of the order, finding the listed product
@@ -51,6 +88,8 @@ func CalculateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 // amount, setting it to the correct amount. It returns true if everything
 // resolved successfully and false otherwise.
 func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch bool) bool {
+	var couponMatch bool
+
 	for _, line := range order.Lines {
 		var sku *model.SKU
 		var qty int
@@ -74,6 +113,9 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch 
 				if !matchSKU(order, privs, qty, s) {
 					continue
 				}
+				if s.Coupon != "" {
+					couponMatch = true
+				}
 				if sku == nil || betterSKU(s, sku) {
 					sku = s
 				}
@@ -89,6 +131,9 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch 
 			return false
 		}
 		line.Amount = amount
+	}
+	if !couponMatch {
+		order.Coupon = ""
 	}
 	return true
 }
@@ -142,4 +187,24 @@ func betterSKU(sku1, sku2 *model.SKU) bool {
 		return true
 	}
 	return false
+}
+
+// emitCalculatedOrder emits the JSON with the calculated order line amounts.
+// If the coupon code was recognized, it is emitted as well, to confirm to the
+// client that it is valid.
+func emitCalculatedOrder(w io.Writer, o *model.Order) {
+	var jw = json.NewWriter(w)
+	jw.Object(func() {
+		if o.Coupon != "" {
+			jw.Prop("coupon", o.Coupon)
+		}
+		jw.Prop("lineAmounts", func() {
+			jw.Array(func() {
+				for _, ol := range o.Lines {
+					jw.Int(ol.Amount)
+				}
+			})
+		})
+	})
+	jw.Close()
 }

@@ -3,8 +3,10 @@ module scholacantorum.org/orders
 go 1.12
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/mattn/go-sqlite3 v1.9.0
+	github.com/rothskeller/json v0.0.0-20190526204815-1e4f944f3f0a
 	github.com/skip2/go-qrcode v0.0.0-20190110000554-dc11ecdae0a9
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/stripe/stripe-go v60.18.0+incompatible

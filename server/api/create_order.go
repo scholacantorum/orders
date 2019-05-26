@@ -1,13 +1,16 @@
 package api
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"regexp"
 	"time"
+
+	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
@@ -37,7 +40,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		privs = session.Privileges
 	}
 	// Read the order details from the request.
-	if err = json.NewDecoder(r.Body).Decode(&order); err != nil {
+	if order, err = parseCreateOrder(r.Body); err != nil {
 		BadRequestError(tx, w, err.Error())
 		return
 	}
@@ -98,13 +101,100 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	}
 	// Log and return the completed order.
 	if session != nil {
-		log.Printf("%s PLACE ORDER %s", session.Username, toJSON(order))
+		log.Printf("%s PLACE ORDER %s", session.Username, emitOrder(order, true))
 	} else {
-		log.Printf("- PLACE ORDER %s", toJSON(order))
+		log.Printf("- PLACE ORDER %s", emitOrder(order, true))
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(order)
+	w.Write(emitOrder(order, false))
 	emitReceipt(order)
+}
+
+// parseCreateOrder reads the order details from the request body.
+func parseCreateOrder(r io.Reader) (o *model.Order, err error) {
+	var (
+		jr = json.NewReader(r)
+	)
+	o = new(model.Order)
+	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
+		switch key {
+		case "source":
+			return json.StringHandler(func(s string) { o.Source = model.OrderSource(s) })
+		case "name":
+			return json.StringHandler(func(s string) { o.Name = s })
+		case "email":
+			return json.StringHandler(func(s string) { o.Email = s })
+		case "address":
+			return json.StringHandler(func(s string) { o.Address = s })
+		case "city":
+			return json.StringHandler(func(s string) { o.City = s })
+		case "state":
+			return json.StringHandler(func(s string) { o.State = s })
+		case "zip":
+			return json.StringHandler(func(s string) { o.Zip = s })
+		case "phone":
+			return json.StringHandler(func(s string) { o.Phone = s })
+		case "customer":
+			return json.StringHandler(func(s string) { o.Customer = s })
+		case "member":
+			return json.IntHandler(func(i int) { o.Member = i })
+		case "cNote":
+			return json.StringHandler(func(s string) { o.CNote = s })
+		case "oNote":
+			return json.StringHandler(func(s string) { o.ONote = s })
+		case "coupon":
+			return json.StringHandler(func(s string) { o.Coupon = s })
+		case "repeat":
+			return json.TimeHandler(func(t time.Time) { o.Repeat = t })
+		case "lines":
+			return json.ArrayHandler(func() json.Handlers {
+				var ol model.OrderLine
+				o.Lines = append(o.Lines, &ol)
+				return parseCreateOrderLine(&ol)
+			})
+		case "payments":
+			return json.ArrayHandler(func() json.Handlers {
+				var p model.Payment
+				o.Payments = append(o.Payments, &p)
+				return parseCreateOrderPayment(&p)
+			})
+		default:
+			return json.RejectHandler()
+		}
+	}))
+	return o, err
+}
+func parseCreateOrderLine(ol *model.OrderLine) json.Handlers {
+	return json.ObjectHandler(func(key string) json.Handlers {
+		switch key {
+		case "product":
+			return json.StringHandler(func(s string) { ol.Product = &model.Product{ID: model.ProductID(s)} })
+		case "quantity":
+			return json.IntHandler(func(i int) { ol.Quantity = i })
+		case "used":
+			return json.IntHandler(func(i int) { ol.Used = i })
+		case "usedAt":
+			return json.StringHandler(func(s string) { ol.UsedAt = model.EventID(s) })
+		case "amount":
+			return json.IntHandler(func(i int) { ol.Amount = i })
+		default:
+			return json.RejectHandler()
+		}
+	})
+}
+func parseCreateOrderPayment(p *model.Payment) json.Handlers {
+	return json.ObjectHandler(func(key string) json.Handlers {
+		switch key {
+		case "type":
+			return json.StringHandler(func(s string) { p.Type = model.PaymentType(s) })
+		case "method":
+			return json.StringHandler(func(s string) { p.Method = s })
+		case "amount":
+			return json.IntHandler(func(i int) { p.Amount = i })
+		default:
+			return json.RejectHandler()
+		}
+	})
 }
 
 // validateOrderSourcePermissions returns whether the order has a valid source
@@ -407,4 +497,113 @@ RETRY_UNIQUE:
 		goto RETRY_UNIQUE
 	}
 	return token
+}
+
+// emitOrder generates a JSON representation of the order.  If log is true, it
+// includes internal details.
+func emitOrder(o *model.Order, log bool) []byte {
+	var (
+		buf bytes.Buffer
+		jw  = json.NewWriter(&buf)
+	)
+	jw.Object(func() {
+		jw.Prop("id", int(o.ID))
+		if log {
+			jw.Prop("token", o.Token)
+		}
+		jw.Prop("source", string(o.Source))
+		if o.Name != "" {
+			jw.Prop("name", o.Name)
+		}
+		if o.Email != "" {
+			jw.Prop("email", o.Email)
+		}
+		if o.Address != "" {
+			jw.Prop("address", o.Address)
+			jw.Prop("city", o.City)
+			jw.Prop("state", o.State)
+			jw.Prop("zip", o.Zip)
+		}
+		if o.Phone != "" {
+			jw.Prop("phone", o.Phone)
+		}
+		if o.Customer != "" {
+			jw.Prop("customer", o.Customer)
+		}
+		if o.Member != 0 {
+			jw.Prop("member", o.Member)
+		}
+		jw.Prop("created", o.Created.Format(time.RFC3339))
+		if log {
+			jw.Prop("flags", int(o.Flags))
+		}
+		if o.CNote != "" {
+			jw.Prop("cNote", o.CNote)
+		}
+		if o.ONote != "" {
+			jw.Prop("oNote", o.ONote)
+		}
+		if o.Coupon != "" {
+			jw.Prop("coupon", o.Coupon)
+		}
+		if !o.Repeat.IsZero() {
+			jw.Prop("repeat", o.Repeat.Format(time.RFC3339))
+		}
+		jw.Prop("lines", func() {
+			jw.Array(func() {
+				for _, ol := range o.Lines {
+					jw.Object(func() {
+						if log {
+							jw.Prop("id", int(ol.ID))
+						}
+						jw.Prop("product", string(ol.Product.ID))
+						jw.Prop("quantity", ol.Quantity)
+						jw.Prop("amount", ol.Amount)
+						if len(ol.Tickets) != 0 {
+							jw.Prop("tickets", func() {
+								jw.Array(func() {
+									for _, t := range ol.Tickets {
+										jw.Object(func() {
+											if log {
+												jw.Prop("id", int(t.ID))
+											}
+											if t.Event != nil {
+												jw.Prop("event", string(t.Event.ID))
+											}
+											if !t.Used.IsZero() {
+												jw.Prop("used", t.Used.Format(time.RFC3339))
+											}
+										})
+									}
+								})
+							})
+						}
+					})
+				}
+			})
+		})
+		jw.Prop("payments", func() {
+			jw.Array(func() {
+				for _, p := range o.Payments {
+					jw.Object(func() {
+						if log {
+							jw.Prop("id", int(p.ID))
+						}
+						jw.Prop("type", string(p.Type))
+						jw.Prop("method", p.Method)
+						if p.Stripe != "" && log {
+							jw.Prop("stripe", p.Stripe)
+						}
+						jw.Prop("created", p.Created.Format(time.RFC3339))
+						if log {
+							jw.Prop("flags", int(p.Flags))
+						}
+						jw.Prop("amount", p.Amount)
+					})
+				}
+			})
+		})
+	})
+	jw.Close()
+	return buf.Bytes()
 }

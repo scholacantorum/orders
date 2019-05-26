@@ -3,26 +3,28 @@
     #logo
       | Schola Cantorum Ticket Scanner
     #main
-      EventChooser(v-if="!event")
+      EventChooser(v-if="!event" @event="onEvent")
       TicketScanner(v-else-if="!ticket" @ticket="onTicket")
       ConfirmScan(v-else :event="event" :ticket="ticket" @done="onDone")
 </template>
 
 <script>
 import ConfirmScan from './ConfirmScan'
+import EventChooser from './EventChooser'
 import TicketScanner from './TicketScanner'
-
-const EventChooser = {}
 
 export default {
   components: { ConfirmScan, EventChooser, TicketScanner },
   data: () => ({
-    event: '2019-07-15',
+    event: null,
     ticket: null,
   }),
   methods: {
     onDone() {
       this.ticket = null
+    },
+    onEvent(event) {
+      this.event = event
     },
     onTicket(ticket) {
       this.ticket = ticket

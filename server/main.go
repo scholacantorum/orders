@@ -86,7 +86,7 @@ func router(w http.ResponseWriter, r *http.Request) {
 			case "":
 				switch r.Method {
 				case http.MethodGet:
-					notImplementedError(txh, w) // TODO
+					api.ListEvents(txh, w, r)
 				case http.MethodPost:
 					api.CreateEvent(txh, w, r)
 				default:

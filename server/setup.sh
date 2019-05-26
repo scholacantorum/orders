@@ -53,6 +53,19 @@ curl -i -d'{
     }]
 }' http://localhost:8100/api/product
 curl -i -d'{
+    "id": "summer-sings-2019-student",
+    "name": "2019 Summer Sing Ticket (Student)",
+    "ticketName": "Student",
+    "type": "ticket",
+    "ticketCount": 1,
+    "ticketClass": "Student",
+    "events": ["2019-07-08", "2019-07-15", "2019-07-22", "2019-07-29", "2019-08-05", "2019-08-12"],
+    "skus": [{
+        "salesEnd": "2019-08-12T16:30:00-07:00",
+        "price": 0
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
     "id": "recording-2018-11-03",
     "name": "Concert Recording: 2018-11 For the Love of Bach",
     "type": "recording",

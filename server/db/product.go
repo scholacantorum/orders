@@ -70,11 +70,8 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 		p.Events = append(p.Events, event)
 	}
 	panicOnError(rows.Err())
-	q.Reset()
-	q.WriteString(`SELECT `)
-	q.WriteString(`coupon, sales_start, sales_end, members_only, quantity, price`)
-	q.WriteString(` FROM sku WHERE product=?`)
-	rows, err = tx.tx.Query(q.String(), p.ID)
+	rows, err = tx.tx.Query(
+		`SELECT coupon, sales_start, sales_end, members_only, quantity, price FROM sku WHERE product=?`, p.ID)
 	panicOnError(err)
 	for rows.Next() {
 		var sku model.SKU
@@ -85,4 +82,36 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 	}
 	panicOnError(rows.Err())
 	return p
+}
+
+// FetchProductsByEvent returns the set of products that give entry to the
+// specified event.
+func (tx Tx) FetchProductsByEvent(event *model.Event) (products []*model.Product) {
+	var (
+		prows *sql.Rows
+		srows *sql.Rows
+		err   error
+	)
+	prows, err = tx.tx.Query(`
+SELECT p.id, p.name, p.type, p.receipt, p.ticket_name, p.ticket_count, p.ticket_class
+FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=?`, event.ID)
+	panicOnError(err)
+	for prows.Next() {
+		var p model.Product
+		panicOnError(tx.scanProduct(prows, &p))
+		srows, err = tx.tx.Query(
+			`SELECT coupon, sales_start, sales_end, members_only, quantity, price FROM sku WHERE product=?`, p.ID)
+		panicOnError(err)
+		for srows.Next() {
+			var sku model.SKU
+			panicOnError(srows.Scan(&sku.Coupon, (*Time)(&sku.SalesStart),
+				(*Time)(&sku.SalesEnd), &sku.MembersOnly, &sku.Quantity,
+				&sku.Price))
+			p.SKUs = append(p.SKUs, &sku)
+		}
+		panicOnError(srows.Err())
+		products = append(products, &p)
+	}
+	panicOnError(prows.Err())
+	return products
 }

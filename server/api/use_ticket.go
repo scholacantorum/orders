@@ -1,12 +1,13 @@
 package api
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
@@ -19,7 +20,8 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		session *model.Session
 		order   *model.Order
 		event   *model.Event
-		usage   map[string]int
+		jr      *json.Reader
+		usage   = map[string]int{}
 		err     error
 	)
 	// Must have PrivSell to use this API.
@@ -45,7 +47,10 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	// Read the usage parameters from the request body.  It is a (JSON) map
 	// from ticket class name to usage count (where the empty string is used
 	// as the name for General Admission).
-	if err = json.NewDecoder(r.Body).Decode(&usage); err != nil {
+	jr = json.NewReader(r.Body)
+	if err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
+		return json.IntHandler(func(i int) { usage[key] = i })
+	})); err != nil {
 		BadRequestError(tx, w, err.Error())
 		return
 	}
@@ -63,7 +68,7 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	// Clean up and return success.
 	tx.SaveOrder(order)
 	commit(tx)
-	log.Printf("%s USE TICKETS order:%d event:%s %s", session.Username, order.ID, eventID, toJSON(usage))
+	log.Printf("%s USE TICKETS order:%d event:%s %v", session.Username, order.ID, eventID, usage)
 	w.WriteHeader(http.StatusNoContent)
 }
 

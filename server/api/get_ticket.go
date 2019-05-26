@@ -1,9 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
+
+	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
@@ -13,24 +14,17 @@ import (
 // GetTicket is the API used by the scanner app to get information about the
 // ticket(s) on the specified order to the specified event.
 func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID, token string) {
-	type (
-		Class struct {
-			Val int `json:"val"`
-			Max int `json:"max"`
-		}
-		Response struct {
-			ID      model.OrderID     `json:"id"`
-			Name    string            `json:"name"`
-			Error   string            `json:"error,omitempty"`
-			Classes map[string]*Class `json:"classes"`
-		}
-	)
+	type class struct {
+		val int
+		max int
+	}
 	var (
 		session    *model.Session
 		order      *model.Order
-		response   Response
 		ticket     bool
 		eventmatch bool
+		jw         json.Writer
+		classes    = map[string]*class{}
 	)
 	// Must have PrivSell to use this API.
 	if session = auth.GetSession(tx, w, r, model.PrivSell); session == nil {
@@ -53,9 +47,6 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		return
 	}
 	commit(tx)
-	response.ID = order.ID
-	response.Name = order.Name
-	response.Classes = make(map[string]*Class)
 	// Search the order lines looking for tickets to the desired event.
 	for _, ol := range order.Lines {
 		for _, e := range ol.Product.Events {
@@ -63,35 +54,54 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 			if e.ID == eventID {
 				eventmatch = true
 				var cname = ol.Product.TicketClass
-				var cl = response.Classes[cname]
+				var cl = classes[cname]
 				if cl == nil {
-					cl = new(Class)
-					response.Classes[cname] = cl
+					cl = new(class)
+					classes[cname] = cl
 				}
-				cl.Val += ol.Quantity / len(ol.Product.Events)
+				cl.val += ol.Quantity / len(ol.Product.Events)
 				for _, t := range ol.Tickets {
 					if t.Used.IsZero() {
-						cl.Max++
+						cl.max++
 					}
 				}
 			}
 		}
 	}
-	for cname, cl := range response.Classes {
-		if cl.Val > cl.Max {
-			cl.Val = cl.Max
+	for cname, cl := range classes {
+		if cl.val > cl.max {
+			cl.val = cl.max
 		}
-		if cl.Max == 0 {
-			delete(response.Classes, cname)
+		if cl.max == 0 {
+			delete(classes, cname)
 		}
-	}
-	if !ticket {
-		response.Error = "Not a ticket order"
-	} else if !eventmatch {
-		response.Error = "Wrong event"
-	} else if len(response.Classes) == 0 {
-		response.Error = "Ticket already used"
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&response)
+	jw = json.NewWriter(w)
+	jw.Object(func() {
+		jw.Prop("id", int(order.ID))
+		if order.Name != "" {
+			jw.Prop("name", order.Name)
+		}
+		if !ticket {
+			jw.Prop("error", "Not a ticket order")
+		} else if !eventmatch {
+			jw.Prop("error", "Wrong event")
+		} else if len(classes) == 0 {
+			jw.Prop("error", "Ticket already used")
+		}
+		jw.Prop("classes", func() {
+			jw.Object(func() {
+				for cname, class := range classes {
+					jw.Prop(cname, func() {
+						jw.Object(func() {
+							jw.Prop("val", class.val)
+							jw.Prop("max", class.max)
+						})
+					})
+				}
+			})
+		})
+	})
+	jw.Close()
 }

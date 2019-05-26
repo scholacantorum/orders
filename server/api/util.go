@@ -1,8 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
+
+	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/db"
 )
@@ -34,20 +35,11 @@ func ForbiddenError(tx db.Tx, w http.ResponseWriter) {
 func sendError(tx db.Tx, w http.ResponseWriter, message string) {
 	tx.Rollback()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
-}
-
-// toJSON renders the supplied object as a JSON string.  This is primarily used
-// for audit logging.
-func toJSON(v interface{}) string {
-	var (
-		buf []byte
-		err error
-	)
-	if buf, err = json.Marshal(v); err != nil {
-		panic(err)
-	}
-	return string(buf)
+	var jw = json.NewWriter(w)
+	jw.Object(func() {
+		jw.Prop("error", message)
+	})
+	jw.Close()
 }
 
 // commit commits the transaction.
