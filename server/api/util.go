@@ -29,6 +29,14 @@ func ForbiddenError(tx db.Tx, w http.ResponseWriter) {
 	http.Error(w, "403 Forbidden", http.StatusForbidden)
 }
 
+// sendError sends an error message as a JSON object with an "error" key.  For
+// convenience, it also rolls back the transaction.
+func sendError(tx db.Tx, w http.ResponseWriter, message string) {
+	tx.Rollback()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
 // toJSON renders the supplied object as a JSON string.  This is primarily used
 // for audit logging.
 func toJSON(v interface{}) string {

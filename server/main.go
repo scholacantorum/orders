@@ -22,6 +22,7 @@ import (
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/db"
+	"scholacantorum.org/orders/model"
 )
 
 var (
@@ -103,6 +104,20 @@ func router(w http.ResponseWriter, r *http.Request) {
 						notImplementedError(txh, w) // TODO
 					default:
 						methodNotAllowedError(txh, w)
+					}
+				case "ticket":
+					switch order := shiftPath(r); order {
+					case "":
+						api.NotFoundError(txh, w)
+					default:
+						switch r.Method {
+						case http.MethodGet:
+							api.GetTicket(txh, w, r, model.EventID(eventID), order)
+						case http.MethodPost:
+							api.UseTicket(txh, w, r, model.EventID(eventID), order)
+						default:
+							methodNotAllowedError(txh, w)
+						}
 					}
 				default:
 					api.NotFoundError(txh, w)

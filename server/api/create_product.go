@@ -60,13 +60,18 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		seenEvent[event.ID] = true
 	}
 	for i, sku := range product.SKUs {
-		if sku.Price < 0 || (!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
+		if sku.Quantity == 0 {
+			sku.Quantity = 1
+		}
+		if sku.Price < 0 || sku.Quantity < 1 ||
+			(!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
 			BadRequestError(tx, w, "invalid SKU parameters")
 			return
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
-			if prev.MembersOnly == sku.MembersOnly && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
+			if prev.MembersOnly == sku.MembersOnly && prev.Coupon == sku.Coupon && prev.Quantity == sku.Quantity &&
+				overlappingDates(prev, sku) {
 				BadRequestError(tx, w, "overlapping SKUs")
 				return
 			}

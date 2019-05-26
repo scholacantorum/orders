@@ -103,6 +103,8 @@ func (id *IDStr) Scan(value interface{}) error {
 		*id = ""
 	case string:
 		*id = IDStr(value)
+	case []byte:
+		*id = IDStr(string(value))
 	default:
 		return fmt.Errorf("scanning %T into db.IDStr, should be string or nil", value)
 	}

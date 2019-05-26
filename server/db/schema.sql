@@ -72,9 +72,8 @@ CREATE TABLE order_line (
     -- products (e.g. donation), this is 1.
     quantity integer NOT NULL,
 
-    -- The price per unit for the product ordered on this line, in cents.  Note
-    -- that the total cost for the line is always quantity*price.
-    price  integer NOT NULL
+    -- The total amount for the order line, in cents.
+    amount integer NOT NULL
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);
@@ -89,7 +88,7 @@ CREATE TABLE product (
     -- hard-coded in purchase forms when appropriate.
     id text PRIMARY KEY,
 
-    -- Name of the product, as it should appear on the order form and receipt.
+    -- Full name of the product, as it should appear where there is no context.
     name text NOT NULL,
 
     -- Product type.  This selects various type-specific code including ticket
@@ -99,6 +98,11 @@ CREATE TABLE product (
     -- Text associated with the product on the receipt.  Only used by some
     -- product types.
     receipt text NOT NULL DEFAULT '',
+
+    -- Name of the (ticket) product, as it should appear in the ticket scanner
+    -- app (i.e., in a context where the event is known, so this is just what
+    -- type of ticket for the event).  Empty for non-ticket events.
+    ticket_name text NOT NULL DEFAULT '',
 
     -- Number of tickets that should be issued for each unit of this product.
     -- For non-ticket products, this will be zero.  For individual event
@@ -119,14 +123,11 @@ CREATE TABLE product (
 -- represents the pricing scheme by which they ordered it.
 --
 -- Although not expressed in SQL, the code enforces a uniqueness constraint on
--- this table:  for any given combination of product, coupon, and members_only
--- flag, there cannot be overlapping sales_start..sales_end ranges.  Thus, when
--- an order for a product is placed, there are at most four matching SKUs:
---   - matching coupon code and members_only flag set
---   - empty coupon code    and members_only flag set
---   - matching coupon code and members_only flag clear
---   - empty coupon code    and members_only flag clear
--- The first one of those that applies to the purchase is the one used.
+-- this table:  for any given combination of product, coupon, quantity, and
+-- members_only flag, there cannot be overlapping sales_start..sales_end ranges.
+-- When choosing which SKU(s) to use for an order, preference is given to the
+-- SKUs with members_only=true, then to SKUs with a non-empty coupon code, and
+-- finally to SKUs with higher quantities.
 CREATE TABLE sku (
 
     -- Identifier of the product that can be purchased with this SKU.
@@ -147,6 +148,14 @@ CREATE TABLE sku (
     -- Flag indicating that this SKU can only be used by a logged-in Schola
     -- member placing an order through scholacantorummembers.org.
     members_only boolean NOT NULL DEFAULT 0,
+
+    -- Quantity needed to purchase the product using this SKU.  Each product
+    -- should have a SKU with a quantity of 1.  If it also has SKUs with higher
+    -- quantities, those are preferred.  If a product has SKUs with quantities
+    -- 1 and 4, and the customer orders 10 units, their price will be two times
+    -- the price of the quantity-4 SKU plus two times the price of the
+    -- quantity-1 SKU.
+    quantity integer NOT NULL DEFAULT 1,
 
     -- Price to purchase the product using this SKU, in cents.  Depending on the
     -- product type, a zero value may mean that the product is free when
@@ -176,7 +185,14 @@ CREATE TABLE event (
     start text NOT NULL,
 
     -- Seating capacity of the event.  Zero means unlimited.
-    capacity integer NOT NULL DEFAULT 0
+    capacity integer NOT NULL DEFAULT 0,
+
+    -- Count of people admitted who bought tickets at the door (and therefore
+    -- gave the ticket taker a token rather than a QR code).
+    door_sales integer NOT NULL DEFAULT 0,
+
+    -- Count of people admitted for free.
+    free_entries integer NOT NULL DEFAULT 0
 );
 
 -- The product_event table specifies which products grant admission to which

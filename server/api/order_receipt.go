@@ -53,7 +53,7 @@ func emitReceipt(order *model.Order) {
 			if typename == "" {
 				typename = "Donation"
 			}
-		case model.ProdFlexPass, model.ProdTicket:
+		case model.ProdTicket:
 			ticket = true
 			fallthrough
 		default:

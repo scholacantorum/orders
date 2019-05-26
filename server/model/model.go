@@ -11,21 +11,25 @@ import (
 type EventID string
 
 type Event struct {
-	ID        EventID
-	MembersID int
-	Name      string
-	Start     time.Time
-	Capacity  int
+	ID          EventID
+	MembersID   int
+	Name        string
+	Start       time.Time
+	Capacity    int
+	DoorSales   int
+	FreeEntries int
 }
 
 func (e *Event) MarshalJSON() ([]byte, error) {
 	var t = struct {
-		ID        EventID `json:"id,omitempty"`
-		MembersID int     `json:"membersID,omitempty"`
-		Name      string  `json:"name,omitempty"`
-		Start     string  `json:"start,omitempty"`
-		Capacity  int     `json:"capacity,omitempty"`
-	}{e.ID, e.MembersID, e.Name, fmtJSONTime(e.Start), e.Capacity}
+		ID          EventID `json:"id,omitempty"`
+		MembersID   int     `json:"membersID,omitempty"`
+		Name        string  `json:"name,omitempty"`
+		Start       string  `json:"start,omitempty"`
+		Capacity    int     `json:"capacity,omitempty"`
+		DoorSales   int     `json:"doorSales,omitempty"`
+		FreeEntries int     `json:"freeEntries,omitempty"`
+	}{e.ID, e.MembersID, e.Name, fmtJSONTime(e.Start), e.Capacity, e.DoorSales, e.FreeEntries}
 	return json.Marshal(&t)
 }
 
@@ -47,6 +51,8 @@ func (e *Event) UnmarshalJSON(data []byte) (err error) {
 		return err
 	}
 	e.Capacity = t.Capacity
+	e.DoorSales = 0
+	e.FreeEntries = 0
 	return nil
 }
 
@@ -193,7 +199,7 @@ type OrderLine struct {
 	Quantity int
 	Used     int
 	UsedAt   EventID
-	Price    int
+	Amount   int
 	Tickets  []*Ticket
 }
 
@@ -202,9 +208,9 @@ func (ol *OrderLine) MarshalJSON() ([]byte, error) {
 		ID       OrderLineID `json:"id,omitempty"`
 		Product  ProductID   `json:"product,omitempty"`
 		Quantity int         `json:"quantity,omitempty"`
-		Price    int         `json:"price"`
+		Amount   int         `json:"amount"`
 		Tickets  []*Ticket   `json:"tickets,omitempty"`
-	}{ol.ID, ol.Product.ID, ol.Quantity, ol.Price, ol.Tickets}
+	}{ol.ID, ol.Product.ID, ol.Quantity, ol.Amount, ol.Tickets}
 	return json.Marshal(&t)
 }
 
@@ -215,7 +221,7 @@ func (ol *OrderLine) UnmarshalJSON(data []byte) (err error) {
 		Quantity int         `json:"quantity"`
 		Used     int         `json:"used"`
 		UsedAt   EventID     `json:"usedAt"`
-		Price    int         `json:"price"`
+		Amount   int         `json:"amount"`
 		Tickets  []*Ticket   `json:"tickets"`
 	}
 	if err = json.Unmarshal(data, &t); err != nil {
@@ -226,7 +232,7 @@ func (ol *OrderLine) UnmarshalJSON(data []byte) (err error) {
 	ol.Quantity = t.Quantity
 	ol.Used = t.Used
 	ol.UsedAt = t.UsedAt
-	ol.Price = t.Price
+	ol.Amount = t.Amount
 	ol.Tickets = t.Tickets
 	return nil
 }
@@ -324,13 +330,10 @@ type ProductID string
 type ProductType string
 
 const (
-	// ProdTicket is an individual event ticket.
+	// ProdTicket is an event ticket.  It may be valid at one event or at
+	// multiple events; it may be valid for a single entry or multiple
+	// entries.
 	ProdTicket ProductType = "ticket"
-
-	// ProdFlexPass is a ticket that can be used a specified number of times
-	// at a specific set of events.  All of its uses can be at one of the
-	// events, or one at each of the events, or any mixture.
-	ProdFlexPass = "flexpass"
 
 	// ProdRecording is a concert recording.  Recordings are available for
 	// sale only to performers in that concert.
@@ -352,6 +355,7 @@ type Product struct {
 	Name        string
 	Type        ProductType
 	Receipt     string
+	TicketName  string
 	TicketCount int
 	TicketClass string
 	SKUs        []*SKU
@@ -364,11 +368,12 @@ func (p *Product) MarshalJSON() ([]byte, error) {
 		Name        string      `json:"name,omitempty"`
 		Type        ProductType `json:"type,omitempty"`
 		Receipt     string      `json:"receipt,omitempty"`
+		TicketName  string      `json:"ticketName,omitempty"`
 		TicketCount int         `json:"ticketCount,omitempty"`
 		TicketClass string      `json:"ticketClass,omitempty"`
 		SKUs        []*SKU      `json:"skus,omitempty"`
 		Events      []EventID   `json:"events,omitempty"`
-	}{p.ID, p.Name, p.Type, p.Receipt, p.TicketCount, p.TicketClass, p.SKUs, make([]EventID, len(p.Events))}
+	}{p.ID, p.Name, p.Type, p.Receipt, p.TicketName, p.TicketCount, p.TicketClass, p.SKUs, make([]EventID, len(p.Events))}
 	for i, e := range p.Events {
 		t.Events[i] = e.ID
 	}
@@ -381,6 +386,7 @@ func (p *Product) UnmarshalJSON(data []byte) (err error) {
 		Name        string      `json:"name"`
 		Type        ProductType `json:"type"`
 		Receipt     string      `json:"receipt"`
+		TicketName  string      `json:"ticketName"`
 		TicketCount int         `json:"ticketCount"`
 		TicketClass string      `json:"ticketClass"`
 		SKUs        []*SKU      `json:"skus"`
@@ -393,6 +399,7 @@ func (p *Product) UnmarshalJSON(data []byte) (err error) {
 	p.Name = t.Name
 	p.Type = t.Type
 	p.Receipt = t.Receipt
+	p.TicketName = t.TicketName
 	p.TicketCount = t.TicketCount
 	p.TicketClass = t.TicketClass
 	p.SKUs = t.SKUs
@@ -420,6 +427,7 @@ type SKU struct {
 	SalesStart  time.Time
 	SalesEnd    time.Time
 	MembersOnly bool
+	Quantity    int
 	Price       int
 }
 
@@ -429,8 +437,9 @@ func (s *SKU) MarshalJSON() ([]byte, error) {
 		SalesStart  string `json:"salesStart,omitempty"`
 		SalesEnd    string `json:"salesEnd,omitempty"`
 		MembersOnly bool   `json:"membersOnly,omitempty"`
+		Quantity    int    `json:"quantity,omitempty"`
 		Price       int    `json:"price"`
-	}{s.Coupon, fmtJSONTime(s.SalesStart), fmtJSONTime(s.SalesEnd), s.MembersOnly, s.Price}
+	}{s.Coupon, fmtJSONTime(s.SalesStart), fmtJSONTime(s.SalesEnd), s.MembersOnly, s.Quantity, s.Price}
 	return json.Marshal(&t)
 }
 
@@ -440,6 +449,7 @@ func (s *SKU) UnmarshalJSON(data []byte) (err error) {
 		SalesStart  string `json:"salesStart"`
 		SalesEnd    string `json:"salesEnd"`
 		MembersOnly bool   `json:"membersOnly"`
+		Quantity    int    `json:"quantity"`
 		Price       int    `json:"price"`
 	}
 	if err = json.Unmarshal(data, &t); err != nil {
@@ -453,6 +463,7 @@ func (s *SKU) UnmarshalJSON(data []byte) (err error) {
 		return err
 	}
 	s.MembersOnly = t.MembersOnly
+	s.Quantity = t.Quantity
 	s.Price = t.Price
 	return nil
 }

@@ -89,8 +89,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 			if message == "" {
 				message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
 			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"error": message})
+			sendError(tx, w, message)
 			return
 		}
 		order.Flags |= model.OrderValid
@@ -262,7 +261,7 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 			if line.Quantity != 1 || line.Used != 0 || line.UsedAt != "" {
 				return false
 			}
-		case model.ProdFlexPass, model.ProdTicket:
+		case model.ProdTicket:
 			if line.Used == 0 && line.UsedAt != "" {
 				return false
 			}
@@ -293,7 +292,7 @@ func validatePayment(order *model.Order) bool {
 
 	// Calculate the order total.
 	for _, ol := range order.Lines {
-		total += ol.Quantity * ol.Price
+		total += ol.Amount
 	}
 	// If this is a free order, there shouldn't be any payment.
 	if total == 0 {
@@ -384,7 +383,7 @@ func generateTickets(tx db.Tx, order *model.Order) {
 			}
 		}
 		// Create the ticket objects.
-		for i := 0; i < ol.Product.TicketCount; i++ {
+		for i := 0; i < ol.Product.TicketCount*ol.Quantity; i++ {
 			var tick = model.Ticket{Event: event}
 			if ol.Used > 0 {
 				tick.Event = &model.Event{ID: ol.UsedAt}

@@ -2,7 +2,6 @@
 package stripe
 
 import (
-	"fmt"
 	"log"
 	"strconv"
 
@@ -52,6 +51,20 @@ func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, cardError
 	}
 	charge = intent.Charges.Data[0]
 	pmt.Stripe = charge.ID
-	pmt.Method = fmt.Sprintf("%s %s", charge.PaymentMethodDetails.Card.Brand, charge.PaymentMethodDetails.Card.Last4)
+	pmt.Method = brandMap[charge.PaymentMethodDetails.Card.Brand]
+	if pmt.Method == "" {
+		pmt.Method = "card "
+	}
+	pmt.Method += charge.PaymentMethodDetails.Card.Last4
 	return true, ""
+}
+
+var brandMap = map[sapi.PaymentMethodCardBrand]string{
+	sapi.PaymentMethodCardBrandAmex:       "AmEx ",
+	sapi.PaymentMethodCardBrandDiners:     "Diners ",
+	sapi.PaymentMethodCardBrandDiscover:   "Discover ",
+	sapi.PaymentMethodCardBrandJCB:        "JCB ",
+	sapi.PaymentMethodCardBrandMastercard: "MasterCard ",
+	sapi.PaymentMethodCardBrandUnionpay:   "UnionPay ",
+	sapi.PaymentMethodCardBrandVisa:       "Visa ",
 }
