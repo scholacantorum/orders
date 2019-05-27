@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/rothskeller/json"
@@ -15,23 +16,27 @@ import (
 // ticket(s) on the specified order to the specified event.
 func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID, token string) {
 	type class struct {
-		val int
-		max int
+		val  int
+		max  int
+		used int
 	}
 	var (
-		session    *model.Session
-		order      *model.Order
-		ticket     bool
-		eventmatch bool
-		jw         json.Writer
-		classes    = map[string]*class{}
+		session     *model.Session
+		order       *model.Order
+		event       *model.Event
+		freeClasses []string
+		ticket      bool
+		eventmatch  bool
+		jw          json.Writer
+		cnames      []string
+		classes     = map[string]*class{}
 	)
 	// Must have PrivSell to use this API.
 	if session = auth.GetSession(tx, w, r, model.PrivSell); session == nil {
 		return
 	}
 	// Make sure the requisite event exists.
-	if tx.FetchEvent(eventID) == nil {
+	if event = tx.FetchEvent(eventID); event == nil {
 		NotFoundError(tx, w)
 		return
 	}
@@ -46,12 +51,25 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		sendError(tx, w, "Order not found")
 		return
 	}
+	// Also search for any free ticket classes.
+	for _, p := range tx.FetchProductsByEvent(event) {
+		for _, sku := range p.SKUs {
+			if sku.Price != 0 || sku.Coupon != "" || sku.Quantity != 1 || sku.MembersOnly {
+				continue
+			}
+			// Note deliberately ignoring SalesStart..SalesEnd
+			// range.  Free student tickets are usually set up with
+			// a range that never matches so they don't appear as
+			// explicitly orderable.
+			freeClasses = append(freeClasses, p.TicketClass)
+		}
+	}
 	commit(tx)
 	// Search the order lines looking for tickets to the desired event.
 	for _, ol := range order.Lines {
-		for _, e := range ol.Product.Events {
+		for _, pe := range ol.Product.Events {
 			ticket = true
-			if e.ID == eventID {
+			if pe.Event.ID == eventID {
 				eventmatch = true
 				var cname = ol.Product.TicketClass
 				var cl = classes[cname]
@@ -59,15 +77,18 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 					cl = new(class)
 					classes[cname] = cl
 				}
-				cl.val += ol.Quantity / len(ol.Product.Events)
+				cl.val += ol.Quantity
 				for _, t := range ol.Tickets {
 					if t.Used.IsZero() {
 						cl.max++
+					} else {
+						cl.used++
 					}
 				}
 			}
 		}
 	}
+	// Normalize the availability map.
 	for cname, cl := range classes {
 		if cl.val > cl.max {
 			cl.val = cl.max
@@ -76,6 +97,26 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 			delete(classes, cname)
 		}
 	}
+	// Add in the free ticket classes if they aren't already there.  But
+	// don't do so if the class map is empty; that means the ticket is
+	// invalid and we don't want to make it look valid.
+	if len(classes) != 0 {
+		for _, f := range freeClasses {
+			if cl := classes[f]; cl != nil {
+				if cl.max < 6 {
+					cl.max = 6
+				}
+			} else {
+				classes[f] = &class{max: 6}
+			}
+		}
+	}
+	// Sort the classes by name.
+	for cl := range classes {
+		cnames = append(cnames, cl)
+	}
+	sort.Strings(cnames)
+	// Send the results.
 	w.Header().Set("Content-Type", "application/json")
 	jw = json.NewWriter(w)
 	jw.Object(func() {
@@ -91,13 +132,14 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 			jw.Prop("error", "Ticket already used")
 		}
 		jw.Prop("classes", func() {
-			jw.Object(func() {
-				for cname, class := range classes {
-					jw.Prop(cname, func() {
-						jw.Object(func() {
-							jw.Prop("val", class.val)
-							jw.Prop("max", class.max)
-						})
+			jw.Array(func() {
+				for _, cname := range cnames {
+					class := classes[cname]
+					jw.Object(func() {
+						jw.Prop("name", cname)
+						jw.Prop("val", class.val)
+						jw.Prop("max", class.max)
+						jw.Prop("used", class.used)
 					})
 				}
 			})

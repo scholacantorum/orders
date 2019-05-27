@@ -56,6 +56,8 @@ func parseCreateEvent(r io.Reader) (e *model.Event, err error) {
 	e = new(model.Event)
 	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
 		switch key {
+		case "id":
+			return json.StringHandler(func(s string) { e.ID = model.EventID(s) })
 		case "membersID":
 			return json.IntHandler(func(i int) { e.MembersID = i })
 		case "name":

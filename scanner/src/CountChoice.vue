@@ -10,8 +10,14 @@ div
     v-for="n in choices"
     :key="n"
     :disabled="n === 0 && !zero"
-    :variant="n === value ? 'primary' : 'outline-primary'"
+    :variant="(n === 0 && !zero) ? null : n === value ? 'primary' : 'outline-primary'"
     @click="$emit('input', n)"
+    v-text="n"
+  )
+  b-button.count-choice(
+    v-for="n in usedChoices"
+    :key="n"
+    :disabled="true"
     v-text="n"
   )
 </template>
@@ -22,11 +28,17 @@ export default {
     value: Number,
     zero: Boolean,
     max: Number,
+    used: Number,
   },
   computed: {
     choices() {
       const list = []
       for (let n = 0; n <= this.max; n++) list.push(n)
+      return list
+    },
+    usedChoices() {
+      const list = []
+      for (let n = this.max + 1; n <= this.max + this.used; n++) list.push(n)
       return list
     },
   },

@@ -36,32 +36,148 @@ curl -i -d'{
     "skus": [{}]
 }' http://localhost:8100/api/product
 curl -i -d'{
-    "id": "summer-sings-2019",
-    "name": "2019 Summer Sing Ticket",
-    "ticketName": "General Admission",
+    "id": "ticket-2019-07-08",
+    "name": "Ticket to July 8 Summer Sing",
     "type": "ticket",
-    "ticketCount": 1,
-    "receipt": "<p>We confirm your purchase of {{ .Quantity }} 2019 Summer Sings ticket{{ if gt .Quantity 1 }}s{{ end }}, for ${{ dollars .Amount }}.  {{ if gt .Quantity 1 }}Each{{ else }}Your{{ end }} ticket is good for entry to any one of the sings.  The sings are on Monday nights from July 8 through August 12, 2019 (see <a href=\"https://scholacantorum.org/summer-sings\">schedule</a>).  Each sing starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
-    "events": ["2019-07-08", "2019-07-15", "2019-07-22", "2019-07-29", "2019-08-05", "2019-08-12"],
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} ticket{{ if gt .Quantity 1 }}s{{ end }} to the Summer Sing on Monday, July 8, for ${{ dollars .Amount }}.  The sings starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 0},
+        {"event": "2019-07-15", "priority": 30},
+        {"event": "2019-07-22", "priority": 30},
+        {"event": "2019-07-29", "priority": 30},
+        {"event": "2019-08-05", "priority": 30},
+        {"event": "2019-08-12", "priority": 30}
+    ],
+    "skus": [{
+        "salesEnd": "2019-07-08T16:30:00-07:00",
+        "price": 1700
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
+    "id": "ticket-2019-07-15",
+    "name": "Ticket to July 15 Summer Sing",
+    "type": "ticket",
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} ticket{{ if gt .Quantity 1 }}s{{ end }} to the Summer Sing on Monday, July 15, for ${{ dollars .Amount }}.  The sings starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 30},
+        {"event": "2019-07-15", "priority": 0},
+        {"event": "2019-07-22", "priority": 30},
+        {"event": "2019-07-29", "priority": 30},
+        {"event": "2019-08-05", "priority": 30},
+        {"event": "2019-08-12", "priority": 30}
+    ],
+    "skus": [{
+        "salesEnd": "2019-07-15T16:30:00-07:00",
+        "price": 1700
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
+    "id": "ticket-2019-07-22",
+    "name": "Ticket to July 22 Summer Sing",
+    "type": "ticket",
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} ticket{{ if gt .Quantity 1 }}s{{ end }} to the Summer Sing on Monday, July 22, for ${{ dollars .Amount }}.  The sings starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 30},
+        {"event": "2019-07-15", "priority": 30},
+        {"event": "2019-07-22", "priority": 0},
+        {"event": "2019-07-29", "priority": 30},
+        {"event": "2019-08-05", "priority": 30},
+        {"event": "2019-08-12", "priority": 30}
+    ],
+    "skus": [{
+        "salesEnd": "2019-07-22T16:30:00-07:00",
+        "price": 1700
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
+    "id": "ticket-2019-07-29",
+    "name": "Ticket to July 29 Summer Sing",
+    "type": "ticket",
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} ticket{{ if gt .Quantity 1 }}s{{ end }} to the Summer Sings on Monday, July 29, for ${{ dollars .Amount }}.  The sings starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 30},
+        {"event": "2019-07-15", "priority": 30},
+        {"event": "2019-07-22", "priority": 30},
+        {"event": "2019-07-29", "priority": 0},
+        {"event": "2019-08-05", "priority": 30},
+        {"event": "2019-08-12", "priority": 30}
+    ],
+    "skus": [{
+        "salesEnd": "2019-07-29T16:30:00-07:00",
+        "price": 1700
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
+    "id": "ticket-2019-08-05",
+    "name": "Ticket to August 5 Summer Sing",
+    "type": "ticket",
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} ticket{{ if gt .Quantity 1 }}s{{ end }} to the Summer Sings on Monday, August 5, for ${{ dollars .Amount }}.  The sings starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 30},
+        {"event": "2019-07-15", "priority": 30},
+        {"event": "2019-07-22", "priority": 30},
+        {"event": "2019-07-29", "priority": 30},
+        {"event": "2019-08-05", "priority": 0},
+        {"event": "2019-08-12", "priority": 30}
+    ],
+    "skus": [{
+        "salesEnd": "2019-08-05T16:30:00-07:00",
+        "price": 1700
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
+    "id": "ticket-2019-08-12",
+    "name": "Ticket to August 12 Summer Sing",
+    "type": "ticket",
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} ticket{{ if gt .Quantity 1 }}s{{ end }} to the Summer Sings on Monday, August 12, for ${{ dollars .Amount }}.  The sings starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 30},
+        {"event": "2019-07-15", "priority": 30},
+        {"event": "2019-07-22", "priority": 30},
+        {"event": "2019-07-29", "priority": 30},
+        {"event": "2019-08-05", "priority": 30},
+        {"event": "2019-08-12", "priority": 0}
+    ],
     "skus": [{
         "salesEnd": "2019-08-12T16:30:00-07:00",
         "price": 1700
-    }, {
+    }]
+}' http://localhost:8100/api/product
+curl -i -d'{
+    "id": "summer-sings-2019",
+    "name": "2019 Summer Sings Flex Pass",
+    "type": "ticket",
+    "ticketCount": 6,
+    "receipt": "<p>We confirm your purchase of {{ .Quantity }} Flex Pass{{ if gt .Quantity 1 }}es{{ end }} to the 2019 Summer Sings, for ${{ dollars .Amount }}.  {{ if gt .Quantity 1 }}Each{{ else }}Your{{ end }} pass is good for six entries to the sings: six people on one night, one person on six nights, or any mixture.  The sings are on Monday nights from July 8 through August 12, 2019 (see <a href=\"https://scholacantorum.org/summer-sings\">schedule</a>).  Each sing starts at 7:30pm at Los Altos United Methodist Church, 655 Magdalena Avenue, Los Altos (see <a href=\"https://www.google.com/maps/place/Los+Altos+United+Methodist+Church/@37.3604399,-122.1163995,14z/data=!4m13!1m7!3m6!1s0x808fb13b09db205b:0x3cb6a0075024dc76!2s655+Magdalena+Ave,+Los+Altos,+CA+94024!3b1!8m2!3d37.3604399!4d-122.09889!3m4!1s0x808fb13baf46a387:0xcfbef6958c3a62d!8m2!3d37.3604399!4d-122.09889\">map</a>). Please bring this email (printed or on your phone) for admission.</p>",
+    "events": [
+        {"event": "2019-07-08", "priority": 20},
+        {"event": "2019-07-15", "priority": 20},
+        {"event": "2019-07-22", "priority": 20},
+        {"event": "2019-07-29", "priority": 20},
+        {"event": "2019-08-05", "priority": 20},
+        {"event": "2019-08-12", "priority": 20}
+    ],
+    "skus": [{
         "salesEnd": "2019-08-12T16:30:00-07:00",
-        "quantity": 6,
         "price": 8500
     }]
 }' http://localhost:8100/api/product
 curl -i -d'{
     "id": "summer-sings-2019-student",
-    "name": "2019 Summer Sing Ticket (Student)",
-    "ticketName": "Student",
+    "name": "2019 Summer Sing Student Entry",
     "type": "ticket",
     "ticketCount": 1,
     "ticketClass": "Student",
-    "events": ["2019-07-08", "2019-07-15", "2019-07-22", "2019-07-29", "2019-08-05", "2019-08-12"],
+    "events": [
+        {"event": "2019-07-08", "priority": 20},
+        {"event": "2019-07-15", "priority": 20},
+        {"event": "2019-07-22", "priority": 20},
+        {"event": "2019-07-29", "priority": 20},
+        {"event": "2019-08-05", "priority": 20},
+        {"event": "2019-08-12", "priority": 20}
+    ],
     "skus": [{
-        "salesEnd": "2019-08-12T16:30:00-07:00",
+        "salesEnd": "2019-01-01T00:00:00-07:00",
         "price": 0
     }]
 }' http://localhost:8100/api/product

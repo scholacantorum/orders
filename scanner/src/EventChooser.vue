@@ -6,7 +6,7 @@ which one they are taking tickets for.
 <template lang="pug">
 #events
   #events-head(v-if="events.length") Which event are you taking tickets for?
-  .event(v-for="event in events" :key="event.id" @click="$emit('event', event.id)")
+  .event(v-for="event in events" :key="event.id" @click="$emit('event', event)")
     | {{ event.start.substr(0, 10) }} {{ event.name }}
 </template>
 
@@ -14,7 +14,7 @@ which one they are taking tickets for.
 export default {
   data: () => ({ events: [] }),
   async mounted() {
-    const resp = await this.$axios.get(`/api/event?future=1`).catch(err => {
+    const resp = await this.$axios.get(`/api/event?future=1&freeEntry=1`).catch(err => {
       console.log(err)
       window.alert('Network error')
       return null

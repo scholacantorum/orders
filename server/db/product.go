@@ -8,11 +8,11 @@ import (
 )
 
 // productColumns is the list of columns of the product table.
-var productColumns = `id, name, type, receipt, ticket_name, ticket_count, ticket_class`
+var productColumns = `id, name, type, receipt, ticket_count, ticket_class`
 
 // scanProduct scans a product table row.
 func (tx Tx) scanProduct(scanner interface{ Scan(...interface{}) error }, p *model.Product) error {
-	return scanner.Scan(&p.ID, &p.Name, &p.Type, &p.Receipt, &p.TicketName, &p.TicketCount, &p.TicketClass)
+	return scanner.Scan(&p.ID, &p.Name, &p.Type, &p.Receipt, &p.TicketCount, &p.TicketClass)
 }
 
 // SaveProduct saves a product to the database.
@@ -22,11 +22,12 @@ func (tx Tx) SaveProduct(p *model.Product) {
 	)
 	q.WriteString(`INSERT OR REPLACE INTO product (`)
 	q.WriteString(productColumns)
-	q.WriteString(`) VALUES (?,?,?,?,?,?,?)`)
-	panicOnExecError(tx.tx.Exec(q.String(), p.ID, p.Name, p.Type, p.Receipt, p.TicketName, p.TicketCount, p.TicketClass))
+	q.WriteString(`) VALUES (?,?,?,?,?,?)`)
+	panicOnExecError(tx.tx.Exec(q.String(), p.ID, p.Name, p.Type, p.Receipt, p.TicketCount, p.TicketClass))
 	panicOnExecError(tx.tx.Exec(`DELETE FROM product_event WHERE product=?`, p.ID))
-	for _, event := range p.Events {
-		panicOnNoRows(tx.tx.Exec(`INSERT INTO product_event (product, event) VALUES (?,?)`, p.ID, event.ID))
+	for _, pe := range p.Events {
+		panicOnNoRows(tx.tx.Exec(
+			`INSERT INTO product_event (product, event, priority) VALUES (?,?,?)`, p.ID, pe.Event.ID, pe.Priority))
 	}
 	panicOnExecError(tx.tx.Exec(`DELETE FROM sku WHERE product=?`, p.ID))
 	for _, sku := range p.SKUs {
@@ -47,6 +48,7 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 	var (
 		q    strings.Builder
 		rows *sql.Rows
+		prio int
 		eid  model.EventID
 		err  error
 	)
@@ -62,12 +64,12 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 	default:
 		panic(err)
 	}
-	rows, err = tx.tx.Query(`SELECT event FROM product_event WHERE product=?`, p.ID)
+	rows, err = tx.tx.Query(`SELECT event, priority FROM product_event WHERE product=?`, p.ID)
 	panicOnError(err)
 	for rows.Next() {
-		panicOnError(rows.Scan(&eid))
+		panicOnError(rows.Scan(&eid, &prio))
 		var event = tx.FetchEvent(eid)
-		p.Events = append(p.Events, event)
+		p.Events = append(p.Events, model.ProductEvent{Event: event, Priority: prio})
 	}
 	panicOnError(rows.Err())
 	rows, err = tx.tx.Query(
@@ -85,7 +87,7 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 }
 
 // FetchProductsByEvent returns the set of products that give entry to the
-// specified event.
+// specified event.  They are returned in priority order.
 func (tx Tx) FetchProductsByEvent(event *model.Event) (products []*model.Product) {
 	var (
 		prows *sql.Rows
@@ -93,8 +95,8 @@ func (tx Tx) FetchProductsByEvent(event *model.Event) (products []*model.Product
 		err   error
 	)
 	prows, err = tx.tx.Query(`
-SELECT p.id, p.name, p.type, p.receipt, p.ticket_name, p.ticket_count, p.ticket_class
-FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=?`, event.ID)
+SELECT p.id, p.name, p.type, p.receipt, p.ticket_count, p.ticket_class
+FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=? ORDER BY pe.priority`, event.ID)
 	panicOnError(err)
 	for prows.Next() {
 		var p model.Product

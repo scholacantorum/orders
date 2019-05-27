@@ -9,7 +9,7 @@ import (
 )
 
 // eventColumns is the list of columns of the event table.
-var eventColumns = `id, members_id, name, start, capacity, door_sales, free_entries`
+var eventColumns = `id, members_id, name, start, capacity`
 
 // scanEvent scans an event table row.
 func (tx Tx) scanEvent(scanner interface{ Scan(...interface{}) error }, e *model.Event) error {
@@ -17,7 +17,7 @@ func (tx Tx) scanEvent(scanner interface{ Scan(...interface{}) error }, e *model
 		membersID ID
 		err       error
 	)
-	err = scanner.Scan(&e.ID, &membersID, &e.Name, (*Time)(&e.Start), &e.Capacity, &e.DoorSales, &e.FreeEntries)
+	err = scanner.Scan(&e.ID, &membersID, &e.Name, (*Time)(&e.Start), &e.Capacity)
 	if err != nil {
 		return err
 	}
@@ -32,9 +32,8 @@ func (tx Tx) SaveEvent(e *model.Event) {
 	)
 	q.WriteString(`INSERT OR REPLACE INTO event (`)
 	q.WriteString(eventColumns)
-	q.WriteString(`) VALUES (?,?,?,?,?,?,?)`)
-	panicOnExecError(tx.tx.Exec(q.String(), IDStr(e.ID), ID(e.MembersID),
-		e.Name, Time(e.Start), e.Capacity, e.DoorSales, e.FreeEntries))
+	q.WriteString(`) VALUES (?,?,?,?,?)`)
+	panicOnExecError(tx.tx.Exec(q.String(), IDStr(e.ID), ID(e.MembersID), e.Name, Time(e.Start), e.Capacity))
 }
 
 // DeleteEvent deletes an event.

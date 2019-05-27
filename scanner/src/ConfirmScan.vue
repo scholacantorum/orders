@@ -8,17 +8,17 @@ needed) and then marks the tickets used.  It emits 'done' when finished.
 #confirm
   #confirm-order(v-if="odata")
     #confirm-oname(v-if="odata.name" v-text="odata.name")
-    #confirm-oid(v-text="`Order number ${odata.id}`")
+    #confirm-oid(v-if="odata.id" v-text="`Order number ${odata.id}`")
   #confirm-error(v-if="error" @click="$emit('done')" v-text="error")
-  template(v-else)
+  template(v-else-if="odata && odata.classes")
     #confirm-counts
       .confirm-class(
-        v-for="cls, cname in odata.classes"
-        :key="cname"
-        :class="cname ? 'confirm-restricted' : null"
+        v-for="cls in odata.classes"
+        :key="cls.name"
+        :class="cls.name ? 'confirm-restricted' : null"
       )
-        .confirm-cname(v-text="cname || 'General Admission'")
-        CountChoice(v-model="cls.val" :max="cls.max" :zero="showZero")
+        .confirm-cname(v-text="cls.name || 'General Admission'")
+        CountChoice(v-model="cls.val" :max="cls.max" :zero="showZero" :used="cls.used")
     #confirm-buttons
       b-button#confirm-cancel(@click="$emit('done')") Cancel
       b-button#confirm-save(variant="success" :disabled="!canSave" @click="onSave") Use Tickets
@@ -30,7 +30,7 @@ import CountChoice from './CountChoice'
 export default {
   components: { CountChoice },
   props: {
-    event: String,
+    event: Object,
     ticket: String,
   },
   data: () => ({ error: null, odata: null }),
@@ -42,11 +42,11 @@ export default {
           case 'non-schola':
             this.error = 'Not a Schola order'
             break
-          case 'door':
-            // TODO
-            break
           case 'free':
-            // TODO
+            this.odata = {
+              name: 'Free Entry',
+              classes: [{ name: this.event.freeEntry, val: 1, max: 6, used: 0 }],
+            }
             break
           default:
             this.fetchOrderData()
@@ -71,7 +71,7 @@ export default {
   },
   methods: {
     async fetchOrderData() {
-      const resp = await this.$axios.get(`/api/event/${this.event}/ticket/${this.ticket}`).catch(err => {
+      const resp = await this.$axios.get(`/api/event/${this.event.id}/ticket/${this.ticket}`).catch(err => {
         console.log(err)
         this.error = 'Network failure'
         return null
@@ -87,11 +87,11 @@ export default {
     },
     async onSave() {
       const body = {}
-      for (let cl in this.odata.classes) {
-        if (this.odata.classes[cl].val)
-          body[cl] = this.odata.classes[cl].val
-      }
-      const resp = await this.$axios.post(`/api/event/${this.event}/ticket/${this.ticket}`, JSON.stringify(body)).catch(err => {
+      this.odata.classes.forEach(cl => {
+        if (cl.val)
+          body[cl.name] = cl.val
+      })
+      const resp = await this.$axios.post(`/api/event/${this.event.id}/ticket/${this.ticket}`, JSON.stringify(body)).catch(err => {
         console.log(err)
         this.error = 'Network failure'
         return null
@@ -150,6 +150,7 @@ export default {
   flex auto
 .confirm-class
   padding 12px 6px 6px
+  background-color #7fff7f
 .confirm-restricted
   background-color gold
 #confirm-buttons

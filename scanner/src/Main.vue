@@ -4,7 +4,7 @@
       | Schola Cantorum Ticket Scanner
     #main
       EventChooser(v-if="!event" @event="onEvent")
-      TicketScanner(v-else-if="!ticket" @ticket="onTicket")
+      TicketScanner(v-else-if="!ticket" :freeEntry="event.freeEntry" @ticket="onTicket")
       ConfirmScan(v-else :event="event" :ticket="ticket" @done="onDone")
 </template>
 

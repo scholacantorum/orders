@@ -12,7 +12,7 @@ CREATE TABLE orderT (
 
     -- Another unique identifier of the order, but this one's opaque.  This is
     -- the one used in the generated QR codes.
-    token string NOT NULL UNIQUE,
+    token string UNIQUE,
 
     -- Source of the order, one of "public", "members", "gala", "office", or
     -- "inperson".
@@ -99,11 +99,6 @@ CREATE TABLE product (
     -- product types.
     receipt text NOT NULL DEFAULT '',
 
-    -- Name of the (ticket) product, as it should appear in the ticket scanner
-    -- app (i.e., in a context where the event is known, so this is just what
-    -- type of ticket for the event).  Empty for non-ticket events.
-    ticket_name text NOT NULL DEFAULT '',
-
     -- Number of tickets that should be issued for each unit of this product.
     -- For non-ticket products, this will be zero.  For individual event
     -- tickets, this will be 1.  For Flex Passes, this will be the number of
@@ -185,14 +180,7 @@ CREATE TABLE event (
     start text NOT NULL,
 
     -- Seating capacity of the event.  Zero means unlimited.
-    capacity integer NOT NULL DEFAULT 0,
-
-    -- Count of people admitted who bought tickets at the door (and therefore
-    -- gave the ticket taker a token rather than a QR code).
-    door_sales integer NOT NULL DEFAULT 0,
-
-    -- Count of people admitted for free.
-    free_entries integer NOT NULL DEFAULT 0
+    capacity integer NOT NULL DEFAULT 0
 );
 
 -- The product_event table specifies which products grant admission to which
@@ -207,6 +195,20 @@ CREATE TABLE product_event (
 
     -- Identifier of the event.
     event text NOT NULL REFERENCES event ON DELETE CASCADE,
+
+    -- Priority of this product-event match.  When using tickets to an event,
+    -- the tickets with the lower priority number are used first.  Priority zero
+    -- is special in that the tickets generated from this product are considered
+    -- "pre-allocated" to the event with priority zero, if they have one, for
+    -- the purposes of capping sales to enforce event capacity.
+    --
+    -- Typical usage:
+    --    0 for tickets targeted at the event
+    --   10 for tickets targeted at the other seating of the same concert
+    --   20 for flex passes including the event
+    --   30 for tickets targeted at a different concert in the season
+    priority integer NOT NULL,
+
     PRIMARY KEY (product, event)
 );
 CREATE INDEX product_event_event_index ON product_event (event);

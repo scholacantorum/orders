@@ -361,7 +361,7 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 			if line.Used != 0 {
 				var found bool
 				for _, e := range line.Product.Events {
-					if e.ID == line.UsedAt {
+					if e.Event.ID == line.UsedAt {
 						found = true
 						break
 					}
@@ -450,25 +450,25 @@ func generateTickets(tx db.Tx, order *model.Order) {
 		if ol.Product.TicketCount == 0 {
 			continue
 		}
-		// Figure out whether this ticket is dedicated to a particular
-		// event, either because it's an individual event ticket...
-		if len(ol.Product.Events) == 1 {
-			event = ol.Product.Events[0]
-		} else {
-			// ... or because it's a multiple-event ticket but only
-			// one of those events is in the future.  We put an
-			// hour's slop on "future" to allow for at-the-door
-			// sales after an event has started.
-			for _, e := range ol.Product.Events {
-				// One hour slop to allow for at-the-door sales
-				// after curtain.
-				if e.Start.After(time.Now().Add(-time.Hour)) {
-					if found {
-						event = nil // multiple matches
-					} else {
-						found = true
-						event = e
-					}
+		// Figure out whether this ticket is allocated to a particular
+		// event.
+		for _, pe := range ol.Product.Events {
+			// If the event has priority zero, the ticket is
+			// dedicated to that event by definition.
+			if pe.Priority == 0 {
+				event = pe.Event
+				break
+			}
+			// Otherwise, look to see if it is the only future event
+			// at which the ticket is valid.  "Future" is taken with
+			// one hour slop to allow for at-the-door sales after
+			// curtain.
+			if pe.Event.Start.After(time.Now().Add(-time.Hour)) {
+				if found {
+					event = nil // multiple matches
+				} else {
+					found = true
+					event = pe.Event
 				}
 			}
 		}

@@ -35,7 +35,13 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	}
 	// Get the requested order.  It could be either an order number or an
 	// order token.
-	if oid, err := strconv.Atoi(token); err == nil {
+	if token == "free" {
+		order = &model.Order{
+			Source:  model.OrderInPerson,
+			Created: time.Now(),
+			Flags:   model.OrderValid,
+		}
+	} else if oid, err := strconv.Atoi(token); err == nil {
 		order = tx.FetchOrder(model.OrderID(oid))
 	} else {
 		order = tx.FetchOrderByToken(token)
@@ -60,7 +66,7 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	}
 	// Walk through each ticket class, marking the requisite tickets used.
 	for cname := range usage {
-		if !useTicketClass(order, event, cname, usage[cname]) {
+		if !useTicketClass(tx, order, event, cname, usage[cname]) {
 			sendError(tx, w, "Ticket already used")
 			return
 		}
@@ -75,9 +81,10 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 // useTicketClass marks the specified number of tickets of the specified order,
 // event, and class used.  It returns true if successful, or false if the
 // requested number of tickets isn't available.
-func useTicketClass(order *model.Order, event *model.Event, cname string, count int) bool {
+func useTicketClass(tx db.Tx, order *model.Order, event *model.Event, cname string, count int) bool {
 	var (
 		lines []*model.OrderLine
+		prios = map[model.OrderLineID]int{}
 		now   = time.Now()
 	)
 	// Find the order lines that can be used for this request.
@@ -85,22 +92,17 @@ func useTicketClass(order *model.Order, event *model.Event, cname string, count 
 		if ol.Product.TicketClass != cname {
 			continue
 		}
-		var found bool
-		for _, e := range ol.Product.Events {
-			if e.ID == event.ID {
-				found = true
+		for _, pe := range ol.Product.Events {
+			if pe.Event.ID == event.ID {
+				lines = append(lines, ol)
+				prios[ol.ID] = pe.Priority
 				break
 			}
 		}
-		if !found {
-			continue
-		}
-		lines = append(lines, ol)
 	}
-	// Sort the lines based on how many events they can be used for; we want
-	// to use the most specific tickets first.
+	// Sort the lines by priority.
 	sort.Slice(lines, func(i, j int) bool {
-		return len(lines[i].Product.Events) < len(lines[j].Product.Events)
+		return prios[lines[i].ID] < prios[lines[j].ID]
 	})
 	// Walk through the lines, marking tickets used.
 	for _, ol := range lines {
@@ -116,5 +118,25 @@ func useTicketClass(order *model.Order, event *model.Event, cname string, count 
 			}
 		}
 	}
+	// We didn't find enough tickets on the order to fulfill the request.
+	// That might be OK if the ticket class is free.
+	for _, p := range tx.FetchProductsByEvent(event) {
+		if p.TicketClass != cname {
+			continue
+		}
+		for _, sku := range p.SKUs {
+			if sku.Price == 0 && sku.Coupon == "" && sku.Quantity == 1 && !sku.MembersOnly {
+				// This is a free ticket class.  Add a line for
+				// it to the order and mark the tickets used.
+				var ol = model.OrderLine{Product: p, Quantity: count, Amount: 0}
+				for ; count > 0; count-- {
+					ol.Tickets = append(ol.Tickets, &model.Ticket{Event: event, Used: now})
+				}
+				order.Lines = append(order.Lines, &ol)
+				return true
+			}
+		}
+	}
+	// Nope, not saved by a free ticket class.
 	return false
 }

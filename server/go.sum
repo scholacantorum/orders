@@ -20,6 +20,8 @@ github.com/rothskeller/json v0.0.0-20190526165338-f715c9cc75a3 h1:mFMAeeMbWvJNKk
 github.com/rothskeller/json v0.0.0-20190526165338-f715c9cc75a3/go.mod h1:gCFIphucdxWXdvQOi2ozsuXc2B6mSusLuUQ1SMMaB6E=
 github.com/rothskeller/json v0.0.0-20190526204815-1e4f944f3f0a h1:KkO5EjBSn1me1ZS6yiP4UCi1RDBvSW9TrMBa3TDfuxo=
 github.com/rothskeller/json v0.0.0-20190526204815-1e4f944f3f0a/go.mod h1:gCFIphucdxWXdvQOi2ozsuXc2B6mSusLuUQ1SMMaB6E=
+github.com/rothskeller/json v0.0.0-20190526214720-3ba4888c587a h1:7Nc0NMFUGUFZJeTYHHRUTB7Q7++dgW0GrqBNUWjUNoQ=
+github.com/rothskeller/json v0.0.0-20190526214720-3ba4888c587a/go.mod h1:gCFIphucdxWXdvQOi2ozsuXc2B6mSusLuUQ1SMMaB6E=
 github.com/skip2/go-qrcode v0.0.0-20190110000554-dc11ecdae0a9 h1:lpEzuenPuO1XNTeikEmvqYFcU37GVLl8SRNblzyvGBE=
 github.com/skip2/go-qrcode v0.0.0-20190110000554-dc11ecdae0a9/go.mod h1:PLPIyL7ikehBD1OAjmKKiOEhbvWyHGaNDjquXMcYABo=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

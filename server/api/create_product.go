@@ -22,6 +22,7 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		out       []byte
 		err       error
 		seenEvent = map[model.EventID]bool{}
+		seenPrio0 bool
 	)
 	if session = auth.GetSession(tx, w, r, model.PrivSetup); session == nil {
 		return
@@ -49,20 +50,27 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	for _, event := range product.Events {
-		if event.ID == "" {
+	for _, pe := range product.Events {
+		if pe.Event == nil {
 			BadRequestError(tx, w, "invalid event")
 			return
 		}
-		if seenEvent[event.ID] {
+		if seenEvent[pe.Event.ID] {
 			BadRequestError(tx, w, "duplicate event")
 			return
 		}
-		if tx.FetchEvent(event.ID) == nil {
+		if tx.FetchEvent(pe.Event.ID) == nil {
 			BadRequestError(tx, w, "nonexistent event")
 			return
 		}
-		seenEvent[event.ID] = true
+		seenEvent[pe.Event.ID] = true
+		if pe.Priority == 0 {
+			if seenPrio0 {
+				BadRequestError(tx, w, "multiple priority 0 events")
+				return
+			}
+			seenPrio0 = true
+		}
 	}
 	for i, sku := range product.SKUs {
 		if sku.Quantity == 0 {
@@ -95,6 +103,7 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 	var jr = json.NewReader(r)
 
 	p = new(model.Product)
+	p.TicketCount = 1 // default
 	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
 		switch key {
 		case "id":
@@ -105,8 +114,6 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 			return json.StringHandler(func(s string) { p.Type = model.ProductType(s) })
 		case "receipt":
 			return json.StringHandler(func(s string) { p.Receipt = s })
-		case "ticketName":
-			return json.StringHandler(func(s string) { p.TicketName = s })
 		case "ticketCount":
 			return json.IntHandler(func(i int) { p.TicketCount = i })
 		case "ticketClass":
@@ -119,9 +126,8 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 			})
 		case "events":
 			return json.ArrayHandler(func() json.Handlers {
-				return json.Handlers{String: func(s string) {
-					p.Events = append(p.Events, &model.Event{ID: model.EventID(s)})
-				}}
+				p.Events = append(p.Events, model.ProductEvent{})
+				return parseCreateProductEvent(&p.Events[len(p.Events)-1])
 			})
 		default:
 			return json.RejectHandler()
@@ -144,6 +150,18 @@ func parseCreateProductSKU(sku *model.SKU) json.Handlers {
 			return json.IntHandler(func(i int) { sku.Quantity = i })
 		case "price":
 			return json.IntHandler(func(i int) { sku.Price = i })
+		default:
+			return json.RejectHandler()
+		}
+	})
+}
+func parseCreateProductEvent(pe *model.ProductEvent) json.Handlers {
+	return json.ObjectHandler(func(key string) json.Handlers {
+		switch key {
+		case "event":
+			return json.StringHandler(func(s string) { pe.Event = &model.Event{ID: model.EventID(s)} })
+		case "priority":
+			return json.IntHandler(func(i int) { pe.Priority = i })
 		default:
 			return json.RejectHandler()
 		}
@@ -185,9 +203,6 @@ func emitProduct(p *model.Product) []byte {
 		jw.Prop("name", p.Name)
 		jw.Prop("type", string(p.Type))
 		jw.Prop("receipt", p.Receipt)
-		if p.TicketName != "" {
-			jw.Prop("ticketName", p.TicketName)
-		}
 		if p.TicketCount != 0 {
 			jw.Prop("ticketCount", p.TicketCount)
 		}
@@ -221,8 +236,11 @@ func emitProduct(p *model.Product) []byte {
 		if len(p.Events) != 0 {
 			jw.Prop("events", func() {
 				jw.Array(func() {
-					for _, e := range p.Events {
-						jw.String(string(e.ID))
+					for _, pe := range p.Events {
+						jw.Object(func() {
+							jw.Prop("event", string(pe.Event.ID))
+							jw.Prop("priority", pe.Priority)
+						})
 					}
 				})
 			})

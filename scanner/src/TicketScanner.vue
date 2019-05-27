@@ -2,20 +2,17 @@
 TicketScanner displays the page that scans a ticket bar code, or allows other
 methods of entering ticket usage.  It emits a 'ticket' event whenever a ticket
 is entered.  The value of the 'ticket' event may be an order ID number (manually
-entered), an order token (scanned), 'door' for an at-the-door sale, or 'free'
-for a free entry.
+entered), an order token (scanned),  or 'free' for a free entry.
 -->
 
 <template lang="pug">
 #scanner
   QrcodeStream#stream(:style="streamStyle" :track="false" @init="onStreamInit" @decode="onDecode")
   form#orderidform(@submit.prevent="onSubmit")
-    label(for="orderid" style="align-self:center;margin:0") Order number:
-    b-form-input#orderid(v-model="orderid" type="number" min="1" step="any" size="5")
-    b-button(type="submit") Submit
-  #buttons
-    b-button(@click="onDoor") Door Sale
-    b-button(@click="onFree") Free Entry
+    #forminner
+      b-form-input#orderid(v-model="orderid" type="number" min="1" step="any" size="5" placeholder="Order #")
+      b-button(type="submit") Submit
+    b-button#freeEntry(@click.prevent="onFree" :disabled="!freeEntry") Free Entry
 </template>
 
 <script>
@@ -24,6 +21,9 @@ import { QrcodeStream } from 'vue-qrcode-reader'
 export default {
   components: { QrcodeStream },
   data: () => ({ orderid: null }),
+  props: {
+    freeEntry: String,
+  },
   computed: {
     streamStyle() {
       // On Android at least, the size of the stream is dictated solely by its
@@ -32,7 +32,7 @@ export default {
       // of the displayed stream.  To make everything fit on the page, we need
       // to have the width be no more than 3/4 of the available vertical space,
       // and of course, no more than the available horizontal space.
-      let width = (window.innerHeight - 150) * 3 / 4
+      let width = (window.innerHeight - 100) * 3 / 4
       if (width > window.innerWidth) width = window.innerWidth
       let height = width * 4 / 3
       return { width: `${width}px`, height: `${height}px` }
@@ -44,9 +44,6 @@ export default {
         this.$emit('ticket', text.substr(42))
       else
         this.$emit('ticket', 'non-schola')
-    },
-    onDoor() {
-      this.$emit('ticket', 'door')
     },
     onFree() {
       this.$emit('ticket', 'free')
@@ -83,22 +80,16 @@ export default {
   height 100%
 #orderidform
   display flex
-  justify-content center
+  justify-content space-between
   box-sizing border-box
   padding 6px 12px
   width 100%
   height 50px
-  border-bottom 1px solid #ccc
-#orderid
-  margin 0 24px
-  width 5em
-#buttons
+#forminner
   display flex
-  justify-content space-around
-  align-items center
-  width 100%
-  height 50px
-  button
-    width 35%
-    height 38px
+#orderid
+  margin-right 6px
+  width 6em
+#freeEntry
+  margin-left 12px
 </style>
