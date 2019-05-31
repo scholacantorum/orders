@@ -92,45 +92,34 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch 
 
 	for _, line := range order.Lines {
 		var sku *model.SKU
-		var qty int
-		var amount int
-		var count int
 
-		if qty = line.Quantity; qty < 1 {
-			return false
-		}
 		if line.Product = tx.FetchProduct(line.Product.ID); line.Product == nil {
 			return false
 		}
 		if line.Product.Type == model.ProdAuctionItem || line.Product.Type == model.ProdDonation {
-			if line.Amount < 1 {
+			if line.Price < 1 {
 				return false
 			}
 			continue
 		}
-		for qty > 0 {
-			for _, s := range line.Product.SKUs {
-				if !matchSKU(order, privs, qty, s) {
-					continue
-				}
-				if s.Coupon != "" {
-					couponMatch = true
-				}
-				if sku == nil || betterSKU(s, sku) {
-					sku = s
-				}
+		for _, s := range line.Product.SKUs {
+			if !matchSKU(order, privs, s) {
+				continue
 			}
-			if sku == nil {
-				return false
+			if s.Coupon != "" {
+				couponMatch = true
 			}
-			count = line.Quantity / sku.Quantity
-			amount += sku.Price * count
-			qty -= count * sku.Quantity
+			if sku == nil || betterSKU(s, sku) {
+				sku = s
+			}
 		}
-		if mustMatch && line.Amount != amount {
+		if sku == nil {
+			continue
+		}
+		if mustMatch && line.Price != sku.Price {
 			return false
 		}
-		line.Amount = amount
+		line.Price = sku.Price
 	}
 	if !couponMatch {
 		order.Coupon = ""
@@ -140,7 +129,7 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch 
 
 // matchSKU returns true if all of the criteria for the SKU are met by the order
 // being placed.
-func matchSKU(order *model.Order, privs model.Privilege, qty int, sku *model.SKU) bool {
+func matchSKU(order *model.Order, privs model.Privilege, sku *model.SKU) bool {
 	if sku.MembersOnly && privs == 0 {
 		return false
 	}
@@ -154,9 +143,6 @@ func matchSKU(order *model.Order, privs model.Privilege, qty int, sku *model.SKU
 		return false
 	}
 	if !sku.SalesEnd.IsZero() && sku.SalesEnd.Before(time.Now()) {
-		return false
-	}
-	if qty < sku.Quantity {
 		return false
 	}
 	return true
@@ -176,20 +162,30 @@ func betterSKU(sku1, sku2 *model.SKU) bool {
 	if sku1.Coupon == "" && sku2.Coupon != "" {
 		return false
 	}
-	if sku1.Quantity > sku2.Quantity {
+	var now = time.Now()
+	if !sku1.SalesStart.After(now) && (sku1.SalesEnd.IsZero() || !sku1.SalesEnd.Before(now)) {
+		// sku1 contains now; uniqueness guarantees that sku2 doesn't
 		return true
 	}
-	if sku1.Quantity < sku2.Quantity {
+	if !sku2.SalesStart.After(now) && (sku2.SalesEnd.IsZero() || !sku2.SalesEnd.Before(now)) {
+		// sku2 contains now; uniqueness guarantees that sku1 doesn't
 		return false
 	}
-	if (sku1.SalesStart.IsZero() || !sku1.SalesStart.After(time.Now())) &&
-		(sku2.SalesEnd.IsZero() || !sku2.SalesEnd.Before(time.Now())) {
+	if sku1.SalesStart.Before(now) && sku2.SalesStart.Before(now) {
+		// both earlier than now, so take the one that starts later
+		return sku2.SalesStart.Before(sku1.SalesStart)
+	} else if sku1.SalesStart.Before(now) {
+		// sku1 is before now and sku2 is after
 		return true
+	} else if sku2.SalesStart.Before(now) {
+		// sku2 is before now and sku1 is after
+		return false
 	}
-	return false
+	// both later than now, so take the one that starts earlier
+	return sku1.SalesStart.Before(sku2.SalesStart)
 }
 
-// emitCalculatedOrder emits the JSON with the calculated order line amounts.
+// emitCalculatedOrder emits the JSON with the calculated order line prices.
 // If the coupon code was recognized, it is emitted as well, to confirm to the
 // client that it is valid.
 func emitCalculatedOrder(w io.Writer, o *model.Order) {
@@ -198,10 +194,12 @@ func emitCalculatedOrder(w io.Writer, o *model.Order) {
 		if o.Coupon != "" {
 			jw.Prop("coupon", o.Coupon)
 		}
-		jw.Prop("lineAmounts", func() {
+		jw.Prop("lines", func() {
 			jw.Array(func() {
 				for _, ol := range o.Lines {
-					jw.Int(ol.Amount)
+					jw.Object(func() {
+						jw.Prop("price", ol.Price)
+					})
 				}
 			})
 		})

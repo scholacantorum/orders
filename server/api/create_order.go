@@ -175,8 +175,8 @@ func parseCreateOrderLine(ol *model.OrderLine) json.Handlers {
 			return json.IntHandler(func(i int) { ol.Used = i })
 		case "usedAt":
 			return json.StringHandler(func(s string) { ol.UsedAt = model.EventID(s) })
-		case "amount":
-			return json.IntHandler(func(i int) { ol.Amount = i })
+		case "price":
+			return json.IntHandler(func(i int) { ol.Price = i })
 		default:
 			return json.RejectHandler()
 		}
@@ -382,7 +382,7 @@ func validatePayment(order *model.Order) bool {
 
 	// Calculate the order total.
 	for _, ol := range order.Lines {
-		total += ol.Amount
+		total += ol.Price * ol.Quantity
 	}
 	// If this is a free order, there shouldn't be any payment.
 	if total == 0 {
@@ -558,7 +558,7 @@ func emitOrder(o *model.Order, log bool) []byte {
 						}
 						jw.Prop("product", string(ol.Product.ID))
 						jw.Prop("quantity", ol.Quantity)
-						jw.Prop("amount", ol.Amount)
+						jw.Prop("price", ol.Price)
 						if len(ol.Tickets) != 0 {
 							jw.Prop("tickets", func() {
 								jw.Array(func() {

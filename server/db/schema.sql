@@ -72,8 +72,9 @@ CREATE TABLE order_line (
     -- products (e.g. donation), this is 1.
     quantity integer NOT NULL,
 
-    -- The total amount for the order line, in cents.
-    amount integer NOT NULL
+    -- The price per unit for this line, in cents.  The total amount for this
+    -- line will always be price * quantity.
+    price integer NOT NULL
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);
@@ -90,6 +91,10 @@ CREATE TABLE product (
 
     -- Full name of the product, as it should appear where there is no context.
     name text NOT NULL,
+
+    -- Short name of the product, as it should appear on an order form that
+    -- gives context.
+    shortname text NOT NULL,
 
     -- Product type.  This selects various type-specific code including ticket
     -- tracking, receipt generation, etc.  See model/product.go for values.
@@ -118,11 +123,22 @@ CREATE TABLE product (
 -- represents the pricing scheme by which they ordered it.
 --
 -- Although not expressed in SQL, the code enforces a uniqueness constraint on
--- this table:  for any given combination of product, coupon, quantity, and
--- members_only flag, there cannot be overlapping sales_start..sales_end ranges.
--- When choosing which SKU(s) to use for an order, preference is given to the
--- SKUs with members_only=true, then to SKUs with a non-empty coupon code, and
--- finally to SKUs with higher quantities.
+-- this table:  for any given combination of product, coupon, and members_only
+-- flag, there cannot be overlapping sales_start..sales_end ranges.  When
+-- choosing which SKU to use for a given order, the following algorithm is used:
+--   - If the caller is not logged in, SKUs with members_only=1 are not
+--     considered.
+--   - If the caller is logged in, and there are any SKUs with members_only=1,
+--     SKUs with members_only=0 are not considered.
+--   - If the caller supplied a coupon code, and there are any SKUs with that
+--     coupon code, no SKUs without that coupon code are considered.
+--   - If the caller does not have PrivHandleOrders privilege, only SKUs whose
+--     sales_start..sales_end range contains the current moment are considered.
+--   - If the caller does have PrivHandleOrders privilege, preference is given
+--     to the SKU whose sales_start..sales_end range contains the current
+--     moment, then to the one whose range is before the current moment and
+--     closest to it, and finally to the one whose range is after the current
+--     moment and closest to it.
 CREATE TABLE sku (
 
     -- Identifier of the product that can be purchased with this SKU.
@@ -143,14 +159,6 @@ CREATE TABLE sku (
     -- Flag indicating that this SKU can only be used by a logged-in Schola
     -- member placing an order through scholacantorummembers.org.
     members_only boolean NOT NULL DEFAULT 0,
-
-    -- Quantity needed to purchase the product using this SKU.  Each product
-    -- should have a SKU with a quantity of 1.  If it also has SKUs with higher
-    -- quantities, those are preferred.  If a product has SKUs with quantities
-    -- 1 and 4, and the customer orders 10 units, their price will be two times
-    -- the price of the quantity-4 SKU plus two times the price of the
-    -- quantity-1 SKU.
-    quantity integer NOT NULL DEFAULT 1,
 
     -- Price to purchase the product using this SKU, in cents.  Depending on the
     -- product type, a zero value may mean that the product is free when

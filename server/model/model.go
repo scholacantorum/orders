@@ -80,10 +80,11 @@ type OrderLine struct {
 	ID       OrderLineID
 	Product  *Product
 	Quantity int
-	Used     int
-	UsedAt   EventID
-	Amount   int
+	Price    int
 	Tickets  []*Ticket
+	Used     int     // not persistent; input only
+	UsedAt   EventID // not persistent; input only
+	Error    string  // not persistent; output only
 }
 
 type PaymentID int
@@ -167,6 +168,7 @@ const (
 type Product struct {
 	ID          ProductID
 	Name        string
+	ShortName   string
 	Type        ProductType
 	Receipt     string
 	TicketCount int
@@ -193,8 +195,19 @@ type SKU struct {
 	SalesStart  time.Time
 	SalesEnd    time.Time
 	MembersOnly bool
-	Quantity    int
 	Price       int
+}
+
+// InSalesRange returns -1 if the specified time is before the sales range of
+// the SKU, 0 if it is in range, and +1 if it is after the sales range.
+func (s *SKU) InSalesRange(t time.Time) int {
+	if s.SalesStart.After(t) {
+		return -1
+	}
+	if !s.SalesEnd.IsZero() && s.SalesEnd.Before(t) {
+		return +1
+	}
+	return 0
 }
 
 type TicketID int

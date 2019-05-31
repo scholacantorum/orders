@@ -125,10 +125,10 @@ func useTicketClass(tx db.Tx, order *model.Order, event *model.Event, cname stri
 			continue
 		}
 		for _, sku := range p.SKUs {
-			if sku.Price == 0 && sku.Coupon == "" && sku.Quantity == 1 && !sku.MembersOnly {
+			if sku.Price == 0 && sku.Coupon == "" && !sku.MembersOnly {
 				// This is a free ticket class.  Add a line for
 				// it to the order and mark the tickets used.
-				var ol = model.OrderLine{Product: p, Quantity: count, Amount: 0}
+				var ol = model.OrderLine{Product: p, Quantity: count}
 				for ; count > 0; count-- {
 					ol.Tickets = append(ol.Tickets, &model.Ticket{Event: event, Used: now})
 				}

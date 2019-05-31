@@ -31,7 +31,7 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		BadRequestError(tx, w, err.Error())
 		return
 	}
-	if product.ID == "" || product.Name == "" || product.Type == "" || product.TicketCount < 0 {
+	if product.ID == "" || product.Name == "" || product.ShortName == "" || product.Type == "" || product.TicketCount < 0 {
 		BadRequestError(tx, w, "invalid parameters")
 		return
 	}
@@ -73,18 +73,13 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for i, sku := range product.SKUs {
-		if sku.Quantity == 0 {
-			sku.Quantity = 1
-		}
-		if sku.Price < 0 || sku.Quantity < 1 ||
-			(!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
+		if sku.Price < 0 || (!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
 			BadRequestError(tx, w, "invalid SKU parameters")
 			return
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
-			if prev.MembersOnly == sku.MembersOnly && prev.Coupon == sku.Coupon && prev.Quantity == sku.Quantity &&
-				overlappingDates(prev, sku) {
+			if prev.MembersOnly == sku.MembersOnly && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
 				BadRequestError(tx, w, "overlapping SKUs")
 				return
 			}
@@ -103,13 +98,14 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 	var jr = json.NewReader(r)
 
 	p = new(model.Product)
-	p.TicketCount = 1 // default
 	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
 		switch key {
 		case "id":
 			return json.StringHandler(func(s string) { p.ID = model.ProductID(s) })
 		case "name":
 			return json.StringHandler(func(s string) { p.Name = s })
+		case "shortname":
+			return json.StringHandler(func(s string) { p.ShortName = s })
 		case "type":
 			return json.StringHandler(func(s string) { p.Type = model.ProductType(s) })
 		case "receipt":
@@ -120,7 +116,7 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 			return json.StringHandler(func(s string) { p.TicketClass = s })
 		case "skus":
 			return json.ArrayHandler(func() json.Handlers {
-				var sku = model.SKU{Quantity: 1}
+				var sku model.SKU
 				p.SKUs = append(p.SKUs, &sku)
 				return parseCreateProductSKU(&sku)
 			})
@@ -146,8 +142,6 @@ func parseCreateProductSKU(sku *model.SKU) json.Handlers {
 			return json.TimeHandler(func(t time.Time) { sku.SalesEnd = t })
 		case "membersOnly":
 			return json.BoolHandler(func(b bool) { sku.MembersOnly = b })
-		case "quantity":
-			return json.IntHandler(func(i int) { sku.Quantity = i })
 		case "price":
 			return json.IntHandler(func(i int) { sku.Price = i })
 		default:
@@ -201,6 +195,7 @@ func emitProduct(p *model.Product) []byte {
 	jw.Object(func() {
 		jw.Prop("id", string(p.ID))
 		jw.Prop("name", p.Name)
+		jw.Prop("shortname", p.ShortName)
 		jw.Prop("type", string(p.Type))
 		jw.Prop("receipt", p.Receipt)
 		if p.TicketCount != 0 {
@@ -224,9 +219,6 @@ func emitProduct(p *model.Product) []byte {
 						}
 						if sku.MembersOnly {
 							jw.Prop("membersOnly", true)
-						}
-						if sku.Quantity != 1 {
-							jw.Prop("quantity", sku.Quantity)
 						}
 						jw.Prop("price", sku.Price)
 					})

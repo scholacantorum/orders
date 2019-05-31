@@ -23,6 +23,7 @@ import (
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
+	"scholacantorum.org/orders/private"
 )
 
 var (
@@ -78,6 +79,7 @@ func main() {
 }
 
 func router(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", private.AccessControlAllowOrigin)
 	switch shiftPath(r) {
 	case "api":
 		switch shiftPath(r) {
@@ -137,6 +139,18 @@ func router(w http.ResponseWriter, r *http.Request) {
 			default:
 				notImplementedError(txh, w) // TODO
 			case -1:
+				api.NotFoundError(txh, w)
+			}
+		case "prices":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodGet:
+					api.GetPrices(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
 				api.NotFoundError(txh, w)
 			}
 		case "product":

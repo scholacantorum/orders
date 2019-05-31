@@ -54,7 +54,7 @@ func GetTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	// Also search for any free ticket classes.
 	for _, p := range tx.FetchProductsByEvent(event) {
 		for _, sku := range p.SKUs {
-			if sku.Price != 0 || sku.Coupon != "" || sku.Quantity != 1 || sku.MembersOnly {
+			if sku.Price != 0 || sku.Coupon != "" || sku.MembersOnly {
 				continue
 			}
 			// Note deliberately ignoring SalesStart..SalesEnd

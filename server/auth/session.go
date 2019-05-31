@@ -23,4 +23,5 @@ func GetSession(tx db.Tx, w http.ResponseWriter, r *http.Request, priv model.Pri
 func HasSession(r *http.Request) bool {
 	// TODO
 	return true
+	// return false
 }

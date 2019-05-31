@@ -68,7 +68,7 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 func getFreeEntry(tx db.Tx, event *model.Event) string {
 	for _, product := range tx.FetchProductsByEvent(event) {
 		for _, sku := range product.SKUs {
-			if sku.Coupon == "" && !sku.MembersOnly && sku.Quantity == 1 && sku.Price == 0 {
+			if sku.Coupon == "" && !sku.MembersOnly && sku.Price == 0 {
 				return product.TicketClass
 			}
 			// Note that we're deliberately ignoring SalesStart and

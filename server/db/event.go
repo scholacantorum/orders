@@ -124,3 +124,11 @@ func (tx Tx) FetchFutureEvents() (events []*model.Event) {
 	panicOnError(rows.Err())
 	return events
 }
+
+// FetchTicketCount returns the number of tickets allocated to the specified
+// event.  These could be either tickets that have been used at the event, or
+// tickets that are labeled for that event.
+func (tx Tx) FetchTicketCount(event *model.Event) (count int) {
+	panicOnError(tx.tx.QueryRow(`SELECT COUNT(*) FROM ticket WHERE event=?`, event.ID).Scan(&count))
+	return count
+}
