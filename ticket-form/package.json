@@ -36,7 +36,6 @@
     "vue-template-compiler": "^2.6.10"
   },
   "vue": {
-    "filenameHashing": false,
     "devServer": {
       "port": 8200
     },
