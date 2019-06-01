@@ -5,8 +5,10 @@ go 1.12
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/magefile/mage v1.8.0
 	github.com/mattn/go-sqlite3 v1.9.0
 	github.com/rothskeller/json v0.0.0-20190526214720-3ba4888c587a
+	github.com/scholacantorum/go-sqlite3 v1.10.0
 	github.com/skip2/go-qrcode v0.0.0-20190110000554-dc11ecdae0a9
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/stripe/stripe-go v60.18.0+incompatible
@@ -14,5 +16,3 @@ require (
 	golang.org/x/oauth2 v0.0.0-20190523182746-aaccbc9213b0
 	google.golang.org/api v0.5.0
 )
-
-replace github.com/mattn/go-sqlite3 => /Users/stever/go/src/github.com/mattn/go-sqlite3

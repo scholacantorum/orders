@@ -38,8 +38,8 @@ func main() {
 	// First, change working directory to orders.scholacantorum.org/data.
 	// This directory should be mode 700 so that it not directly readable by
 	// the web server.
-	if err = os.Chdir("../data"); err != nil {
-		fmt.Printf("Status: 500 Internal Server Error\nContent-Type: text/plain\n\n../data: %s\n", err)
+	if err = os.Chdir("data"); err != nil {
+		fmt.Printf("Status: 500 Internal Server Error\nContent-Type: text/plain\n\n%s\n", err)
 		os.Exit(1)
 	}
 	// Next, initialize the logger.

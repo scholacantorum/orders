@@ -165,8 +165,11 @@ Phone: (650) 254-1700</p></div></body><html>
 	mw.Close()
 
 	emailTo = []string{"admin@scholacantorum.org"}
+	if config.Get("mode") != "development" {
+		emailTo = append(emailTo, order.Email)
+	}
 	if config.Get("mode") == "production" {
-		emailTo = append(emailTo, "info@scholacantorum.org", order.Email)
+		emailTo = append(emailTo, "info@scholacantorum.org")
 	}
 	cmd = exec.Command(config.Get("bin")+"/send-raw-email", emailTo...)
 	if pipe, err = cmd.StdinPipe(); err != nil {

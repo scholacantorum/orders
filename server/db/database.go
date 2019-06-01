@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/scholacantorum/go-sqlite3"
 )
 
 var dbh *sql.DB
