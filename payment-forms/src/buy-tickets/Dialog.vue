@@ -7,7 +7,7 @@ b-modal(ref="modal" :title="title" no-close-on-backdrop hide-footer @shown="onSh
   Confirmation(v-if="orderID" :key="seq" :orderID="orderID" @close="onClose")
   OrderForm(v-else :key="seq" ref="form"
     :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey"
-    @success="onOrderSuccess"
+    @success="onOrderSuccess" @cancel="onClose"
   )
 </template>
 

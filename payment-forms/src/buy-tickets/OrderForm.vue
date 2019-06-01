@@ -38,7 +38,7 @@ b-form(novalidate @submit.prevent="onSubmit")
     #buy-tickets-form-footer
       #buy-tickets-form-message(v-if="message" v-text="message")
       #buy-tickets-form-buttons
-        b-btn(type="button" variant="secondary" :disabled="submitting") Cancel
+        b-btn(type="button" variant="secondary" :disabled="submitting" @click="onCancel") Cancel
         b-btn#buy-tickets-form-pay-now(v-if="submitting" type="submit" variant="primary" disabled)
           b-spinner.mr-1(small)
           | Paying...
@@ -138,6 +138,7 @@ export default {
       })
       if (validProductCount === 1) lastValidProductLine.quantity = 1
     },
+    onCancel() { this.$emit('cancel') },
     onCardChange(evt) { this.cardChange = evt },
     async onSubmit() {
       this.submitted = true
