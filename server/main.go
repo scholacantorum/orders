@@ -23,6 +23,7 @@ import (
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
+	"scholacantorum.org/orders/gui"
 	"scholacantorum.org/orders/model"
 )
 
@@ -178,14 +179,19 @@ func router(w http.ResponseWriter, r *http.Request) {
 	case "ticket":
 		switch token := shiftPath(r); token {
 		case "":
-			switch r.Method {
-			case http.MethodGet:
-				notImplementedError(txh, w) // TODO
-			default:
-				methodNotAllowedError(txh, w)
-			}
-		default:
 			api.NotFoundError(txh, w)
+		default:
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodGet:
+					gui.ShowTicketInfo(txh, w, r, token)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
 		}
 	default:
 		// This script shouldn't get invoked for anything other than
