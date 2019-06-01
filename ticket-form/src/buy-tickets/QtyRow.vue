@@ -6,7 +6,7 @@ QtyRow displays a single product and gets the quantity of it.
 tr.buy-tickets-qty-row
   template(v-if="message")
     td.buy-tickets-qty-row-name(v-text="name")
-    td(colspan="4").buy-tickets-qty-row-message(v-if="message" v-text="message")
+    td.buy-tickets-qty-row-message(colspan="4" v-if="message" v-text="message")
   template(v-else)
     td.buy-tickets-qty-row-name(colspan="2" v-text="name")
     td.buy-tickets-qty-row-qty-cell

@@ -3,7 +3,6 @@ import 'mutationobserver-shim'
 import Vue from 'vue'
 import '@/plugins/axios'
 import '@/plugins/bootstrap-vue'
-import '@/plugins/vuelidate'
 import BuyTickets from './BuyTickets'
 
 Vue.config.productionTip = false
