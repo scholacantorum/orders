@@ -6,7 +6,7 @@ That script element invokes this Vue component, and specifies the products to be
 sold through the ticket purchase button.
 
 ```html
-<script src="https://orders.scholacantorum.org/ticket-form?product=ticket-2019-07-08"></script>
+<script src="https://orders.scholacantorum.org/payment-forms?product=ticket-2019-07-08"></script>
 ```
 
 In othe
