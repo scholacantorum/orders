@@ -6,7 +6,7 @@ orderable, and an optional message otherwise.
 <template lang="pug">
 div(v-if="message" v-text="message")
 div(v-else-if="products")
-  Dialog(ref="dialog" :products="products" :title="title")
+  Dialog(ref="dialog" :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey" :title="title")
   b-btn(variant="primary" @click="onBuyTickets") Buy Tickets
 </template>
 
@@ -15,7 +15,9 @@ import Dialog from './Dialog'
 
 export default {
   props: {
+    ordersURL: String,
     productIDs: Array,
+    stripeKey: String,
     title: String,
   },
   components: { Dialog },
@@ -27,7 +29,7 @@ export default {
     try {
       result = (await this.$axios({
         method: 'GET',
-        url: `${process.env.VUE_APP_ORDERS_URL}/api/prices`,
+        url: `${this.ordersURL}/api/prices`,
         params,
       })).data
     } catch (err) {

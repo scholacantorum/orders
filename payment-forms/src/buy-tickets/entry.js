@@ -15,8 +15,10 @@ window.addEventListener('load', () => {
     new Vue({
       render(h) {
         return h(BuyTickets, { props: {
-          title: elm.getAttribute('data-title'),
+          ordersURL: elm.getAttribute('data-orders-url'),
           productIDs,
+          stripeKey: elm.getAttribute('data-stripe-key'),
+          title: elm.getAttribute('data-title'),
         } })
       }
     }).$mount(elm)

@@ -55,7 +55,9 @@ let stripe
 export default {
   components: { DonationRow, QtyRow, TotalRow },
   props: {
+    ordersURL: String,
     products: Array,
+    stripeKey: String,
     title: String,
   },
   data: () => ({
@@ -77,7 +79,7 @@ export default {
   },
   mounted() {
     // eslint-disable-next-line
-    if (!stripe) stripe = Stripe(process.env.VUE_APP_STRIPE_KEY);
+    if (!stripe) stripe = Stripe(this.stripeKey);
     this.elements = stripe.elements();
     this.card = this.elements.create('card', { style: { base: { fontSize: '16px', lineHeight: 1.5 } } });
     this.$nextTick(() => {
@@ -151,7 +153,7 @@ export default {
         else this.message = `We’re sorry, but we're unable to process payment cards at the moment.  Please try again later, or call our office at (650) 254-1700 to order by phone.`
         return
       }
-      const result = await this.$axios.post(`${process.env.VUE_APP_ORDERS_URL}/api/order`, JSON.stringify({
+      const result = await this.$axios.post(`${this.ordersURL}/api/order`, JSON.stringify({
         source: 'public',
         name: this.order.name,
         email: this.order.email,

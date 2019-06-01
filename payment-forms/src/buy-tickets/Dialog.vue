@@ -5,7 +5,10 @@ Dialog is the dialog box that opens when someone clicks "Buy Tickets".
 <template lang="pug">
 b-modal(ref="modal" :title="title" no-close-on-backdrop hide-footer @shown="onShown")
   Confirmation(v-if="orderID" :key="seq" :orderID="orderID" @close="onClose")
-  OrderForm(v-else :key="seq" ref="form" :products="products" @success="onOrderSuccess")
+  OrderForm(v-else :key="seq" ref="form"
+    :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey"
+    @success="onOrderSuccess"
+  )
 </template>
 
 <script>
@@ -15,7 +18,9 @@ import OrderForm from './OrderForm'
 export default {
   components: { Confirmation, OrderForm },
   props: {
+    ordersURL: String,
     products: Array,
+    stripeKey: String,
     title: String,
   },
   data: () => ({
