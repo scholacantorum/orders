@@ -11,6 +11,8 @@ require (
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/stripe/stripe-go v60.18.0+incompatible
 	golang.org/x/net v0.0.0-20190509222800-a4d6f7feada5 // indirect
+	golang.org/x/oauth2 v0.0.0-20190523182746-aaccbc9213b0
+	google.golang.org/api v0.5.0
 )
 
 replace github.com/mattn/go-sqlite3 => /Users/stever/go/src/github.com/mattn/go-sqlite3

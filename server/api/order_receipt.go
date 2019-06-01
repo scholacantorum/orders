@@ -16,6 +16,7 @@ import (
 
 	"github.com/skip2/go-qrcode"
 
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/model"
 )
 
@@ -39,6 +40,7 @@ func emitReceipt(order *model.Order) {
 		pipe     io.WriteCloser
 		typename string
 		ticket   bool
+		emailTo  []string
 		err      error
 	)
 	// Can't send a receipt if we don't have an email to send it to.
@@ -82,8 +84,9 @@ func emitReceipt(order *model.Order) {
 
 	// Include the QR code if we need it.
 	if ticket {
-		fmt.Fprintf(htmlqp, `<div style="float:right"><a href="https://orders.scholacantorum.org/ticket/%s">
-<img src="cid:ORDER_QRCODE" alt="[Ticket Barcode]" style="border-width:0"></a></div>`, order.Token)
+		fmt.Fprintf(htmlqp, `<div style="float:right"><a href="%s/ticket/%s">
+<img src="cid:ORDER_QRCODE" alt="[Ticket Barcode]" style="border-width:0"></a></div>`,
+			config.Get("ordersURL"), order.Token)
 	}
 
 	// Greet the customer.
@@ -150,7 +153,7 @@ Phone: (650) 254-1700</p></div></body><html>
 		hdr.Set("Content-ID", "<ORDER_QRCODE>")
 		img, _ = mw.CreatePart(hdr)
 		if qr, err = qrcode.Encode(
-			fmt.Sprintf("https://orders.scholacantorum.org/ticket/%s", order.Token),
+			fmt.Sprintf("%s/ticket/%s", config.Get("ordersURL"), order.Token),
 			qrcode.Medium, 200); err != nil {
 			log.Printf("ERROR: can't create QR code for order %d: %s", order.ID, err)
 			return
@@ -161,7 +164,11 @@ Phone: (650) 254-1700</p></div></body><html>
 	}
 	mw.Close()
 
-	cmd = exec.Command("/Users/stever/go/bin/send-raw-email", "rothskeller@gmail.com")
+	emailTo = []string{"admin@scholacantorum.org"}
+	if config.Get("mode") == "production" {
+		emailTo = append(emailTo, "info@scholacantorum.org", order.Email)
+	}
+	cmd = exec.Command(config.Get("bin")+"/send-raw-email", emailTo...)
 	if pipe, err = cmd.StdinPipe(); err != nil {
 		log.Printf("ERROR: can't send receipt for order %d: can't send email: %s", order.ID, err)
 		return

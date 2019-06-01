@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"scholacantorum.org/orders/api"
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
-	"scholacantorum.org/orders/private"
 )
 
 var (
@@ -42,7 +42,6 @@ func main() {
 		fmt.Printf("Status: 500 Internal Server Error\nContent-Type: text/plain\n\n../data: %s\n", err)
 		os.Exit(1)
 	}
-
 	// Next, initialize the logger.
 	if logfile, err = os.OpenFile("server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err != nil {
 		fmt.Printf("Status: 500 Internal Server Error\nContent-Type: text/plain\n\nserver.log: %s\n", err)
@@ -50,7 +49,6 @@ func main() {
 	}
 	log.SetOutput(logfile)
 	log.SetFlags(log.Ldate | log.Ltime)
-
 	// Next, make sure that any panic gets logged, and an error returned to
 	// the caller.  Also, ensure that the transaction we're about to open,
 	// below, gets rolled back if a panic occurs or if it isn't properly
@@ -68,18 +66,16 @@ func main() {
 			}
 		}
 	}()
-
 	// Next, open the database and start a transaction.
 	db.Open("orders.db")
 	txh = db.Begin()
-
 	// Finally, handle the request.
 	cgi.Serve(http.HandlerFunc(router))
 	os.Exit(0)
 }
 
 func router(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", private.AccessControlAllowOrigin)
+	w.Header().Set("Access-Control-Allow-Origin", config.Get("allowOrigin"))
 	switch shiftPath(r) {
 	case "api":
 		switch shiftPath(r) {

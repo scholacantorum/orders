@@ -7,12 +7,15 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os/exec"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/auth"
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 	"scholacantorum.org/orders/stripe"
@@ -108,6 +111,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(emitOrder(order, false))
 	emitReceipt(order)
+	updateGoogleSheet(order)
 }
 
 // parseCreateOrder reads the order details from the request body.
@@ -606,4 +610,20 @@ func emitOrder(o *model.Order, log bool) []byte {
 	})
 	jw.Close()
 	return buf.Bytes()
+}
+
+func updateGoogleSheet(order *model.Order) {
+	var (
+		cmd *exec.Cmd
+		err error
+	)
+	cmd = exec.Command(config.Get("bin")+"/update-orders-sheet", strconv.Itoa(int(order.ID)))
+	if err = cmd.Start(); err != nil {
+		log.Printf("ERROR: can't update orders sheet for order %d: %s", order.ID, err)
+		return
+	}
+	// Note that we are intentionally not waiting for the subprocess to
+	// finish.  This CGI script will exit immediately, so that the user gets
+	// a fast response to their order.  The subprocess will continue as an
+	// orphan, and its zombie will be reaped by the init daemon.
 }

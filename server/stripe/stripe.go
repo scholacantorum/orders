@@ -8,14 +8,9 @@ import (
 	sapi "github.com/stripe/stripe-go"
 	"github.com/stripe/stripe-go/paymentintent"
 
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/model"
-	"scholacantorum.org/orders/private"
 )
-
-func init() {
-	sapi.LogLevel = 1 // log only errors
-	sapi.Key = private.StripeSecretKey
-}
 
 // ChargeCard charges the user's card specified in the payment.  If the charge
 // succeeds, the payment Method and Stripe fields are updated, and the function
@@ -28,6 +23,8 @@ func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, cardError
 		charge *sapi.Charge
 		err    error
 	)
+	sapi.LogLevel = 1 // log only errors
+	sapi.Key = config.Get("stripeSecretKey")
 	intent, err = paymentintent.New(&sapi.PaymentIntentParams{
 		Amount:             sapi.Int64(int64(pmt.Amount)),
 		Confirm:            sapi.Bool(true),

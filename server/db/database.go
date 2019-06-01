@@ -54,9 +54,9 @@ func (t *Time) Scan(value interface{}) error {
 		*t = Time(time.Time{})
 		return nil
 	}
-	ft, err := time.Parse("2006-01-02 15:04:05", tt)
+	ft, err := time.ParseInLocation("2006-01-02 15:04:05", tt, time.Local)
 	if err == nil {
-		*t = Time(ft.In(time.Local))
+		*t = Time(ft)
 	}
 	return err
 }
