@@ -4,7 +4,7 @@ OrderForm is the ticket order form displayed in the dialog box.
 
 <template lang="pug">
 b-form(novalidate @submit.prevent="onSubmit")
-  b-form-group(:state="amountState" invalid-text="Please enter an amount.")
+  b-form-group(:state="amountState" invalid-feedback="Please enter an amount.")
     table#donate-amount-row
       tr
         td#donate-amount-label

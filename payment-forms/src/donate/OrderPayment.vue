@@ -272,7 +272,7 @@ export default {
       this.card.update({ disabled: true })
       const error = await this.send({
         name: evt.payerName, email: evt.payerEmail,
-        address: evt.shippingAddress.addressLines.join(', '),
+        address: evt.shippingAddress.addressLine.join(', '),
         city: evt.shippingAddress.city, state: evt.shippingAddress.region,
         zip: evt.shippingAddress.postalCode, method: evt.paymentMethod.id      })
       this.submitting = false
