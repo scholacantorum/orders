@@ -18,6 +18,32 @@ It emits:
 It exposes:
   - submit() - to be called when the containing form is submitted.  The default
     action of the form submit should be prevented by the caller.
+
+In the mounted() method, this component determines whether the user's browser
+supports the PaymentRequest API (in other words, Apple Pay, Google Pay, etc.).
+It sets the "canPR" flag to true or false based on that.  No payment UI is shown
+until this flag is set.
+
+If PaymentRequest API is supported, we give the user the option of using it or
+directly entering their payment info.  Both UIs are rendered so that switching
+between them is quick, but only the selected one is visible.  The user's choice
+is stored in the "usePR" flag, controlled by a switch in the UI.  It defaults to
+true (i.e, use the PaymentRequest API).
+
+If the PaymentRequest API is used, we will get a 'click' event from the payment
+request button when it is clicked.  If the form passes validation, we update the
+payment request with the correct order total and allow the browser to proceed
+with its payment UI.  When that succeeds, we will get a 'paymentmethod' event
+from the payment request button.  We get the customer name and email and the
+payment method ID from that event, and tell our parent component to place the
+order using those; we then notify the payment request button whether the order
+was successfully placed.
+
+If the PaymentRequest API is not used, we will get a 'submit' event from the
+form when the user clicks the 'Pay Now' button.  If the form passes validation,
+we will request a payment method from the card entry field, and if that is
+successful, we will tell our parent component to place the order using it and
+using the customer name and email from our form fields.
 -->
 
 <template lang="pug">
@@ -59,7 +85,7 @@ It exposes:
 </template>
 
 <script>
-let stripe
+let stripe // handle to Stripe API, set in mounted()
 
 export default {
   props: {
@@ -68,24 +94,26 @@ export default {
     total: Number,
   },
   data: () => ({
-    canPR: null,
-    card: null,
-    cardChange: null,
-    cardFocus: false,
-    elements: null,
-    email: '',
-    emailFocused: false,
-    message: null,
-    name: '',
-    payreq: null,
-    prbutton: null,
-    submitted: false,
-    submitting: false,
-    usePR: false,
+    canPR: null,         // browser supports PaymentRequest API; null means still checking
+    card: null,          // Stripe card element
+    cardChange: null,    // most recent cardChange event payload from card element
+    cardFocus: false,    // card element currently has focus
+    elements: null,      // Stripe elements collection
+    email: '',           // customer email address from form
+    emailFocused: false, // email address input has focus
+    message: null,       // error message after failed submission
+    name: '',            // customer name from form
+    payreq: null,        // Stripe payment request object
+    prbutton: null,      // Stripe payment request button element
+    submitted: false,    // true if submission has been attempted
+    submitting: false,   // true if submission is in progress (disables all fields)
+    usePR: false,        // true if user wants to use PaymentRequest API
   }),
   async mounted() {
     // eslint-disable-next-line
     if (!stripe) stripe = Stripe(this.stripeKey);
+
+    // Create the Stripe card element and set it up.
     this.elements = stripe.elements();
     this.card = this.elements.create('card', { style: { base: { fontSize: '16px', lineHeight: 1.5 } } });
     this.card.on('change', this.onCardChange)
@@ -94,25 +122,32 @@ export default {
     this.$nextTick(() => {
       this.card.mount(this.$refs.card)
     })
+
+    // Create the payment request and check whether the Payment Request API is
+    // supported.
     this.payreq = stripe.paymentRequest({
       country: 'US', currency: 'usd',
       total: { label: 'Schola Cantorum Ticket Order', amount: 100, pending: true },
       requestPayerName: true, requestPayerEmail: true,
     })
-    if (await this.payreq.canMakePayment()) {
-      this.canPR = this.usePR = true
+
+    // If the Payment Request API is supported, create the payment request
+    // button element and set it up.
+    this.canPR = await this.payreq.canMakePayment()
+    if (this.canPR) {
+      this.usePR = true
       this.payreq.on('paymentmethod', this.onPaymentMethod)
       this.prbutton = this.elements.create('paymentRequestButton', { paymentRequest: this.payreq })
       this.prbutton.on('click', this.onPRButtonClick)
       this.$nextTick(() => {
         this.prbutton.mount(this.$refs.prbutton)
       })
-    } else {
-      this.canPR = false
     }
   },
   computed: {
     cardError() {
+      // Returns an error message describing the problem with the card input,
+      // or null if no error message should be displayed.
       if (this.cardChange && this.cardChange.error) return this.cardChange.error.message
       if (!this.submitted) return null
       if (!this.cardChange || this.cardChange.empty) return 'Please enter your card number.'
@@ -123,28 +158,47 @@ export default {
       return null
     },
     deviceOrBrowser() {
+      // This is an imperfect heuristic used to tailor the label of the usePR
+      // switch.  On mobile devices it asks whether to use the payment info
+      // saved on device; on desktops it asks whether to use the payment info
+      // saved in browser.
       const userAgent = navigator.userAgent || navigator.vendor
       if (/android|ipad|iphone|ipod|windows phone/i.test(userAgent)) return 'on device'
       return 'in browser'
     },
     emailState() {
+      // Returns false if the email field should show an error message, null if
+      // it should not.
       if (!this.emailFocused && this.email &&
         !this.email.match(/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/))
         return false
       if (this.submitted && !this.email) return false
       return null
     },
-    nameState() { return this.submitted && this.name == '' ? false : null },
+    nameState() {
+      // Returns false if the name field should show an error message, null if
+      // it should not.
+      return this.submitted && this.name == '' ? false : null
+    },
   },
   watch: {
     submitted() { if (this.submitted) this.$emit('submitted') },
     submitting() { this.$emit('submitting', this.submitting) },
-    usePR() { this.submitted = false },
+    usePR() {
+      // When someone changes from payment request to manual entry, it's likely
+      // because their payment request failed.  If so, the name, email, and card
+      // fields are all showing error messages because they are empty.  We'll
+      // clear those by pretending that the form was never submitted.
+      this.submitted = false
+    },
   },
   methods: {
     onCancel() { this.$emit('cancel') },
     onCardChange(evt) { this.cardChange = evt },
     async onPaymentMethod(evt) {
+      // The user has completed the browser payment request, and we have a
+      // payment method to use.  Ask our parent to place the order, and report
+      // back the result.
       this.submitting = true
       this.card.update({ disabled: true })
       const error = await this.send({ name: evt.payerName, email: evt.payerEmail, method: evt.paymentMethod.id })
@@ -154,6 +208,9 @@ export default {
       evt.complete(error ? 'fail' : 'success')
     },
     onPRButtonClick(evt) {
+      // The user has clicked the payment request button.  Validate the form,
+      // and update the payment request with the correct order total before the
+      // browser starts its payment request UI.
       this.submitted = true
       this.message = null
       if (this.total === null) {
@@ -163,9 +220,17 @@ export default {
       this.payreq.update({ total: { label: 'Schola Cantorum Ticket Order', amount: this.total, pending: false } })
     },
     async submit() {
+      // The user has clicked the Pay Now button, or pressed enter in one of
+      // the form fields.  If they're using Payment Request API, or we don't
+      // know yet, ignore it.
+      if (this.canPR === null || this.usePR) return
+
+      // Otherwise, validate the form.
       this.submitted = true
       this.message = null
       if (this.total === null || this.nameState !== null || this.emailState !== null || this.cardError) return
+
+      // The form is valid, so ask the card element for a payment method.
       this.submitting = true
       this.card.update({ disabled: true })
       const { paymentMethod, error } = await stripe.createPaymentMethod('card', this.card, {
@@ -179,6 +244,8 @@ export default {
         else this.message = `We’re sorry, but we're unable to process payment cards at the moment.  Please try again later, or call our office at (650) 254-1700 to order by phone.`
         return
       }
+
+      // We got a payment method, so ask our parent to place the order.
       const error2 = await this.send({ name: this.name, email: this.email, method: paymentMethod.id })
       this.submitting = false
       this.card.update({ disabled: false })
