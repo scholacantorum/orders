@@ -262,9 +262,10 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 		return false
 	}
 
-	// An address is needed for donations.  If any of the address fields is
-	// set, they must all be set, and they need to match the appropriate
-	// regular expressions.
+	// An address is needed for orders that consist only of a donation.  (It
+	// is not required for ticket orders with an additional donation line.)
+	// If any of the address fields is set, they must all be set, and they
+	// need to match the appropriate regular expressions.
 	if (order.Address != "" || order.City != "" || order.State != "" || order.Zip != "") &&
 		(order.Address == "" || order.City == "" || order.State == "" || order.Zip == "") {
 		return false
@@ -278,10 +279,8 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 	if order.Customer != "" && !customerRE.MatchString(order.Customer) {
 		return false
 	}
-	for _, line := range order.Lines {
-		if line.Product.Type == model.ProdDonation && order.Address == "" {
-			return false
-		}
+	if len(order.Lines) == 1 && order.Lines[0].Product.Type == model.ProdDonation && order.Address == "" {
+		return false
 	}
 
 	// A Stripe customer ID is allowed only for gala sales.  TODO
