@@ -5,22 +5,26 @@ connected with us.
 
 <template lang="pug">
 div
-  #ticket-confirm
-    | Thank you.  We have received your payment and emailed your
-    | ticket. <span id="ticket-reminder">Please bring it with
-    | you</span> (printed or on phone) for admission.
+  #donate-confirm
+    | We have received your donation and emailed you a receipt.  We will send
+    | a confirmation by postal mail for your tax records.  Thank you for
+    | supporting Schola Cantorum!
   #connect-head Stay informed of Schola news!
   div
     b-spinner.connect-done.mt-1(v-show="emailSpinner" small)
     .connect-done(v-show="emailDone") ✓
     .connect-link(@click="onEmail") Subscribe to our email list
   div
+    b-spinner.connect-done.mt-1(v-show="pmailSpinner" small)
+    .connect-done(v-show="pmailDone") ✓
+    .connect-link(@click="onPMail") Subscribe to our postal mailing list
+  div
     .connect-done(v-show="facebookDone") ✓
     .connect-link(@click="onFacebook") Follow us on Facebook
   div
     .connect-done(v-show="twitterDone") ✓
     .connect-link(@click="onTwitter") Follow us on Twitter
-  div
+  div(style="text-align:right")
     b-btn#connect-close(variant="primary" @click="$emit('close')") Close
 </template>
 
@@ -33,6 +37,8 @@ export default {
     emailDone: false,
     emailSpinner: false,
     facebookDone: false,
+    pmailDone: false,
+    pmailSpinner: false,
     twitterDone: false,
   }),
   methods: {
@@ -54,6 +60,20 @@ export default {
       window.open('https://www.facebook.com/scholacantorum.org', '_blank')
       this.facebookDone = true
     },
+    async onPMail() {
+      if (this.pmailDone) return
+      this.pmailSpinner = true
+      const resp = await this.$axios.post(`/backend/mail-signup?order=${this.orderID}`).catch(err => {
+        console.error(err)
+        return null
+      })
+      this.pmailSpinner = false
+      if (!resp) return
+      if (resp.status < 400)
+        this.pmailDone = true
+      else
+        console.error(resp.statusText)
+    },
     onTwitter() {
       window.open('https://twitter.com/scholacantorum1', '_blank')
       this.twitterDone = true
@@ -63,12 +83,10 @@ export default {
 </script>
 
 <style lang="stylus">
-#ticket-confirm
+#donate-confirm
   color #0153a5
   font-weight bold
   line-height 1.2
-#ticket-reminder
-  color #ff9900
 #connect-head
   margin-top 12px
   font-weight bold
