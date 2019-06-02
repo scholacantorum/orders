@@ -37,7 +37,8 @@
   },
   "vue": {
     "devServer": {
-      "port": 8200
+      "port": 8200,
+      "proxy": "http://localhost:8100"
     },
     "pages": {
       "buy-tickets": "src/buy-tickets/entry.js"

@@ -1,5 +1,5 @@
 <!--
-TotalRow displays the order total.
+OrderLinesTotal displays the order total.
 -->
 
 <template lang="pug">

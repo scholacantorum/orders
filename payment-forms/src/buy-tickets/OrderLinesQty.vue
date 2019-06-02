@@ -1,5 +1,5 @@
 <!--
-QtyRow displays a single product and gets the quantity of it.
+OrderLinesQty displays a single product and gets the quantity of it.
 -->
 
 <template lang="pug">
@@ -11,7 +11,7 @@ tr.buy-tickets-qty-row
     td.buy-tickets-qty-row-name(colspan="2" v-text="name")
     td.buy-tickets-qty-row-qty-cell
       b-form-input.buy-tickets-qty-row-qty(
-        ref="input" :value="value || ''" :state="valid"
+        ref="input" :value="value || ''" :state="state" :disabled="disabled"
         type="number" placeholder="0" min="0"
         @input="$emit('input', Math.max(parseInt($event) || 0), 0)"
       )
@@ -23,11 +23,12 @@ tr.buy-tickets-qty-row
 export default {
   props: {
     autofocus: Boolean,
+    disabled: Boolean,
     message: String,
     name: String,
     price: Number,
+    state: Boolean,
     value: Number,
-    valid: Boolean,
   },
   methods: {
     focus() { this.$refs.input.focus() },

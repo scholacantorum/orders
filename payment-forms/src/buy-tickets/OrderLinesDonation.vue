@@ -1,5 +1,5 @@
 <!--
-DonationRow displays the row of the order form that asks for a donation.
+OrderLinesDonation displays the row of the order form that asks for a donation.
 -->
 
 <template lang="pug">
@@ -9,7 +9,7 @@ table#buy-tickets-donation-row
     td#buy-tickets-donation-amount-cell
       | $
       b-form-input#buy-tickets-donation-amount(
-        :value="value || ''"
+        :value="value || ''" :disabled="disabled"
         type="number" placeholder="0" min="0"
         @input="$emit('input', Math.max(parseInt($event) || 0), 0)"
       )
@@ -18,6 +18,7 @@ table#buy-tickets-donation-row
 <script>
 export default {
   props: {
+    disabled: Boolean,
     value: Number,
   },
 }
