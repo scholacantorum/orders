@@ -12,7 +12,7 @@ It emits:
 -->
 
 <template lang="pug">
-b-container.px-0(fluid)
+b-container.px-0.mb-3(fluid)
   b-form-group.mb-0(
     label="Ticket Quantities" label-sr-only
     :state="state" invalid-feedback="How many tickets do you want?"
