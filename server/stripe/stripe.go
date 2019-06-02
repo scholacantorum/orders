@@ -54,7 +54,7 @@ func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, cardError
 	}
 	pmt.Method += charge.PaymentMethodDetails.Card.Last4
 	if charge.PaymentMethodDetails.Card.Wallet != nil {
-		pmt.Subtype += " " + string(charge.PaymentMethodDetails.Card.Wallet.Type)
+		pmt.Subtype = string(charge.PaymentMethodDetails.Card.Wallet.Type)
 	}
 	return true, ""
 }
