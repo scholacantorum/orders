@@ -43,12 +43,12 @@ func (tx Tx) FetchOrder(id model.OrderID) (o *model.Order) {
 		panic(err)
 	}
 	prows, err = tx.tx.Query(
-		`SELECT id, type, method, stripe, created, flags, amount FROM payment WHERE orderid=? ORDER BY id`,
+		`SELECT id, type, subtype, method, stripe, created, flags, amount FROM payment WHERE orderid=? ORDER BY id`,
 		o.ID)
 	panicOnError(err)
 	for prows.Next() {
 		var p model.Payment
-		panicOnError(prows.Scan(&p.ID, &p.Type, &p.Method, &p.Stripe, (*Time)(&p.Created), &p.Flags, &p.Amount))
+		panicOnError(prows.Scan(&p.ID, &p.Type, &p.Subtype, &p.Method, &p.Stripe, (*Time)(&p.Created), &p.Flags, &p.Amount))
 		o.Payments = append(o.Payments, &p)
 	}
 	panicOnError(prows.Err())
@@ -114,8 +114,8 @@ func (tx Tx) SaveOrder(o *model.Order) {
 	}
 	for _, p := range o.Payments {
 		res, err = tx.tx.Exec(
-			`INSERT OR REPLACE INTO payment (id, orderid, type, method, stripe, created, flags, amount) VALUES (?,?,?,?,?,?,?,?)`,
-			ID(p.ID), o.ID, p.Type, p.Method, p.Stripe, Time(p.Created), p.Flags, p.Amount)
+			`INSERT OR REPLACE INTO payment (id, orderid, type, subtype, method, stripe, created, flags, amount) VALUES (?,?,?,?,?,?,?,?,?)`,
+			ID(p.ID), o.ID, p.Type, p.Subtype, p.Method, p.Stripe, Time(p.Created), p.Flags, p.Amount)
 		panicOnError(err)
 		if p.ID == 0 {
 			p.ID = model.PaymentID(lastInsertID(res))

@@ -107,6 +107,7 @@ const (
 type Payment struct {
 	ID      PaymentID
 	Type    PaymentType
+	Subtype string
 	Method  string
 	Stripe  string
 	Created time.Time

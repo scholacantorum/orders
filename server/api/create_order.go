@@ -191,6 +191,8 @@ func parseCreateOrderPayment(p *model.Payment) json.Handlers {
 		switch key {
 		case "type":
 			return json.StringHandler(func(s string) { p.Type = model.PaymentType(s) })
+		case "subtype":
+			return json.StringHandler(func(s string) { p.Subtype = s })
 		case "method":
 			return json.StringHandler(func(s string) { p.Method = s })
 		case "amount":
@@ -593,6 +595,9 @@ func emitOrder(o *model.Order, log bool) []byte {
 							jw.Prop("id", int(p.ID))
 						}
 						jw.Prop("type", string(p.Type))
+						if p.Subtype != "" {
+							jw.Prop("subtype", p.Subtype)
+						}
 						jw.Prop("method", p.Method)
 						if p.Stripe != "" && log {
 							jw.Prop("stripe", p.Stripe)

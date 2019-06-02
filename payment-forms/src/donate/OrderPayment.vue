@@ -8,6 +8,7 @@ OrderPayment gets the payment method.  Its properties are:
       - city - the customer city
       - state - the customer state
       - zip - the customer zip code
+      - subtype - the payment subtype information
       - method - the Stripe payment method ID
     This function must return a Promise that resolves to null if the order was
     placed successfully, or an error message otherwise.
@@ -274,7 +275,9 @@ export default {
         name: evt.payerName, email: evt.payerEmail,
         address: evt.shippingAddress.addressLine.join(', '),
         city: evt.shippingAddress.city, state: evt.shippingAddress.region,
-        zip: evt.shippingAddress.postalCode, method: evt.paymentMethod.id      })
+        zip: evt.shippingAddress.postalCode, subtype: `API ${evt.methodName}`,
+        method: evt.paymentMethod.id,
+      })
       this.submitting = false
       this.card.update({ disabled: false })
       if (error) this.message = error
@@ -326,7 +329,8 @@ export default {
       // We got a payment method, so ask our parent to place the order.
       const error2 = await this.send({
         name: this.name, email: this.email, address: this.address, city: this.city,
-        state: this.state.toUpperCase(), zip: this.zip, method: paymentMethod.id
+        state: this.state.toUpperCase(), zip: this.zip, subtype: 'manual',
+        method: paymentMethod.id
       })
       this.submitting = false
       this.card.update({ disabled: false })

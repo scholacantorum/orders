@@ -255,6 +255,10 @@ CREATE TABLE payment (
     -- Type of the payment method, one of "card", "card-present", or "other".
     type text NOT NULL,
 
+    -- Subtype of the payment method: basically, how the card number was
+    -- provided.  Free form text, empty when not applicable.
+    subtype text NOT NULL,
+
     -- Text description of the payment method.  For "card" and "card-present"
     -- payments, this is the card type and last 4 digits(e.g. "Visa 1234").  For
     -- "other" payments, this is manual entry.

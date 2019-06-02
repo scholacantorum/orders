@@ -42,7 +42,7 @@ export default {
     onSubmit() { this.$refs.pmt.submit() },
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
-    , async onSend({ name, email, method }) {
+    , async onSend({ name, email, subtype, method }) {
       const result = await this.$axios.post(`${this.ordersURL}/api/order`, JSON.stringify({
         source: 'public', name, email,
         lines: this.lines.filter(ol => ol.quantity && !ol.message).map(ol => ({
@@ -50,7 +50,7 @@ export default {
           quantity: ol.quantity,
           price: ol.price,
         })),
-        payments: [{ type: 'card', method, amount: this.total }],
+        payments: [{ type: 'card', subtype, method, amount: this.total }],
       })).catch(err => {
         return err
       })

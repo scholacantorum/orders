@@ -13,10 +13,10 @@ import (
 )
 
 // ChargeCard charges the user's card specified in the payment.  If the charge
-// succeeds, the payment Method and Stripe fields are updated, and the function
-// returns (true, "").  If the charge is declined, the function returns false
-// and the decline message.  If the charge fails due to a Stripe API error, the
-// function returns false and an empty string.
+// succeeds, the payment Subtype, Method, and Stripe fields are updated, and the
+// function returns (true, "").  If the charge is declined, the function returns
+// false and the decline message.  If the charge fails due to a Stripe API
+// error, the function returns false and an empty string.
 func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, cardError string) {
 	var (
 		intent *sapi.PaymentIntent
@@ -53,6 +53,9 @@ func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, cardError
 		pmt.Method = "card "
 	}
 	pmt.Method += charge.PaymentMethodDetails.Card.Last4
+	if charge.PaymentMethodDetails.Card.Wallet != nil {
+		pmt.Subtype += " " + string(charge.PaymentMethodDetails.Card.Wallet.Type)
+	}
 	return true, ""
 }
 
