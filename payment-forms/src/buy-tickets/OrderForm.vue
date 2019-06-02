@@ -33,6 +33,9 @@ export default {
       return this.lines.reduce((t, ol) => t + ol.quantity * (ol.price || 0), 0)
     },
   },
+  watch: {
+    submitting() { this.$emit('submitting', this.submitting) },
+  },
   methods: {
     onCancel() { this.$emit('cancel') },
     onLines(lines) { this.lines = lines },

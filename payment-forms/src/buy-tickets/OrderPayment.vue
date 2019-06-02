@@ -133,7 +133,7 @@ export default {
 
     // If the Payment Request API is supported, create the payment request
     // button element and set it up.
-    this.canPR = await this.payreq.canMakePayment()
+    this.canPR = !!(await this.payreq.canMakePayment())
     if (this.canPR) {
       this.usePR = true
       this.payreq.on('paymentmethod', this.onPaymentMethod)
