@@ -25,6 +25,10 @@ const (
 	// set, the payment processing for the order is still in progress (or
 	// failed), and the order should not be considered "real".
 	OrderValid OrderFlags = 1 << iota
+
+	// OrderInAccess indicates that the office staff have posted this order
+	// into the Access database.
+	OrderInAccess
 )
 
 type OrderSource string
@@ -94,11 +98,16 @@ type PaymentFlags byte
 type PaymentType string
 
 const (
-	// PaymentCard is a card-not-present Stripe card payment.
+	// PaymentCard is a card-not-present, immediate, single-use Stripe card
+	// payment.
 	PaymentCard PaymentType = "card"
 
 	// PaymentCardPresent is a card-present Stripe card payment.
 	PaymentCardPresent = "card-present"
+
+	// PaymentCardSaved is an card-not-present Stripe card payment using a
+	// card previously saved on a Stripe Customer.
+	PaymentCardSaved = "card-saved"
 
 	// PaymentOther is a non-Stripe payment, described in Method.
 	PaymentOther = "other"
@@ -164,6 +173,10 @@ const (
 
 	// ProdAuctionItem is an auction item purchased at the gala or similar.
 	ProdAuctionItem = "auctionitem"
+
+	// ProdOther is an "other" product type, not allowed for new products
+	// but used for products in archive orders.
+	ProdOther = "other"
 )
 
 type Product struct {
