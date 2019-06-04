@@ -102,7 +102,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 // interestingSKU returns true if the SKU's criteria are met, or come close.
 // "Close", in this context, means that all criteria are met except for the
 // sales range, and one of the following is true:
-//   - The caller has Sell privilege
+//   - The caller has PrivInPersonSales
 //   - The sales range is in the future
 //   - The product is a ticket to an event that starts today or later
 func interestingSKU(product *model.Product, sku *model.SKU, privs model.Privilege, coupon string) bool {
@@ -112,7 +112,7 @@ func interestingSKU(product *model.Product, sku *model.SKU, privs model.Privileg
 	if sku.Coupon != "" && sku.Coupon != coupon {
 		return false
 	}
-	if privs&model.PrivSell != 0 {
+	if privs&model.PrivInPersonSales != 0 {
 		return true
 	}
 	var now = time.Now()
@@ -182,7 +182,7 @@ func betterSKU2(sku1, sku2 *model.SKU) *model.SKU {
 // noSalesMessage returns the string describing why the SKU isn't available for
 // sale, or an empty string if it is available.
 func noSalesMessage(sku *model.SKU, privs model.Privilege) string {
-	if privs&model.PrivSell != 0 {
+	if privs&model.PrivInPersonSales != 0 {
 		return ""
 	}
 	switch sku.InSalesRange(time.Now()) {

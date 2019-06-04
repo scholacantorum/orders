@@ -27,8 +27,8 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		scan    string
 		now     = time.Now()
 	)
-	// Must have PrivSell to use this API.
-	if session = auth.GetSession(tx, w, r, model.PrivSell); session == nil {
+	// Must have PrivScanTickets to use this API.
+	if session = auth.GetSession(tx, w, r, model.PrivScanTickets); session == nil {
 		return
 	}
 	// Make sure the requisite event exists.

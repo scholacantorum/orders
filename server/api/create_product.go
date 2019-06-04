@@ -24,7 +24,7 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		seenEvent = map[model.EventID]bool{}
 		seenPrio0 bool
 	)
-	if session = auth.GetSession(tx, w, r, model.PrivSetup); session == nil {
+	if session = auth.GetSession(tx, w, r, model.PrivSetupOrders); session == nil {
 		return
 	}
 	if product, err = parseCreateProduct(r.Body); err != nil {

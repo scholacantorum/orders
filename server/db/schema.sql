@@ -146,9 +146,9 @@ CREATE TABLE product (
 --     SKUs with members_only=0 are not considered.
 --   - If the caller supplied a coupon code, and there are any SKUs with that
 --     coupon code, no SKUs without that coupon code are considered.
---   - If the caller does not have PrivHandleOrders privilege, only SKUs whose
+--   - If the caller does not have PrivManageOrders privilege, only SKUs whose
 --     sales_start..sales_end range contains the current moment are considered.
---   - If the caller does have PrivHandleOrders privilege, preference is given
+--   - If the caller does have PrivManageOrders privilege, preference is given
 --     to the SKU whose sales_start..sales_end range contains the current
 --     moment, then to the one whose range is before the current moment and
 --     closest to it, and finally to the one whose range is after the current

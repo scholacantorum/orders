@@ -22,7 +22,7 @@ func CreateEvent(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		out     []byte
 		err     error
 	)
-	if session = auth.GetSession(tx, w, r, model.PrivSetup); session == nil {
+	if session = auth.GetSession(tx, w, r, model.PrivSetupOrders); session == nil {
 		return
 	}
 	if event, err = parseCreateEvent(r.Body); err != nil {

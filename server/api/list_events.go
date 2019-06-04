@@ -26,9 +26,10 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		jw              json.Writer
 		freeEntries     = map[model.EventID][]string{}
 	)
-	// Getting events needs either PrivSetup or PrivSell.  Here we assume
-	// that anyone with PrivSetup will also have PrivSell.
-	if session = auth.GetSession(tx, w, r, model.PrivSell); session == nil {
+	// Getting events needs either PrivSetupOrders or PrivScanTickets.  Here
+	// we assume that anyone with PrivSetupOrders will also have
+	// PrivScanTickets.
+	if session = auth.GetSession(tx, w, r, model.PrivScanTickets); session == nil {
 		return
 	}
 	// If future is specified as a query parameter, then we should only

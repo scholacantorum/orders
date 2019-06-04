@@ -14,14 +14,22 @@ import (
 // GetSession emits an appropriate error, rolls back the transaction, and
 // returns nil.
 func GetSession(tx db.Tx, w http.ResponseWriter, r *http.Request, priv model.Privilege) (session *model.Session) {
-	// TODO
-	return &model.Session{Username: "guest", Privileges: 0xFF}
+	tx.ExpireSessions()
+	if session = tx.FetchSession(r.Header.Get("Auth")); session == nil {
+		tx.Rollback()
+		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+	if session.Privileges&priv != priv {
+		tx.Rollback()
+		http.Error(w, "403 Forbidden", http.StatusForbidden)
+		return nil
+	}
+	return session
 }
 
 // HasSession returns whether the HTTP request identifies a session.  (The
 // session is not necessarily valid.)
 func HasSession(r *http.Request) bool {
-	// TODO
-	return true
-	// return false
+	return r.Header.Get("Auth") != ""
 }

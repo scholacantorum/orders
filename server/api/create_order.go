@@ -224,7 +224,7 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 		return false // TODO
 	case model.OrderFromOffice:
 		// Office orders must have a session with appropriate privilege.
-		if session == nil || session.Privileges&model.PrivHandleOrders == 0 || order.Member < 0 {
+		if session == nil || session.Privileges&model.PrivManageOrders == 0 || order.Member < 0 {
 			return false
 		}
 		if order.Member == 0 {
@@ -233,7 +233,7 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 	case model.OrderInPerson:
 		// In-person orders must have a session with appropriate
 		// privilege, and no member ID.
-		if session == nil || session.Privileges&model.PrivSell == 0 || order.Member != 0 {
+		if session == nil || session.Privileges&model.PrivInPersonSales == 0 || order.Member != 0 {
 			return false
 		}
 	default:
@@ -297,7 +297,7 @@ func matchSKU(order *model.Order, privs model.Privilege, sku *model.SKU) bool {
 	if sku.Coupon != "" && !strings.EqualFold(sku.Coupon, order.Coupon) {
 		return false
 	}
-	if privs&model.PrivHandleOrders != 0 {
+	if privs&model.PrivManageOrders != 0 {
 		return true
 	}
 	if !sku.SalesStart.IsZero() && sku.SalesStart.After(time.Now()) {
@@ -421,7 +421,7 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 	order.Created = time.Now()
 
 	// Office notes are allowed only by office staff.
-	if order.ONote != "" && privs&model.PrivHandleOrders == 0 {
+	if order.ONote != "" && privs&model.PrivManageOrders == 0 {
 		return false
 	}
 

@@ -133,24 +133,24 @@ const (
 	// PrivLogin is a privilege held by all valid users.
 	PrivLogin Privilege = 1 << iota
 
-	// PrivSetup is the privilege needed to create, modify, or delete
+	// PrivSetupOrders is the privilege needed to create, modify, or delete
 	// products, SKUs, and events.
-	PrivSetup
+	PrivSetupOrders
 
-	// PrivAnalyze allows read-only access to all data in the system.
-	PrivAnalyze
+	// PrivViewOrders allows read-only access to all data in the system.
+	PrivViewOrders
 
-	// PrivHandleOrders allows recording offline orders and making notes on
+	// PrivManageOrders allows recording offline orders and making notes on
 	// orders.
-	PrivHandleOrders
+	PrivManageOrders
 
-	// PrivSell allows making and recording in-person sales.  Note that this
-	// includes refunding those sales within a few minutes of recording
-	// them.
-	PrivSell
+	// PrivInPersonSales allows making and recording in-person sales.  Note
+	// that this includes refunding those sales within a few minutes of
+	// recording them.
+	PrivInPersonSales
 
-	// PrivAdmit allows recording ticket usage.
-	PrivAdmit
+	// PrivScanTickets allows recording ticket usage.
+	PrivScanTickets
 )
 
 type ProductID string
