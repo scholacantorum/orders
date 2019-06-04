@@ -120,6 +120,18 @@ func router(w http.ResponseWriter, r *http.Request) {
 					api.NotFoundError(txh, w)
 				}
 			}
+		case "login":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodPost:
+					api.Login(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
 		case "order":
 			switch orderID := shiftPathID(r); orderID {
 			case 0:

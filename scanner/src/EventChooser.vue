@@ -16,9 +16,14 @@ import LogoWide from './LogoWide'
 
 export default {
   components: { LogoWide },
+  props: {
+    auth: String,
+  },
   data: () => ({ events: [] }),
   async mounted() {
-    const resp = await this.$axios.get(`/api/event?future=1&freeEntries=1`).catch(err => {
+    const resp = await this.$axios.get(`/api/event?future=1&freeEntries=1`, {
+      headers: { auth: this.auth },
+    }).catch(err => {
       console.log(err)
       this.$emit('fatal', 'Server error')
       return null

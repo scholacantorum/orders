@@ -35,6 +35,7 @@ import LogoTall from './LogoTall'
 export default {
   components: { CameraView, ClassUsage, LogoTall },
   props: {
+    auth: String,
     event: Object,
     freeEntry: Array,
   },
@@ -46,7 +47,9 @@ export default {
   methods: {
     async fetchTicket(token) {
       this.scanError = this.order = null
-      const resp = await this.$axios.post(`/api/event/${this.event.id}/ticket/${token}`).catch(err => {
+      const resp = await this.$axios.post(`/api/event/${this.event.id}/ticket/${token}`, null,
+        { headers: { auth: this.auth } }
+      ).catch(err => {
         if (err.response && err.response.status === 404) {
           this.scanError = 'No such order'
         } else {
@@ -60,9 +63,13 @@ export default {
       if (resp.data.error) this.scanError = resp.data.error
     },
     async onCountChange(tclass, count) {
+      const body = new URLSearchParams()
+      body.append('scan', this.order.scan)
+      body.append('class', tclass.name)
+      body.append('used', count)
       const resp = await this.$axios.post(
-        `/api/event/${this.event.id}/ticket/${this.order.id || 'free'}`, null,
-        { params: { scan: this.order.scan, class: tclass.name, used: count } }
+        `/api/event/${this.event.id}/ticket/${this.order.id || 'free'}`, body,
+        { headers: { auth: this.auth } }
       ).catch(err => {
         console.log(err)
         this.scanError = 'Server error'

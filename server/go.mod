@@ -7,7 +7,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/magefile/mage v1.8.0
 	github.com/mattn/go-sqlite3 v1.9.0
-	github.com/rothskeller/json v0.0.0-20190526214720-3ba4888c587a
+	github.com/rothskeller/json v0.0.0-20190604180104-831a68af1667
 	github.com/scholacantorum/go-sqlite3 v1.10.0
 	github.com/skip2/go-qrcode v0.0.0-20190110000554-dc11ecdae0a9
 	github.com/stretchr/testify v1.3.0 // indirect

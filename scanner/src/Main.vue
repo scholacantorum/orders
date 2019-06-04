@@ -1,18 +1,21 @@
 <template lang="pug">
 #main
   FatalError(v-if="fatal" :error="fatal")
-  EventChooser(v-else-if="!event" @event="event = $event" @fatal="fatal = $event")
-  TicketScanner(v-else :event="event" :freeEntry="event.freeEntries")
+  LoginPage(v-else-if="!auth" @auth="auth=$event" @fatal="fatal=$event")
+  EventChooser(v-else-if="!event" :auth="auth" @event="event=$event" @fatal="fatal=$event")
+  TicketScanner(v-else :auth="auth" :event="event" :freeEntry="event.freeEntries")
 </template>
 
 <script>
 import EventChooser from './EventChooser'
 import FatalError from './FatalError'
+import LoginPage from './LoginPage'
 import TicketScanner from './TicketScanner'
 
 export default {
-  components: { EventChooser, FatalError, TicketScanner },
+  components: { EventChooser, FatalError, LoginPage, TicketScanner },
   data: () => ({
+    auth: null,
     event: null,
     fatal: null,
   }),

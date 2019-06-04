@@ -37,6 +37,8 @@ github.com/rothskeller/json v0.0.0-20190526204815-1e4f944f3f0a h1:KkO5EjBSn1me1Z
 github.com/rothskeller/json v0.0.0-20190526204815-1e4f944f3f0a/go.mod h1:gCFIphucdxWXdvQOi2ozsuXc2B6mSusLuUQ1SMMaB6E=
 github.com/rothskeller/json v0.0.0-20190526214720-3ba4888c587a h1:7Nc0NMFUGUFZJeTYHHRUTB7Q7++dgW0GrqBNUWjUNoQ=
 github.com/rothskeller/json v0.0.0-20190526214720-3ba4888c587a/go.mod h1:gCFIphucdxWXdvQOi2ozsuXc2B6mSusLuUQ1SMMaB6E=
+github.com/rothskeller/json v0.0.0-20190604180104-831a68af1667 h1:bRs98CXh13nnc+9TYDOO3RFFdoWjWqmP08czVEas9bw=
+github.com/rothskeller/json v0.0.0-20190604180104-831a68af1667/go.mod h1:gCFIphucdxWXdvQOi2ozsuXc2B6mSusLuUQ1SMMaB6E=
 github.com/scholacantorum/go-sqlite3 v1.10.0 h1:MG3SyBE/DlGQdmSOKYxUgYd6j0vwu4zLZ6qwhLzJuLc=
 github.com/scholacantorum/go-sqlite3 v1.10.0/go.mod h1:5Jwm1PDd9ca2rbz1suRZrqDVtLP1krQt0EcU1rGnlIw=
 github.com/skip2/go-qrcode v0.0.0-20190110000554-dc11ecdae0a9 h1:lpEzuenPuO1XNTeikEmvqYFcU37GVLl8SRNblzyvGBE=
