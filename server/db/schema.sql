@@ -46,10 +46,10 @@ CREATE TABLE orderT (
     -- Coupon code supplied by the customer (empty if none).
     coupon text NOT NULL DEFAULT '',
 
-    -- Date on which this order should stop recurring, in seconds after the Unix
-    -- epoch.  If zero, the order does not recur.  Otherwise, the order will
-    -- recur on the first of every month until this date is reached.
-    repeat integer NOT NULL DEFAULT 0
+    -- Date on which this order should stop recurring.  If empty, the order does
+    -- not recur.  Otherwise, the order will recur on the first of every month
+    -- until this date is reached.
+    repeat text NOT NULL DEFAULT ''
 );
 CREATE INDEX order_name_email_index ON orderT (name, email);
 CREATE INDEX order_email_index      ON orderT (email);
@@ -74,7 +74,21 @@ CREATE TABLE order_line (
 
     -- The price per unit for this line, in cents.  The total amount for this
     -- line will always be price * quantity.
-    price integer NOT NULL
+    price integer NOT NULL,
+
+    -- Scan instance key.  A new key is assigned each time the order token is
+    -- scanned (or the order ID is entered into the scanner tool).  Incremental
+    -- changes are allowed only by providing the key.
+    scan text NOT NULL DEFAULT '',
+
+    -- The minimum number of tickets used for this line.  This is set to the
+    -- current usage count each time the order token is scanned, so incremental
+    -- changes cannot go below this.  Meaningless for non-ticket products.
+    min_used integer NOT NULL DEFAULT 0,
+
+    -- The number of tickets to be used automatically each time the order token
+    -- is scanned.  Meaningless for non-ticket products.
+    auto_use integer NOT NULL
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);

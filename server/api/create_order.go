@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rothskeller/json"
@@ -241,6 +242,110 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 	return true
 }
 
+// resolveSKUs walks through each line of the order, finding the listed product
+// and computing the amount of the order line, following the SKU rules
+// documented in db/schema.sql.  If mustMatch is true, it requires that the line
+// have the correct amount.  If mustMatch is false, it overrides the line
+// amount, setting it to the correct amount. It returns true if everything
+// resolved successfully and false otherwise.
+func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch bool) bool {
+	var couponMatch bool
+
+	for _, line := range order.Lines {
+		var sku *model.SKU
+
+		if line.Product = tx.FetchProduct(line.Product.ID); line.Product == nil {
+			return false
+		}
+		if line.Product.Type == model.ProdAuctionItem || line.Product.Type == model.ProdDonation {
+			if line.Price < 1 {
+				return false
+			}
+			continue
+		}
+		for _, s := range line.Product.SKUs {
+			if !matchSKU(order, privs, s) {
+				continue
+			}
+			if s.Coupon != "" {
+				couponMatch = true
+			}
+			if sku == nil || betterSKU(s, sku) {
+				sku = s
+			}
+		}
+		if sku == nil {
+			continue
+		}
+		if mustMatch && line.Price != sku.Price {
+			return false
+		}
+		line.Price = sku.Price
+	}
+	if !couponMatch {
+		order.Coupon = ""
+	}
+	return true
+}
+
+// matchSKU returns true if all of the criteria for the SKU are met by the order
+// being placed.
+func matchSKU(order *model.Order, privs model.Privilege, sku *model.SKU) bool {
+	if sku.MembersOnly && privs == 0 {
+		return false
+	}
+	if sku.Coupon != "" && !strings.EqualFold(sku.Coupon, order.Coupon) {
+		return false
+	}
+	if privs&model.PrivHandleOrders != 0 {
+		return true
+	}
+	if !sku.SalesStart.IsZero() && sku.SalesStart.After(time.Now()) {
+		return false
+	}
+	if !sku.SalesEnd.IsZero() && sku.SalesEnd.Before(time.Now()) {
+		return false
+	}
+	return true
+}
+
+// betterSKU returns whether sku1 is a higher priority match than sku2.
+func betterSKU(sku1, sku2 *model.SKU) bool {
+	if sku1.MembersOnly && !sku2.MembersOnly {
+		return true
+	}
+	if !sku1.MembersOnly && sku2.MembersOnly {
+		return false
+	}
+	if sku1.Coupon != "" && sku2.Coupon == "" {
+		return true
+	}
+	if sku1.Coupon == "" && sku2.Coupon != "" {
+		return false
+	}
+	var now = time.Now()
+	if !sku1.SalesStart.After(now) && (sku1.SalesEnd.IsZero() || !sku1.SalesEnd.Before(now)) {
+		// sku1 contains now; uniqueness guarantees that sku2 doesn't
+		return true
+	}
+	if !sku2.SalesStart.After(now) && (sku2.SalesEnd.IsZero() || !sku2.SalesEnd.Before(now)) {
+		// sku2 contains now; uniqueness guarantees that sku1 doesn't
+		return false
+	}
+	if sku1.SalesStart.Before(now) && sku2.SalesStart.Before(now) {
+		// both earlier than now, so take the one that starts later
+		return sku2.SalesStart.Before(sku1.SalesStart)
+	} else if sku1.SalesStart.Before(now) {
+		// sku1 is before now and sku2 is after
+		return true
+	} else if sku2.SalesStart.Before(now) {
+		// sku2 is before now and sku1 is after
+		return false
+	}
+	// both later than now, so take the one that starts earlier
+	return sku1.SalesStart.Before(sku2.SalesStart)
+}
+
 var emailRE = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 var stateRE = regexp.MustCompile(`^[A-Z][A-Z]$`)
 var zipRE = regexp.MustCompile(`^\d{5}(?:-\d{4})?$`)
@@ -357,6 +462,7 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 				return false
 			}
 		case model.ProdTicket:
+			line.AutoUse = line.Quantity
 			if line.Used == 0 && line.UsedAt != "" {
 				return false
 			}
@@ -493,15 +599,16 @@ func generateTickets(tx db.Tx, order *model.Order) {
 // newOrderToken generates a token for a new order, retrying until it has one
 // that's unique.
 func newOrderToken(tx db.Tx) (token string) {
-	var tval int
-
-RETRY_UNIQUE:
-	tval = rand.Intn(1000000000000)
-	token = fmt.Sprintf("%04d-%04d-%04d", tval/100000000, tval/10000%10000, tval%10000)
-	if o := tx.FetchOrderByToken(token); o != nil {
-		goto RETRY_UNIQUE
+	for token == "" || tx.FetchOrderByToken(token) != nil {
+		token = newToken()
 	}
 	return token
+}
+
+// newToken generates a random token string.
+func newToken() string {
+	tval := rand.Intn(1000000000000)
+	return fmt.Sprintf("%04d-%04d-%04d", tval/100000000, tval/10000%10000, tval%10000)
 }
 
 // emitOrder generates a JSON representation of the order.  If log is true, it

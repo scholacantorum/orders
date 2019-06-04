@@ -85,6 +85,9 @@ type OrderLine struct {
 	Product  *Product
 	Quantity int
 	Price    int
+	Scan     string
+	MinUsed  int
+	AutoUse  int
 	Tickets  []*Ticket
 	Used     int     // not persistent; input only
 	UsedAt   EventID // not persistent; input only

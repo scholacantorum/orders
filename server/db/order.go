@@ -52,11 +52,12 @@ func (tx Tx) FetchOrder(id model.OrderID) (o *model.Order) {
 		o.Payments = append(o.Payments, &p)
 	}
 	panicOnError(prows.Err())
-	lrows, err = tx.tx.Query(`SELECT id, product, quantity, price FROM order_line WHERE orderid=? ORDER BY id`, o.ID)
+	lrows, err = tx.tx.Query(
+		`SELECT id, product, quantity, price, scan, min_used, auto_use FROM order_line WHERE orderid=? ORDER BY id`, o.ID)
 	panicOnError(err)
 	for lrows.Next() {
 		var ol model.OrderLine
-		panicOnError(lrows.Scan(&ol.ID, &pid, &ol.Quantity, &ol.Price))
+		panicOnError(lrows.Scan(&ol.ID, &pid, &ol.Quantity, &ol.Price, &ol.Scan, &ol.MinUsed, &ol.AutoUse))
 		ol.Product = tx.FetchProduct(pid)
 		trows, err = tx.tx.Query(`SELECT id, event, used FROM ticket WHERE order_line=? ORDER BY id`, ol.ID)
 		panicOnError(err)
@@ -123,8 +124,8 @@ func (tx Tx) SaveOrder(o *model.Order) {
 	}
 	for _, ol := range o.Lines {
 		res, err = tx.tx.Exec(
-			`INSERT OR REPLACE INTO order_line (id, orderid, product, quantity, price) VALUES (?,?,?,?,?)`,
-			ID(ol.ID), o.ID, ol.Product.ID, ol.Quantity, ol.Price)
+			`INSERT OR REPLACE INTO order_line (id, orderid, product, quantity, price, scan, min_used, auto_use) VALUES (?,?,?,?,?,?,?,?)`,
+			ID(ol.ID), o.ID, ol.Product.ID, ol.Quantity, ol.Price, ol.Scan, ol.MinUsed, ol.AutoUse)
 		panicOnError(err)
 		if ol.ID == 0 {
 			ol.ID = model.OrderLineID(lastInsertID(res))

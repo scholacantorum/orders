@@ -5,27 +5,30 @@ which one they are taking tickets for.
 
 <template lang="pug">
 #events
+  LogoWide
   #events-head(v-if="events.length") Which event are you taking tickets for?
   .event(v-for="event in events" :key="event.id" @click="$emit('event', event)")
     | {{ event.start.substr(0, 10) }} {{ event.name }}
 </template>
 
 <script>
+import LogoWide from './LogoWide'
+
 export default {
+  components: { LogoWide },
   data: () => ({ events: [] }),
   async mounted() {
-    const resp = await this.$axios.get(`/api/event?future=1&freeEntry=1`).catch(err => {
+    const resp = await this.$axios.get(`/api/event?future=1&freeEntries=1`).catch(err => {
       console.log(err)
-      window.alert('Network error')
+      this.$emit('fatal', 'Server error')
       return null
     })
     if (!resp) return
     if (resp.status !== 200) {
       console.log(resp.statusText)
-      window.alert('Software error')
+      this.$emit('fatal', 'Server error')
       return
     }
-    console.log(resp)
     this.events = resp.data
   },
 }

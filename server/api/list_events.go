@@ -19,12 +19,12 @@ type freeEntryData struct {
 // ListEvents handles GET /api/event requests.
 func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
-		session     *model.Session
-		events      []*model.Event
-		future      bool
-		freeEntry   bool
-		jw          json.Writer
-		freeEntries = map[model.EventID]string{}
+		session         *model.Session
+		events          []*model.Event
+		future          bool
+		wantFreeEntries bool
+		jw              json.Writer
+		freeEntries     = map[model.EventID][]string{}
 	)
 	// Getting events needs either PrivSetup or PrivSell.  Here we assume
 	// that anyone with PrivSetup will also have PrivSell.
@@ -41,13 +41,13 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	} else {
 		events = tx.FetchEvents()
 	}
-	// If freeEntry is specified as a query parameter, then we should
-	// retrieve the ticket class that allows free entry to the event, if
-	// there is one.
-	freeEntry = r.FormValue("freeEntry") != ""
-	if freeEntry {
+	// If freeEntries is specified as a query parameter, then we should
+	// retrieve the ticket class(es) that allow free entry to the event, if
+	// any.
+	wantFreeEntries = r.FormValue("freeEntries") != ""
+	if wantFreeEntries {
 		for _, e := range events {
-			freeEntries[e.ID] = getFreeEntry(tx, e)
+			freeEntries[e.ID] = getFreeEntries(tx, e)
 		}
 	}
 	commit(tx)
@@ -61,32 +61,40 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	jw.Close()
 }
 
-// getFreeEntry looks for tickets to the event that can be ordered at zero cost,
-// which will generally be the ticket class that gets free entry (e.g.
-// students).  If it finds one, it returns the ticket class name; otherwise, it
-// returns an empty string.
-func getFreeEntry(tx db.Tx, event *model.Event) string {
+// getFreeEntries looks for tickets to the event that can be ordered at zero
+// cost, which will generally be the ticket classes that gets free entry (e.g.
+// students).  If it finds any, it returns a list of the ticket class names;
+// otherwise, it returns nil.
+func getFreeEntries(tx db.Tx, event *model.Event) (list []string) {
+	var seen = map[string]bool{}
 	for _, product := range tx.FetchProductsByEvent(event) {
 		for _, sku := range product.SKUs {
-			if sku.Coupon == "" && !sku.MembersOnly && sku.Price == 0 {
-				return product.TicketClass
+			if sku.Coupon == "" && !sku.MembersOnly && sku.Price == 0 && !seen[product.TicketClass] {
+				seen[product.TicketClass] = true
+				list = append(list, product.TicketClass)
 			}
 			// Note that we're deliberately ignoring SalesStart and
 			// SalesEnd.  Student tickets usually are deliberately
 			// out of range so they don't show up for explicit sale.
 		}
 	}
-	return ""
+	return list
 }
 
 // emitListedEvent emits the JSON for one event in a list.
-func emitListedEvent(jw json.Writer, e *model.Event, fe string) {
+func emitListedEvent(jw json.Writer, e *model.Event, freeEntries []string) {
 	jw.Object(func() {
 		jw.Prop("id", string(e.ID))
 		jw.Prop("name", e.Name)
 		jw.Prop("start", e.Start.Format(time.RFC3339))
-		if fe != "" {
-			jw.Prop("freeEntry", fe)
+		if freeEntries != nil {
+			jw.Prop("freeEntries", func() {
+				jw.Array(func() {
+					for _, fe := range freeEntries {
+						jw.String(fe)
+					}
+				})
+			})
 		}
 	})
 }

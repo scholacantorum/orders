@@ -110,8 +110,6 @@ func router(w http.ResponseWriter, r *http.Request) {
 						api.NotFoundError(txh, w)
 					default:
 						switch r.Method {
-						case http.MethodGet:
-							api.GetTicket(txh, w, r, model.EventID(eventID), order)
 						case http.MethodPost:
 							api.UseTicket(txh, w, r, model.EventID(eventID), order)
 						default:
@@ -126,8 +124,6 @@ func router(w http.ResponseWriter, r *http.Request) {
 			switch orderID := shiftPathID(r); orderID {
 			case 0:
 				switch r.Method {
-				case http.MethodGet:
-					api.CalculateOrder(txh, w, r)
 				case http.MethodPost:
 					api.PlaceOrder(txh, w, r)
 				default:

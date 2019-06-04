@@ -7,68 +7,92 @@ entered), an order token (scanned),  or 'free' for a free entry.
 
 <template lang="pug">
 #scanner
-  QrcodeStream#stream(:style="streamStyle" :track="false" @init="onStreamInit" @decode="onDecode")
-  form#orderidform(@submit.prevent="onSubmit")
-    #forminner
-      b-form-input#orderid(v-model="orderid" type="number" min="1" step="any" size="5" placeholder="Order #")
-      b-button(type="submit") Submit
-    b-button#freeEntry(@click.prevent="onFree" :disabled="!freeEntry") Free Entry
+  #scanner-top
+    CameraView(@decode="onDecode")
+    #scanner-controls
+      LogoTall
+      form#orderidform(@submit.prevent="onSubmit")
+        #forminner
+          b-form-input#orderid(v-model="orderid" type="number" min="1" step="any" size="5" placeholder="Order #")
+          b-button(type="submit") Submit
+        b-button(v-if="freeEntry" @click.prevent="onFree" :disabled="!freeEntry") Free Entry
+      #orderinfo
+        #ordername(v-text="(order && order.name) ? order.name : '\u00A0'")
+        #ordernum(v-text="(order && order.id) ? `Order number ${order.id}` : '\u00A0'")
+  #scanner-bottom
+    #scanError(v-if="scanError" v-text="scanError")
+    #quantities(v-else-if="order && order.classes")
+      ClassUsage(v-for="tclass in order.classes" :key="tclass.name"
+        :tclass="tclass" @change="onCountChange(tclass, $event)"
+      )
 </template>
 
 <script>
-import { QrcodeStream } from 'vue-qrcode-reader'
+import CameraView from './CameraView'
+import ClassUsage from './ClassUsage'
+import LogoTall from './LogoTall'
 
 export default {
-  components: { QrcodeStream },
-  data: () => ({ orderid: null }),
+  components: { CameraView, ClassUsage, LogoTall },
   props: {
-    freeEntry: String,
+    event: Object,
+    freeEntry: Array,
   },
-  computed: {
-    streamStyle() {
-      // On Android at least, the size of the stream is dictated solely by its
-      // width and the standard 4:3 aspect ratio.  The height affects layout of
-      // items further down the page, but it doesn't actually affed the height
-      // of the displayed stream.  To make everything fit on the page, we need
-      // to have the width be no more than 3/4 of the available vertical space,
-      // and of course, no more than the available horizontal space.
-      let width = (window.innerHeight - 100) * 3 / 4
-      if (width > window.innerWidth) width = window.innerWidth
-      let height = width * 4 / 3
-      return { width: `${width}px`, height: `${height}px` }
-    },
-  },
+  data: () => ({
+    order: null,
+    orderid: null,
+    scanError: null,
+  }),
   methods: {
+    async fetchTicket(token) {
+      this.scanError = this.order = null
+      const resp = await this.$axios.post(`/api/event/${this.event.id}/ticket/${token}`).catch(err => {
+        if (err.response && err.response.status === 404) {
+          this.scanError = 'No such order'
+        } else {
+          console.log(err)
+          this.scanError = 'Server error'
+        }
+        return null
+      })
+      if (!resp) return
+      if (resp.data.id) this.order = resp.data
+      if (resp.data.error) this.scanError = resp.data.error
+    },
+    async onCountChange(tclass, count) {
+      const resp = await this.$axios.post(
+        `/api/event/${this.event.id}/ticket/${this.order.id || 'free'}`, null,
+        { params: { scan: this.order.scan, class: tclass.name, used: count } }
+      ).catch(err => {
+        console.log(err)
+        this.scanError = 'Server error'
+        return null
+      })
+      if (!resp) return
+      if (resp.data.error) {
+        this.scanError = resp.data.error
+        return
+      }
+      this.$set(this.order, 'scan', resp.data.scan)
+      this.$set(this.order, 'id', resp.data.id)
+      tclass.used = count
+      tclass.overflow = false
+    },
     onDecode(text) {
-      if (text.startsWith('https://orders.scholacantorum.org/ticket/'))
-        this.$emit('ticket', text.substr(42))
-      else
-        this.$emit('ticket', 'non-schola')
+      const m = text.match(/\/ticket\/(\d{4}-\d{4}-\d{4})$/)
+      if (m) this.fetchTicket(m[1])
+      else this.scanError = 'Not a Schola order'
     },
     onFree() {
-      this.$emit('ticket', 'free')
-    },
-    async onStreamInit(promise) {
-      await promise.catch(err => {
-        if (err.name === 'NotAllowedError') {
-          window.alert('ERROR: you need to grant camera access permisson')
-        } else if (err.name === 'NotFoundError') {
-          window.alert('ERROR: no camera on this device')
-        } else if (err.name === 'NotSupportedError') {
-          window.alert('ERROR: secure context required (HTTPS, localhost)')
-        } else if (err.name === 'NotReadableError') {
-          window.alert('ERROR: is the camera already in use?')
-        } else if (err.name === 'OverconstrainedError') {
-          window.alert('ERROR: installed cameras are not suitable')
-        } else if (err.name === 'StreamApiNotSupportedError') {
-          window.alert('ERROR: Stream API is not supported in this browser')
-        } else {
-          window.alert('ERROR: unable to start QR code scanner')
-        }
-      })
+      this.order = {
+        scan: 'free',
+        name: 'Free Entry',
+        classes: this.freeEntry.map(fe => ({ name: fe, min: 0, max: 1000, used: 0 })),
+      }
     },
     onSubmit() {
-      if (this.orderid > 0) this.$emit('ticket', this.orderid)
+      if (this.orderid > 0) this.fetchTicket(this.orderid)
+      this.orderid = null
     },
   }
 }
@@ -76,20 +100,54 @@ export default {
 
 <style lang="stylus">
 #scanner
-  width 100%
-  height 100%
+  display flex
+  flex-direction column
+  width 100vw
+  height 100vh
+#scanner-top, #scanner-bottom
+  flex none
+  width 100vw
+  height 50vh
+#scanner-top
+  display flex
+#scanner-controls
+  display flex
+  flex none
+  flex-direction column
+  width calc(100vw - 37.5vh) // makes CameraView 4:3 aspect ratio
 #orderidform
   display flex
-  justify-content space-between
+  flex auto
+  flex-direction column
+  justify-content space-around
   box-sizing border-box
-  padding 6px 12px
-  width 100%
-  height 50px
+  padding 6px
 #forminner
   display flex
+  flex-direction column
 #orderid
-  margin-right 6px
-  width 6em
-#freeEntry
-  margin-left 12px
+  margin-bottom 6px
+#orderinfo
+  text-align center
+#ordername
+  font-weight bold
+  font-size 20px
+  line-height 24px
+#orderid
+  color #888
+  font-size 16px
+  line-height 16px
+#scanError
+  display flex
+  justify-content center
+  align-items center
+  height 100%
+  background-color red
+  color white
+  text-align center
+  font-size 24px
+  line-height 1.2
+#quantities
+  overflow-y auto
+  height 100%
 </style>
