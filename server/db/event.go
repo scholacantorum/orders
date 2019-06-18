@@ -132,3 +132,32 @@ func (tx Tx) FetchTicketCount(event *model.Event) (count int) {
 	panicOnError(tx.tx.QueryRow(`SELECT COUNT(*) FROM ticket WHERE event=?`, event.ID).Scan(&count))
 	return count
 }
+
+// EventOrder is the type returned by FetchEventOrders (q.v.).
+type EventOrder struct {
+	ID   model.OrderID
+	Name string
+}
+
+// FetchEventOrders returns a list of order IDs and customer names for will call
+// searches.  The list is not sorted.  It contains those orders which are valid,
+// have a customer name, and have either tickets used at the target event or
+// unused tickets that could be used at it.
+func (tx Tx) FetchEventOrders(event *model.Event) (list []EventOrder) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	rows, err = tx.tx.Query(`
+SELECT DISTINCT o.id, o.name FROM ordert o, order_line ol, product_event pe, ticket t
+WHERE pe.event=?1 AND pe.product=ol.product AND o.id=ol.orderid AND o.name != ''
+AND o.flags&1 AND t.order_line=ol.id AND (t.used='' OR t.event=?1)`, event.ID)
+	panicOnError(err)
+	for rows.Next() {
+		var eo EventOrder
+		panicOnError(rows.Scan(&eo.ID, &eo.Name))
+		list = append(list, eo)
+	}
+	panicOnError(rows.Err())
+	return list
+}

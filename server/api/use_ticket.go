@@ -8,17 +8,27 @@ import (
 	"time"
 
 	"github.com/rothskeller/json"
+
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
-// UseTicket is the API used by the scanner app to get ticket information and
-// mark tickets as being used.  When called without scan=, class=, and used=
-// query parameters, it uses tickets from every class in their natural quantity.
-// When called with scan=, class=, and used= parameters, it uses or unuses
-// tickets of the specified class in order to achieve the desired used count.
-// In either case it returns an array of class structures describing the counts.
+// UseTicket is the API used by the scanner and at-the-door sales apps to get
+// ticket information and mark tickets as being used.  It has two modes,
+// distinguished by query parameters.
+//
+// In "natural" mode, it figures out the number of tickets used, available, and
+// naturally consumed in each ticket class, and returns that information.  For
+// the scanner app (method=POST), it automatically consumes the natural numbers
+// of tickets; for the at-the-door sales app (method=GET), it does not, but
+// returns the counts as if it had so that the app can present them for
+// approval.
+//
+// In "explicit" mode, the scan=, class=, and used= parameters dictate the new
+// usage count of one or more ticket classes.  The counts may go up or down from
+// their current values, but they can't go lower than the usage count at the
+// time of the previous "natural" call.
 func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID, token string) {
 	var (
 		session *model.Session
@@ -37,7 +47,11 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		return
 	}
 	// Find out whether we're in natural or explicit mode.
-	scan = r.FormValue("scan")
+	if scan = r.FormValue("scan"); scan != "" && r.Method != http.MethodPost {
+		commit(tx)
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	// Get the requested order.  It could be either an order number or an
 	// order token.  If we're in explicit mode, it could also be the word
 	// "free", meaning that we should create an anonymous order containing
@@ -62,17 +76,20 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	// The rest of the processing differs between natural and explicit
 	// modes.
 	if scan == "" {
-		useTicketNatural(tx, session, w, event, order, now)
+		useTicketNatural(tx, session, w, event, order, now, r.Method == http.MethodPost)
 	} else {
 		useTicketExplicit(tx, session, w, r, event, order, now)
 	}
 }
 
 // useTicketNatural handles natural UseTicket requests, i.e., the ones made when
-// a ticket is first scanned.  These consume the "natural" number of tickets out
-// of each ticket class on the order, and then supply the UI with information
-// about classes and ticket counts.
-func useTicketNatural(tx db.Tx, session *model.Session, w http.ResponseWriter, event *model.Event, order *model.Order, now time.Time) {
+// a ticket is first scanned.  If autoUse is true, these consume the "natural"
+// number of tickets out of each ticket class on the order.  Regardless, it
+// supplies the UI with information about classes and ticket counts.
+func useTicketNatural(
+	tx db.Tx, session *model.Session, w http.ResponseWriter, event *model.Event,
+	order *model.Order, now time.Time, autoUse bool,
+) {
 	// Information collected and returned about each ticket class.
 	type class struct {
 		// class name
@@ -143,7 +160,7 @@ func useTicketNatural(tx db.Tx, session *model.Session, w http.ResponseWriter, e
 		} else if free[cname] != nil {
 			cdata.max = 1000
 		}
-		if cdata.used > cdata.min {
+		if cdata.used > cdata.min && autoUse {
 			consumeTickets(clines, event, now, cdata.used-cdata.min)
 		}
 	}
@@ -173,8 +190,10 @@ func useTicketNatural(tx db.Tx, session *model.Session, w http.ResponseWriter, e
 							jw.Prop("overflow", true)
 						}
 					})
-					log.Printf("%s USE TICKETS order:%d event:%s %v",
-						session.Username, order.ID, event.ID, class)
+					if autoUse {
+						log.Printf("%s USE TICKETS order:%d event:%s %v",
+							session.Username, order.ID, event.ID, class)
+					}
 				}
 			})
 		})
@@ -190,70 +209,79 @@ func useTicketExplicit(
 	event *model.Event, order *model.Order, now time.Time,
 ) {
 	var (
-		wanted int
-		min    int
-		max    int
-		used   int
-		lines  []*model.OrderLine
-		free   map[string]*model.Product
-		fp     *model.Product
-		jw     json.Writer
-		err    error
-		scan   = r.FormValue("scan")
-		cname  = r.FormValue("class")
+		linemap map[string][]*model.OrderLine
+		free    map[string]*model.Product
+		jw      json.Writer
+		scan    = r.FormValue("scan")
 	)
-	if wanted, err = strconv.Atoi(r.FormValue("used")); err != nil || wanted < 0 {
-		BadRequestError(tx, w, "invalid used count")
-		return
-	}
 	// Get the order lines for the requested ticket class.
-	if linemap := useTicketClassMap(order, event); linemap == nil && len(order.Lines) != 0 {
+	if linemap = useTicketClassMap(order, event); linemap == nil && len(order.Lines) != 0 {
 		BadRequestError(tx, w, "not a ticket order")
 		return
-	} else {
-		lines = linemap[cname]
 	}
-	// Check the desired count against the min and max usage for this class.
-	for _, ol := range lines {
-		if ol.Scan != scan {
-			BadRequestError(tx, w, "wrong scan session")
-			return
-		}
-		max += ol.Quantity * ol.Product.TicketCount
-		min += ol.MinUsed
-		for _, t := range ol.Tickets {
-			if !t.Used.IsZero() {
-				used++
-			}
-		}
-	}
-	if wanted < min {
-		BadRequestError(tx, w, "reducing used count below minimum")
+	if len(r.Form["class"]) != len(r.Form["used"]) {
+		BadRequestError(tx, w, "different numbers of class and used parameters")
 		return
 	}
-	if wanted > max {
-		free = getFreeClasses(tx, event)
-		if fp = free[cname]; fp == nil {
-			sendError(tx, w, "Ticket already used")
+	for cidx, cname := range r.Form["class"] {
+		var (
+			wanted int
+			min    int
+			max    int
+			used   int
+			lines  []*model.OrderLine
+			fp     *model.Product
+			err    error
+		)
+		lines = linemap[cname]
+		if wanted, err = strconv.Atoi(r.Form["used"][cidx]); err != nil || wanted < 0 {
+			BadRequestError(tx, w, "invalid used count")
 			return
 		}
-		if ol := addFreeTickets(order, event, fp, scan, wanted-max); ol != nil {
-			lines = append(lines, ol)
+		// Check the desired count against the min and max usage for this class.
+		for _, ol := range lines {
+			if ol.Scan != scan {
+				BadRequestError(tx, w, "wrong scan session")
+				return
+			}
+			max += ol.Quantity * ol.Product.TicketCount
+			min += ol.MinUsed
+			for _, t := range ol.Tickets {
+				if !t.Used.IsZero() {
+					used++
+				}
+			}
 		}
-		max = 1000
-	}
-	// Adjust the usage as requested.
-	if wanted > used {
-		consumeTickets(lines, event, now, wanted-used)
-	}
-	if wanted < used {
-		unconsumeTickets(lines, event, used-wanted)
+		if wanted < min {
+			BadRequestError(tx, w, "reducing used count below minimum")
+			return
+		}
+		if wanted > max {
+			if free == nil {
+				free = getFreeClasses(tx, event)
+			}
+			if fp = free[cname]; fp == nil {
+				sendError(tx, w, "Ticket already used")
+				return
+			}
+			if ol := addFreeTickets(order, event, fp, scan, wanted-max); ol != nil {
+				lines = append(lines, ol)
+			}
+			max = 1000
+		}
+		// Adjust the usage as requested.
+		if wanted > used {
+			consumeTickets(lines, event, now, wanted-used)
+		}
+		if wanted < used {
+			unconsumeTickets(lines, event, used-wanted)
+		}
+		log.Printf("%s USE TICKETS order:%d event:%s class:%q used:%d want:%d allow:%d-%d",
+			session.Username, order.ID, event.ID, cname, used, wanted, min, max)
 	}
 	// Clean up and return success.
 	tx.SaveOrder(order)
 	commit(tx)
-	log.Printf("%s USE TICKETS order:%d event:%s class:%q used:%d want:%d allow:%d-%d",
-		session.Username, order.ID, event.ID, cname, used, wanted, min, max)
 	jw = json.NewWriter(w)
 	jw.Object(func() {
 		jw.Prop("id", int(order.ID))
@@ -316,13 +344,9 @@ func getFreeClasses(tx db.Tx, event *model.Event) (fc map[string]*model.Product)
 	fc = make(map[string]*model.Product)
 	for _, p := range tx.FetchProductsByEvent(event) {
 		for _, sku := range p.SKUs {
-			if sku.Price == 0 && sku.Coupon == "" && !sku.MembersOnly {
+			if interestingSKU(p, sku, 0, "", false) && sku.Price == 0 {
 				fc[p.TicketClass] = p
 			}
-			// Note deliberately ignoring SalesStart..SalesEnd
-			// range.  Free student tickets are usually set up with
-			// a range that never matches so they don't appear as
-			// explicitly orderable.
 		}
 	}
 	return fc

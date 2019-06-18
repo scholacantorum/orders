@@ -104,13 +104,25 @@ func router(w http.ResponseWriter, r *http.Request) {
 					default:
 						methodNotAllowedError(txh, w)
 					}
+				case "orders":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodGet:
+							api.ListEventOrders(txh, w, r, model.EventID(eventID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
 				case "ticket":
 					switch order := shiftPath(r); order {
 					case "":
 						api.NotFoundError(txh, w)
 					default:
 						switch r.Method {
-						case http.MethodPost:
+						case http.MethodGet, http.MethodPost:
 							api.UseTicket(txh, w, r, model.EventID(eventID), order)
 						default:
 							methodNotAllowedError(txh, w)
@@ -142,7 +154,41 @@ func router(w http.ResponseWriter, r *http.Request) {
 					methodNotAllowedError(txh, w)
 				}
 			default:
-				notImplementedError(txh, w) // TODO
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodDelete:
+						api.CancelOrder(txh, w, r, model.OrderID(orderID))
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				case "capturePayment":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodPost:
+							api.CaptureOrderPayment(txh, w, r, model.OrderID(orderID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				case "sendReceipt":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodPost:
+							api.SendOrderReceipt(txh, w, r, model.OrderID(orderID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
 			case -1:
 				api.NotFoundError(txh, w)
 			}
@@ -180,6 +226,23 @@ func router(w http.ResponseWriter, r *http.Request) {
 				default:
 					methodNotAllowedError(txh, w)
 				}
+			}
+		case "stripe":
+			switch shiftPath(r) {
+			case "connectTerminal":
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodGet:
+						api.GetStripeConnectTerminal(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
 			}
 		default:
 			api.NotFoundError(txh, w)

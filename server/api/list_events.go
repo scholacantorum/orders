@@ -26,9 +26,9 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		jw              json.Writer
 		freeEntries     = map[model.EventID][]string{}
 	)
-	// Getting events needs either PrivSetupOrders or PrivScanTickets.  Here
-	// we assume that anyone with PrivSetupOrders will also have
-	// PrivScanTickets.
+	// Getting events needs PrivSetupOrders, PrivInPersonSales, or
+	// PrivScanTickets.  Here we assume that anyone with PrivSetupOrders or
+	// PrivInPersonSales will also have PrivScanTickets.
 	if session = auth.GetSession(tx, w, r, model.PrivScanTickets); session == nil {
 		return
 	}
@@ -68,15 +68,9 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 // otherwise, it returns nil.
 func getFreeEntries(tx db.Tx, event *model.Event) (list []string) {
 	var seen = map[string]bool{}
-	for _, product := range tx.FetchProductsByEvent(event) {
-		for _, sku := range product.SKUs {
-			if sku.Coupon == "" && !sku.MembersOnly && sku.Price == 0 && !seen[product.TicketClass] {
-				seen[product.TicketClass] = true
-				list = append(list, product.TicketClass)
-			}
-			// Note that we're deliberately ignoring SalesStart and
-			// SalesEnd.  Student tickets usually are deliberately
-			// out of range so they don't show up for explicit sale.
+	for _, p := range getFreeClasses(tx, event) {
+		if !seen[p.TicketClass] {
+			list = append(list, p.TicketClass)
 		}
 	}
 	return list

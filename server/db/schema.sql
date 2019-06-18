@@ -137,13 +137,13 @@ CREATE TABLE product (
 -- represents the pricing scheme by which they ordered it.
 --
 -- Although not expressed in SQL, the code enforces a uniqueness constraint on
--- this table:  for any given combination of product, coupon, and members_only
--- flag, there cannot be overlapping sales_start..sales_end ranges.  When
--- choosing which SKU to use for a given order, the following algorithm is used:
---   - If the caller is not logged in, SKUs with members_only=1 are not
---     considered.
---   - If the caller is logged in, and there are any SKUs with members_only=1,
---     SKUs with members_only=0 are not considered.
+-- this table:  for any given combination of product, coupon, and flags, there
+-- cannot be overlapping sales_start..sales_end ranges.  When choosing which SKU
+-- to use for a given order, the following algorithm is used:
+--   - SKUs with flags set are not considered unless the criteria specified by
+--     those flags are met.
+--   - For each flag whose criteria are met, if there are SKUs with that flag
+--     set, SKUs without that flag are not considered.
 --   - If the caller supplied a coupon code, and there are any SKUs with that
 --     coupon code, no SKUs without that coupon code are considered.
 --   - If the caller does not have PrivManageOrders privilege, only SKUs whose
@@ -170,9 +170,9 @@ CREATE TABLE sku (
     sales_start text NOT NULL DEFAULT '',
     sales_end   text NOT NULL DEFAULT '',
 
-    -- Flag indicating that this SKU can only be used by a logged-in Schola
-    -- member placing an order through scholacantorummembers.org.
-    members_only boolean NOT NULL DEFAULT 0,
+    -- Flags further constraining the use of this SKU.  See model/model.go for
+    -- flag values.
+    flags integer NOT NULL DEFAULT 0,
 
     -- Price to purchase the product using this SKU, in cents.  Depending on the
     -- product type, a zero value may mean that the product is free when
@@ -318,4 +318,22 @@ CREATE TABLE session (
     -- bitmask).  These are derived from the user.roles column in the
     -- scholacantorummembers.org database.
     privileges integer NOT NULL
+);
+
+-- The card_email table maps payment card fingerprints (from Stripe) to email
+-- addresses.  Any time a card is used with a known email address, the address
+-- for that card is added or updated here.  When an order is placed with no
+-- address (e.g. at the door), this table is consulted to "guess" the address
+-- for the receipt.
+CREATE TABLE card_email (
+
+    -- Card fingerprint is lookup key.
+    card text PRIMARY KEY,
+
+    -- Name associated with the card.  May be empty if we've never had a name
+    -- for this card (always used at the door).
+    name text NOT NULL DEFAULT '',
+
+    -- Email address associated with the card.
+    email text NOT NULL DEFAULT ''
 );

@@ -79,7 +79,7 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
-			if prev.MembersOnly == sku.MembersOnly && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
+			if prev.Flags&^model.SKUHidden == sku.Flags&^model.SKUHidden && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
 				BadRequestError(tx, w, "overlapping SKUs")
 				return
 			}
@@ -141,7 +141,23 @@ func parseCreateProductSKU(sku *model.SKU) json.Handlers {
 		case "salesEnd":
 			return json.TimeHandler(func(t time.Time) { sku.SalesEnd = t })
 		case "membersOnly":
-			return json.BoolHandler(func(b bool) { sku.MembersOnly = b })
+			return json.BoolHandler(func(b bool) {
+				if b {
+					sku.Flags |= model.SKUMembersOnly
+				}
+			})
+		case "inPerson":
+			return json.BoolHandler(func(b bool) {
+				if b {
+					sku.Flags |= model.SKUInPerson
+				}
+			})
+		case "hidden":
+			return json.BoolHandler(func(b bool) {
+				if b {
+					sku.Flags |= model.SKUHidden
+				}
+			})
 		case "price":
 			return json.IntHandler(func(i int) { sku.Price = i })
 		default:
@@ -217,8 +233,14 @@ func emitProduct(p *model.Product) []byte {
 						if !sku.SalesEnd.IsZero() {
 							jw.Prop("salesEnd", sku.SalesEnd.Format(time.RFC3339))
 						}
-						if sku.MembersOnly {
+						if sku.Flags&model.SKUMembersOnly != 0 {
 							jw.Prop("membersOnly", true)
+						}
+						if sku.Flags&model.SKUInPerson != 0 {
+							jw.Prop("inPerson", true)
+						}
+						if sku.Flags&model.SKUHidden != 0 {
+							jw.Prop("hidden", true)
 						}
 						jw.Prop("price", sku.Price)
 					})

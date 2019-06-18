@@ -50,6 +50,8 @@ github.com/stripe/stripe-go v57.6.0+incompatible h1:7soRl7adYbnLZd5jhrYShUmDZm1V
 github.com/stripe/stripe-go v57.6.0+incompatible/go.mod h1:A1dQZmO/QypXmsL0T8axYZkSN/uA/T/A64pfKdBAMiY=
 github.com/stripe/stripe-go v60.18.0+incompatible h1:UcMEuRIAa6//BfBsjXZ0Q9aKx+8IWm3fu+UcLqJ+Djg=
 github.com/stripe/stripe-go v60.18.0+incompatible/go.mod h1:A1dQZmO/QypXmsL0T8axYZkSN/uA/T/A64pfKdBAMiY=
+github.com/stripe/stripe-go v61.1.0+incompatible h1:ZxB31fStq/d4LiAHrktm8zlYD15WXycWc1qKUqN95o8=
+github.com/stripe/stripe-go v61.1.0+incompatible/go.mod h1:A1dQZmO/QypXmsL0T8axYZkSN/uA/T/A64pfKdBAMiY=
 go.opencensus.io v0.21.0 h1:mU6zScU4U1YAFPHEHYk+3JC4SY7JxgkqS10ZOSyksNg=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

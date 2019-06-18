@@ -90,7 +90,11 @@ func emitReceipt(order *model.Order) {
 	}
 
 	// Greet the customer.
-	fmt.Fprintf(htmlqp, "<p>Dear %s,</p>", html.EscapeString(order.Name))
+	if order.Name != "" {
+		fmt.Fprintf(htmlqp, "<p>Dear %s,</p>", html.EscapeString(order.Name))
+	} else {
+		fmt.Fprint(htmlqp, "<p>Dear Schola Cantorum Patron,</p>")
+	}
 
 	// Add a paragraph for each line on the order.
 	for _, ol := range order.Lines {

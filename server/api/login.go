@@ -9,6 +9,7 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
@@ -109,6 +110,7 @@ func Login(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	jw.Object(func() {
 		jw.Prop("token", session.Token)
 		jw.Prop("username", session.Username)
+		jw.Prop("stripePublicKey", config.Get("stripePublicKey"))
 		jw.Prop("privSetupOrders", session.Privileges&model.PrivSetupOrders != 0)
 		jw.Prop("privViewOrders", session.Privileges&model.PrivViewOrders != 0)
 		jw.Prop("privManageOrders", session.Privileges&model.PrivManageOrders != 0)

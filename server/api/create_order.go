@@ -33,8 +33,11 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		order   *model.Order
 		privs   model.Privilege
 		success bool
+		card    string
 		message string
+		receipt bool
 		err     error
+		logverb = "PLACE"
 	)
 	// Get current session data, if any.
 	if auth.HasSession(r) {
@@ -54,7 +57,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Resolve the products and SKUs and validate the prices.
-	if !resolveSKUs(tx, order, privs, true) {
+	if !resolveSKUs(tx, order, privs) {
 		BadRequestError(tx, w, "invalid products or prices")
 		return
 	}
@@ -87,32 +90,59 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	tx.SaveOrder(order)
 	commit(tx)
 	// If we do have to charge a card through Stripe, do it now.
-	if len(order.Payments) == 1 && order.Payments[0].Type == model.PaymentCard {
-		success, message = stripe.ChargeCard(order, order.Payments[0])
-		tx = db.Begin()
-		if !success {
-			tx.DeleteOrder(order)
-			commit(tx)
-			if message == "" {
-				message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
+	if len(order.Payments) == 1 {
+		switch order.Payments[0].Type {
+		case model.PaymentCard:
+			success, card, message = stripe.ChargeCard(order, order.Payments[0])
+			tx = db.Begin()
+			if !success {
+				tx.DeleteOrder(order)
+				commit(tx)
+				if message == "" {
+					message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
+				}
+				sendError(tx, w, message)
+				return
 			}
-			sendError(tx, w, message)
-			return
+			order.Flags |= model.OrderValid
+			tx.SaveOrder(order)
+			tx.SaveCard(card, order.Name, order.Email)
+			receipt = order.Email != ""
+			order.Name, order.Email = tx.FetchCard(card)
+			commit(tx)
+		case model.PaymentCardPresent:
+			// For card present transactions, we have to create the
+			// order and notify Stripe before processing the card.
+			// Do that now, and return the (uncompleted) order with
+			// the payment intent in it.
+			success = stripe.CreatePaymentIntent(order)
+			tx = db.Begin()
+			if !success {
+				tx.DeleteOrder(order)
+				commit(tx)
+				sendError(tx, w, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
+				return
+			}
+			tx.SaveOrder(order)
+			commit(tx)
+			logverb = "CREATE"
+			receipt = false
 		}
-		order.Flags |= model.OrderValid
-		tx.SaveOrder(order)
-		commit(tx)
 	}
 	// Log and return the completed order.
 	if session != nil {
-		log.Printf("%s PLACE ORDER %s", session.Username, emitOrder(order, true))
+		log.Printf("%s %s ORDER %s", session.Username, logverb, emitOrder(order, true))
 	} else {
-		log.Printf("- PLACE ORDER %s", emitOrder(order, true))
+		log.Printf("- %s ORDER %s", logverb, emitOrder(order, true))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(emitOrder(order, false))
-	emitReceipt(order)
-	updateGoogleSheet(order)
+	if receipt && order.Email != "" {
+		emitReceipt(order)
+	}
+	if order.Flags&model.OrderValid != 0 {
+		updateGoogleSheet(order)
+	}
 }
 
 // parseCreateOrder reads the order details from the request body.
@@ -243,12 +273,10 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 }
 
 // resolveSKUs walks through each line of the order, finding the listed product
-// and computing the amount of the order line, following the SKU rules
-// documented in db/schema.sql.  If mustMatch is true, it requires that the line
-// have the correct amount.  If mustMatch is false, it overrides the line
-// amount, setting it to the correct amount. It returns true if everything
+// and verifying the amount of the order line, following the SKU rules
+// documented in db/schema.sql. It returns true if everything
 // resolved successfully and false otherwise.
-func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch bool) bool {
+func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege) bool {
 	var couponMatch bool
 
 	for _, line := range order.Lines {
@@ -270,17 +298,14 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch 
 			if s.Coupon != "" {
 				couponMatch = true
 			}
-			if sku == nil || betterSKU(s, sku) {
-				sku = s
-			}
+			sku = betterSKU(sku, s)
 		}
 		if sku == nil {
 			continue
 		}
-		if mustMatch && line.Price != sku.Price {
+		if line.Price != sku.Price {
 			return false
 		}
-		line.Price = sku.Price
 	}
 	if !couponMatch {
 		order.Coupon = ""
@@ -291,7 +316,10 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege, mustMatch 
 // matchSKU returns true if all of the criteria for the SKU are met by the order
 // being placed.
 func matchSKU(order *model.Order, privs model.Privilege, sku *model.SKU) bool {
-	if sku.MembersOnly && privs == 0 {
+	if sku.Flags&model.SKUMembersOnly != 0 && privs == 0 {
+		return false
+	}
+	if sku.Flags&model.SKUInPerson != 0 && order.Source != model.OrderInPerson {
 		return false
 	}
 	if sku.Coupon != "" && !strings.EqualFold(sku.Coupon, order.Coupon) {
@@ -309,41 +337,65 @@ func matchSKU(order *model.Order, privs model.Privilege, sku *model.SKU) bool {
 	return true
 }
 
-// betterSKU returns whether sku1 is a higher priority match than sku2.
-func betterSKU(sku1, sku2 *model.SKU) bool {
-	if sku1.MembersOnly && !sku2.MembersOnly {
-		return true
+// betterSKU returns the better SKU.
+func betterSKU(sku1, sku2 *model.SKU) *model.SKU {
+	var isr1, isr2 int
+	var now = time.Now()
+
+	if sku2 == nil {
+		return sku1
 	}
-	if !sku1.MembersOnly && sku2.MembersOnly {
-		return false
+	if sku1 == nil {
+		return sku2
+	}
+	if sku1.Flags&model.SKUInPerson != 0 && sku2.Flags&model.SKUInPerson == 0 {
+		return sku1
+	}
+	if sku1.Flags&model.SKUInPerson == 0 && sku2.Flags&model.SKUInPerson != 0 {
+		return sku2
+	}
+	if sku1.Flags&model.SKUMembersOnly != 0 && sku2.Flags&model.SKUMembersOnly == 0 {
+		return sku1
+	}
+	if sku1.Flags&model.SKUMembersOnly == 0 && sku2.Flags&model.SKUMembersOnly != 0 {
+		return sku2
 	}
 	if sku1.Coupon != "" && sku2.Coupon == "" {
-		return true
+		return sku1
 	}
 	if sku1.Coupon == "" && sku2.Coupon != "" {
-		return false
+		return sku2
 	}
-	var now = time.Now()
-	if !sku1.SalesStart.After(now) && (sku1.SalesEnd.IsZero() || !sku1.SalesEnd.Before(now)) {
-		// sku1 contains now; uniqueness guarantees that sku2 doesn't
-		return true
+	isr1 = sku1.InSalesRange(now)
+	isr2 = sku2.InSalesRange(now)
+	if isr1 == 0 && isr2 == 0 {
+		if sku1.Price < sku2.Price {
+			return sku1
+		}
+		return sku2
 	}
-	if !sku2.SalesStart.After(now) && (sku2.SalesEnd.IsZero() || !sku2.SalesEnd.Before(now)) {
-		// sku2 contains now; uniqueness guarantees that sku1 doesn't
-		return false
+	if isr1 == 0 {
+		return sku1
 	}
-	if sku1.SalesStart.Before(now) && sku2.SalesStart.Before(now) {
-		// both earlier than now, so take the one that starts later
-		return sku2.SalesStart.Before(sku1.SalesStart)
-	} else if sku1.SalesStart.Before(now) {
-		// sku1 is before now and sku2 is after
-		return true
-	} else if sku2.SalesStart.Before(now) {
-		// sku2 is before now and sku1 is after
-		return false
+	if isr2 == 0 {
+		return sku2
 	}
-	// both later than now, so take the one that starts earlier
-	return sku1.SalesStart.Before(sku2.SalesStart)
+	if isr1 < 0 && isr2 > 0 {
+		return sku1
+	}
+	if isr2 < 0 && isr1 > 0 {
+		return sku2
+	}
+	if isr1 < 0 {
+		if sku1.SalesStart.Before(sku2.SalesStart) {
+			return sku1
+		}
+		return sku2
+	}
+	if sku1.SalesEnd.After(sku2.SalesEnd) {
+		return sku1
+	}
+	return sku2
 }
 
 var emailRE = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
@@ -407,6 +459,8 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 }
 
 var methodRE = regexp.MustCompile(`^pm_[A-Za-z0-9_]+$`)
+var intentRE = regexp.MustCompile(`^pi_[A-Za-z0-9_]+$`)
+var tokenRE = regexp.MustCompile("^tok_[A-Za-z0-9_]*$")
 
 // validateOrderDetails returns whether the order details are valid.  Note that
 // this does not check authorization.  It also doesn't check anything specific
@@ -533,6 +587,10 @@ func validatePayment(order *model.Order) bool {
 		}
 	case model.OrderInPerson:
 		switch pmt.Type {
+		case model.PaymentCard:
+			if !tokenRE.MatchString(pmt.Method) {
+				return false
+			}
 		case model.PaymentCardPresent:
 			if pmt.Method != "" {
 				return false

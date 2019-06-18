@@ -19,12 +19,16 @@ type getPricesData struct {
 	price   int
 }
 
-// GetPrices returns the prices and availability of one or more products.  It is
-// used to drive the order form.
+// GetPrices returns the prices and availability of one or more products, or the
+// products giving admission to an event.  It is used to drive the order form
+// and the in-person sales app.
 func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
+		eventID     model.EventID
 		session     *model.Session
 		privs       model.Privilege
+		event       *model.Event
+		productIDs  []string
 		coupon      string
 		couponMatch bool
 		pdata       []*getPricesData
@@ -32,19 +36,35 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		masterSKU   *model.SKU
 		jw          json.Writer
 	)
+	// If the caller specified an event, they have to have in-person sales
+	// privilege.
+	if eventID = model.EventID(r.FormValue("event")); eventID != "" {
+		privs = model.PrivInPersonSales
+	}
 	// Get current session privileges.
 	if auth.HasSession(r) {
-		if session = auth.GetSession(tx, w, r, 0); session == nil {
+		if session = auth.GetSession(tx, w, r, privs); session == nil {
 			return
 		}
 		privs = session.Privileges
 	}
-	// Read the request details from the request.
-	if coupon = r.FormValue("coupon"); coupon == "" {
-		couponMatch = true
+	// If the caller specified an event, get the list of products offering
+	// ticket sales for that event.
+	if eventID != "" {
+		if event = tx.FetchEvent(eventID); event == nil {
+			NotFoundError(tx, w)
+			return
+		}
+		productIDs = getEventProducts(tx, event)
+	} else {
+		// Read the request details from the request.
+		productIDs = r.Form["p"]
+		if coupon = r.FormValue("coupon"); coupon == "" {
+			couponMatch = true
+		}
 	}
 	// Look up the prices for each product.
-	for _, pid := range r.Form["p"] {
+	for _, pid := range productIDs {
 		var (
 			sku *model.SKU
 			pd  getPricesData
@@ -57,13 +77,13 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		pd.name = product.ShortName
 		// Find the best SKU for this product.
 		for _, s := range product.SKUs {
-			if !interestingSKU(product, s, privs, coupon) {
+			if !interestingSKU(product, s, privs, coupon, event != nil) {
 				continue
 			}
 			if s.Coupon == coupon {
 				couponMatch = true
 			}
-			sku = betterSKU2(s, sku)
+			sku = betterSKU(s, sku)
 		}
 		if sku == nil {
 			// No applicable SKUs; ignore product.
@@ -79,7 +99,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		// The masterSKU determines the message to be shown in lieu of
 		// the purchase button if none of the products are available for
 		// sale.
-		masterSKU = betterSKU2(sku, masterSKU)
+		masterSKU = betterSKU(sku, masterSKU)
 	}
 	commit(tx)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -99,14 +119,38 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	jw.Close()
 }
 
+// getEventProducts returns the product names for the products selling tickets
+// to the specified event.  Only products that are targeted at the event, or not
+// targeted at any specific event, are included.
+func getEventProducts(tx db.Tx, event *model.Event) (productIDs []string) {
+	for _, p := range tx.FetchProductsByEvent(event) {
+		var targeted, match bool
+		for _, pe := range p.Events {
+			if pe.Priority == 0 {
+				targeted = true
+				if pe.Event.ID == event.ID {
+					match = true
+				}
+			}
+		}
+		if match || !targeted {
+			productIDs = append(productIDs, string(p.ID))
+		}
+	}
+	return productIDs
+}
+
 // interestingSKU returns true if the SKU's criteria are met, or come close.
 // "Close", in this context, means that all criteria are met except for the
 // sales range, and one of the following is true:
 //   - The caller has PrivInPersonSales
 //   - The sales range is in the future
 //   - The product is a ticket to an event that starts today or later
-func interestingSKU(product *model.Product, sku *model.SKU, privs model.Privilege, coupon string) bool {
-	if sku.MembersOnly && privs == 0 {
+func interestingSKU(product *model.Product, sku *model.SKU, privs model.Privilege, coupon string, inPerson bool) bool {
+	if sku.Flags&model.SKUMembersOnly != 0 && privs == 0 {
+		return false
+	}
+	if sku.Flags&model.SKUInPerson != 0 && !inPerson {
 		return false
 	}
 	if sku.Coupon != "" && sku.Coupon != coupon {
@@ -129,54 +173,6 @@ func interestingSKU(product *model.Product, sku *model.SKU, privs model.Privileg
 		}
 	}
 	return false
-}
-
-// betterSKU returns whichever SKU has the better fit for the purchase.  It
-// assumes that all SKUs passed the interestingSKU check.  If both SKUs are in
-// sales range, the cheaper one is selected.  Otherwise, a current range is
-// better than one in the future, which is better than one in the past; and for
-// both future and past, a range closer to today is better than one further
-// away.
-func betterSKU2(sku1, sku2 *model.SKU) *model.SKU {
-	var isr1, isr2 int
-	var now = time.Now()
-
-	if sku2 == nil {
-		return sku1
-	}
-	if sku1 == nil {
-		return sku2
-	}
-	isr1 = sku1.InSalesRange(now)
-	isr2 = sku2.InSalesRange(now)
-	if isr1 == 0 && isr2 == 0 {
-		if sku1.Price < sku2.Price {
-			return sku1
-		}
-		return sku2
-	}
-	if isr1 == 0 {
-		return sku1
-	}
-	if isr2 == 0 {
-		return sku2
-	}
-	if isr1 < 0 && isr2 > 0 {
-		return sku1
-	}
-	if isr2 < 0 && isr1 > 0 {
-		return sku2
-	}
-	if isr1 < 0 {
-		if sku1.SalesStart.Before(sku2.SalesStart) {
-			return sku1
-		}
-		return sku2
-	}
-	if sku1.SalesEnd.After(sku2.SalesEnd) {
-		return sku1
-	}
-	return sku2
 }
 
 // noSalesMessage returns the string describing why the SKU isn't available for

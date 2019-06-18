@@ -32,8 +32,8 @@ func (tx Tx) SaveProduct(p *model.Product) {
 	panicOnExecError(tx.tx.Exec(`DELETE FROM sku WHERE product=?`, p.ID))
 	for _, sku := range p.SKUs {
 		panicOnExecError(tx.tx.Exec(
-			`INSERT INTO sku (product, coupon, sales_start, sales_end, members_only, price) VALUES (?,?,?,?,?,?)`,
-			p.ID, sku.Coupon, Time(sku.SalesStart), Time(sku.SalesEnd), sku.MembersOnly, sku.Price))
+			`INSERT INTO sku (product, coupon, sales_start, sales_end, flags, price) VALUES (?,?,?,?,?,?)`,
+			p.ID, sku.Coupon, Time(sku.SalesStart), Time(sku.SalesEnd), sku.Flags, sku.Price))
 	}
 }
 
@@ -73,12 +73,12 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 	}
 	panicOnError(rows.Err())
 	rows, err = tx.tx.Query(
-		`SELECT coupon, sales_start, sales_end, members_only, price FROM sku WHERE product=?`, p.ID)
+		`SELECT coupon, sales_start, sales_end, flags, price FROM sku WHERE product=?`, p.ID)
 	panicOnError(err)
 	for rows.Next() {
 		var sku model.SKU
 		panicOnError(rows.Scan(&sku.Coupon, (*Time)(&sku.SalesStart),
-			(*Time)(&sku.SalesEnd), &sku.MembersOnly, &sku.Price))
+			(*Time)(&sku.SalesEnd), &sku.Flags, &sku.Price))
 		p.SKUs = append(p.SKUs, &sku)
 	}
 	panicOnError(rows.Err())
@@ -86,12 +86,16 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 }
 
 // FetchProductsByEvent returns the set of products that give entry to the
-// specified event.  They are returned in priority order.
+// specified event.  They are returned in priority order.  Their Events lists
+// are not complete; they contain only the single entry for the event requested.
 func (tx Tx) FetchProductsByEvent(event *model.Event) (products []*model.Product) {
 	var (
-		prows *sql.Rows
-		srows *sql.Rows
-		err   error
+		prows    *sql.Rows
+		srows    *sql.Rows
+		erows    *sql.Rows
+		eid      model.EventID
+		priority int
+		err      error
 	)
 	prows, err = tx.tx.Query(`
 SELECT p.id, p.name, p.shortname, p.type, p.receipt, p.ticket_count, p.ticket_class
@@ -101,15 +105,23 @@ FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=? ORDER BY p
 		var p model.Product
 		panicOnError(tx.scanProduct(prows, &p))
 		srows, err = tx.tx.Query(
-			`SELECT coupon, sales_start, sales_end, members_only, price FROM sku WHERE product=?`, p.ID)
+			`SELECT coupon, sales_start, sales_end, flags, price FROM sku WHERE product=?`, p.ID)
 		panicOnError(err)
 		for srows.Next() {
 			var sku model.SKU
 			panicOnError(srows.Scan(&sku.Coupon, (*Time)(&sku.SalesStart),
-				(*Time)(&sku.SalesEnd), &sku.MembersOnly, &sku.Price))
+				(*Time)(&sku.SalesEnd), &sku.Flags, &sku.Price))
 			p.SKUs = append(p.SKUs, &sku)
 		}
 		panicOnError(srows.Err())
+		erows, err = tx.tx.Query(`SELECT event, priority FROM product_event WHERE product=?`, p.ID)
+		panicOnError(err)
+		for erows.Next() {
+			panicOnError(erows.Scan(&eid, &priority))
+			var event = tx.FetchEvent(eid)
+			p.Events = append(p.Events, model.ProductEvent{Event: event, Priority: priority})
+		}
+		panicOnError(erows.Err())
 		products = append(products, &p)
 	}
 	panicOnError(prows.Err())
