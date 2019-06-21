@@ -13,10 +13,10 @@ entered), an order token (scanned),  or 'free' for a free entry.
       LogoTall
       form#orderidform(@submit.prevent="onSubmit")
         #forminner
-          b-form-input#orderid(v-model="orderid" type="number" min="1" step="any" size="5" placeholder="Order #")
+          b-form-input#orderid(ref="orderid" v-model="orderid" type="number" min="1" step="any" size="5" placeholder="Order #")
           b-button(type="submit") Submit
         b-button(v-if="freeEntry" @click.prevent="onFree" :disabled="!freeEntry") Free Entry
-      #orderinfo
+      #orderinfo(:class="orderInfoClass")
         #ordername(v-text="(order && order.name) ? order.name : '\u00A0'")
         #ordernum(v-text="(order && order.id) ? `Order number ${order.id}` : '\u00A0'")
   #scanner-bottom
@@ -40,10 +40,14 @@ export default {
     freeEntry: Array,
   },
   data: () => ({
+    newOrder: false,
     order: null,
     orderid: null,
     scanError: null,
   }),
+  computed: {
+    orderInfoClass() { return this.newOrder ? 'orderinfo-new' : null },
+  },
   methods: {
     async fetchTicket(token) {
       this.scanError = this.order = null
@@ -59,7 +63,11 @@ export default {
         return null
       })
       if (!resp) return
-      if (resp.data.id) this.order = resp.data
+      if (resp.data.id) {
+        this.order = resp.data
+        this.newOrder = true
+        window.setTimeout(() => { this.newOrder = false }, 100)
+      }
       if (resp.data.error) this.scanError = resp.data.error
     },
     async onCountChange(tclass, count) {
@@ -100,6 +108,7 @@ export default {
     onSubmit() {
       if (this.orderid > 0) this.fetchTicket(this.orderid)
       this.orderid = null
+      this.$refs.orderid.blur()
     },
   }
 }
@@ -135,7 +144,12 @@ export default {
 #orderid
   margin-bottom 6px
 #orderinfo
+  background-color #fff
   text-align center
+  transition background-color 0.5s
+  &.orderinfo-new
+    background-color #28a745
+    transition none
 #ordername
   font-weight bold
   font-size 20px
