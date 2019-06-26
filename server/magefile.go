@@ -48,22 +48,28 @@ func orders(path string) error {
 }
 
 func SandboxPaymentForms() error {
-	return paymentForms(
+	if err := publicPaymentForms(
 		"/home/scholacantorum/orders-test.scholacantorum.org",
 		"/home/scholacantorum/schola6p/data/sandbox/resources",
 		"sandbox.yaml",
-	)
+	); err != nil {
+		return err
+	}
+	return membersPaymentForms("/home/scholacantorum/orders-test.scholacantorum.org")
 }
 
 func ProductionPaymentForms() error {
-	return paymentForms(
+	if err := publicPaymentForms(
 		"/home/scholacantorum/orders.scholacantorum.org",
 		"/home/scholacantorum/schola6p/data/production/resources",
 		"production.yaml",
-	)
+	); err != nil {
+		return err
+	}
+	return membersPaymentForms("/home/scholacantorum/orders.scholacantorum.org")
 }
 
-func paymentForms(path, data, config string) error {
+func publicPaymentForms(path, data, config string) error {
 	var (
 		matches   []string
 		resfile   *os.File
@@ -71,7 +77,7 @@ func paymentForms(path, data, config string) error {
 		err       error
 		resources = map[string]map[string][]string{}
 	)
-	for _, base := range []string{"chunk-vendors", "buy-tickets", "donate", "recordings"} {
+	for _, base := range []string{"chunk-vendors", "buy-tickets", "donate"} {
 		matches, _ = filepath.Glob(path + "/" + base + ".*")
 		for _, match := range matches {
 			if err = sh.Rm(match); err != nil {
@@ -129,6 +135,43 @@ func paymentForms(path, data, config string) error {
 		return err
 	}
 	return nil
+}
+
+func membersPaymentForms(path string) error {
+	var (
+		matches []string
+		err     error
+	)
+	for _, base := range []string{"/js/chunk-vendors.*", "/css/chunk-vendors.*", "/js/recordings.*", "/css/recordings.*"} {
+		matches, _ = filepath.Glob(path + base)
+		for _, match := range matches {
+			if err = sh.Rm(match); err != nil {
+				return err
+			}
+		}
+	}
+	for _, base := range []string{"chunk-vendors", "recordings"} {
+		for _, ext := range []string{"js", "css"} {
+			matches, _ = filepath.Glob(fmt.Sprintf("../payment-forms/dist/%s/%s.*.%s", ext, base, ext))
+			for _, match := range matches {
+				if err = sh.Run("mkdir", "-p", path+"/"+ext); err != nil {
+					return err
+				}
+				if err = sh.Copy(path+"/"+ext+"/"+filepath.Base(match), match); err != nil {
+					return err
+				}
+				if err = sh.Run("gzip", "-k", path+"/"+ext+"/"+filepath.Base(match)); err != nil {
+					return err
+				}
+				// Same hack for Apache.
+				if err = sh.Run("mv", path+"/"+ext+"/"+filepath.Base(match),
+					fmt.Sprintf("%s/%s/%s.%s", path, ext, filepath.Base(match), ext)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return sh.Copy(path+"/recordings.html", "../payment-forms/dist/recordings.html")
 }
 
 func SandboxScanner() error {
