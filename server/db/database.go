@@ -131,7 +131,12 @@ func Begin() (tx Tx) {
 func (tx Tx) Commit() error { return tx.tx.Commit() }
 
 // Rollback rolls back a transaction.
-func (tx Tx) Rollback() error { return tx.tx.Rollback() }
+func (tx Tx) Rollback() error {
+	if tx.tx != nil {
+		return tx.tx.Rollback()
+	}
+	return nil
+}
 
 func panicOnError(err error) {
 	if err != nil {

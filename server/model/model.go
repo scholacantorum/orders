@@ -205,6 +205,12 @@ type Session struct {
 	Expires    time.Time
 	Member     int
 	Privileges Privilege
+	Name       string
+	Email      string
+	Address    string
+	City       string
+	State      string
+	Zip        string
 }
 
 type SKU struct {

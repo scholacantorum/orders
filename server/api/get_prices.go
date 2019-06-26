@@ -8,6 +8,7 @@ import (
 	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/auth"
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
@@ -44,6 +45,11 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	// Get current session privileges.
 	if auth.HasSession(r) {
 		if session = auth.GetSession(tx, w, r, privs); session == nil {
+			return
+		}
+		privs = session.Privileges
+	} else if token := r.FormValue("auth"); token != "" {
+		if session = auth.GetSessionMembersAuth(tx, w, r, token); session == nil {
 			return
 		}
 		privs = session.Privileges
@@ -114,7 +120,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		jw.String(message)
 	} else {
 		// Return the product data.
-		emitGetPrices(jw, couponMatch, pdata)
+		emitGetPrices(jw, session, couponMatch, pdata)
 	}
 	jw.Close()
 }
@@ -207,8 +213,28 @@ func hasCapacity(tx db.Tx, product *model.Product) bool {
 }
 
 // emitGetPrices writes the JSON response.
-func emitGetPrices(jw json.Writer, couponMatch bool, pdata []*getPricesData) {
+func emitGetPrices(jw json.Writer, session *model.Session, couponMatch bool, pdata []*getPricesData) {
 	jw.Object(func() {
+		if session.Name != "" {
+			// If there's a name in the session, it came from
+			// GetSessionMembersAuth, which means it came from the
+			// recordings order form loaded in an iframe of the
+			// members site, so we'll provide full user detail and
+			// also the stripe key.
+			jw.Prop("user", func() {
+				jw.Object(func() {
+					jw.Prop("id", int(session.Member))
+					jw.Prop("username", session.Username)
+					jw.Prop("name", session.Name)
+					jw.Prop("email", session.Email)
+					jw.Prop("address", session.Address)
+					jw.Prop("city", session.City)
+					jw.Prop("state", session.State)
+					jw.Prop("zip", session.Zip)
+				})
+			})
+			jw.Prop("stripePublicKey", config.Get("stripePublicKey"))
+		}
 		jw.Prop("coupon", couponMatch)
 		jw.Prop("products", func() {
 			jw.Array(func() {

@@ -45,6 +45,11 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		privs = session.Privileges
+	} else if token := r.FormValue("auth"); token != "" {
+		if session = auth.GetSessionMembersAuth(tx, w, r, token); session == nil {
+			return
+		}
+		privs = session.Privileges
 	}
 	// Read the order details from the request.
 	if order, err = parseCreateOrder(r.Body); err != nil {

@@ -42,7 +42,11 @@
     },
     "pages": {
       "buy-tickets": "src/buy-tickets/entry.js",
-      "donate": "src/donate/entry.js"
+      "donate": "src/donate/entry.js",
+      "recordings": {
+        "entry": "src/recordings/entry.js",
+        "template": "public/index-stripe.html"
+      }
     }
   },
   "eslintConfig": {

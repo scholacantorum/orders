@@ -148,6 +148,9 @@ func router(w http.ResponseWriter, r *http.Request) {
 			switch orderID := shiftPathID(r); orderID {
 			case 0:
 				switch r.Method {
+				case http.MethodOptions:
+					w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+					txh.Rollback()
 				case http.MethodPost:
 					api.PlaceOrder(txh, w, r)
 				default:
@@ -157,6 +160,8 @@ func router(w http.ResponseWriter, r *http.Request) {
 				switch shiftPath(r) {
 				case "":
 					switch r.Method {
+					case http.MethodGet:
+						api.GetOrder(txh, w, r, model.OrderID(orderID))
 					case http.MethodDelete:
 						api.CancelOrder(txh, w, r, model.OrderID(orderID))
 					default:
