@@ -215,7 +215,7 @@ func hasCapacity(tx db.Tx, product *model.Product) bool {
 // emitGetPrices writes the JSON response.
 func emitGetPrices(jw json.Writer, session *model.Session, couponMatch bool, pdata []*getPricesData) {
 	jw.Object(func() {
-		if session.Name != "" {
+		if session != nil && session.Name != "" {
 			// If there's a name in the session, it came from
 			// GetSessionMembersAuth, which means it came from the
 			// recordings order form loaded in an iframe of the
