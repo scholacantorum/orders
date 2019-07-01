@@ -51,7 +51,9 @@ export default {
           price: ol.price,
         })),
         payments: [{ type: 'card', subtype, method, amount: this.total }],
-      })).catch(err => {
+      }),
+        { headers: { 'Content-Type': 'application/json' } },
+      ).catch(err => {
         return err
       })
       if (result && result.data && result.data.id) {

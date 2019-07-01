@@ -55,7 +55,9 @@ export default {
         source: 'public', name, email, address, city, state, zip,
         lines: [{ product: 'donation', quantity: 1, price: this.amount * 100 }],
         payments: [{ type: 'card', subtype, method, amount: this.amount * 100 }],
-      })).catch(err => {
+      }),
+        { headers: { 'Content-Type': 'application/json' } },
+      ).catch(err => {
         return err
       })
       if (result && result.data && result.data.id) {
