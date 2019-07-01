@@ -53,31 +53,37 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	}
 	// Read the order details from the request.
 	if order, err = parseCreateOrder(r.Body); err != nil {
+		log.Printf("ERROR: can't parse body of POST /api/order request: %s", err)
 		BadRequestError(tx, w, err.Error())
 		return
 	}
 	// Validate the order source and permissions.
 	if !validateOrderSourcePermissions(order, session) {
+		log.Printf("ERROR: forbidden order %s", emitOrder(order, true))
 		ForbiddenError(tx, w)
 		return
 	}
 	// Resolve the products and SKUs and validate the prices.
 	if !resolveSKUs(tx, order, privs) {
+		log.Printf("ERROR: invalid products or prices in order %s", emitOrder(order, true))
 		BadRequestError(tx, w, "invalid products or prices")
 		return
 	}
 	// Validate the customer data.
 	if !validateCustomer(tx, order, session) {
+		log.Printf("ERROR: invalid customer data in order %s", emitOrder(order, true))
 		BadRequestError(tx, w, "invalid customer data")
 		return
 	}
 	// Make sure the rest of the order details are OK.
 	if !validateOrderDetails(tx, order, privs) {
+		log.Printf("ERROR: invalid parameters in order %s", emitOrder(order, true))
 		BadRequestError(tx, w, "invalid parameters")
 		return
 	}
 	// Calculate the order total and verify the payment.
 	if !validatePayment(order) {
+		log.Printf("ERROR: invalid payment in order %s", emitOrder(order, true))
 		BadRequestError(tx, w, "invalid payment")
 		return
 	}
@@ -106,6 +112,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 				if message == "" {
 					message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
 				}
+				log.Printf("ERROR: payment rejected (%q) in order %s", message, emitOrder(order, true))
 				sendError(tx, w, message)
 				return
 			}
@@ -126,6 +133,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 				tx.DeleteOrder(order)
 				commit(tx)
 				sendError(tx, w, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
+				log.Printf("ERROR: can't create payment intent for order %s", emitOrder(order, true))
 				return
 			}
 			tx.SaveOrder(order)

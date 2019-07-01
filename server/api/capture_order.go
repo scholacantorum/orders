@@ -25,12 +25,14 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	}
 	// Get the order whose payment we're supposed to capture.
 	if order = tx.FetchOrder(orderID); order == nil {
+		log.Printf("ERROR: capture of nonexistent order %d", orderID)
 		NotFoundError(tx, w)
 		return
 	}
 	// Verify that the order is in the desired state.
 	if order.Flags&model.OrderValid != 0 || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
 		!intentRE.MatchString(order.Payments[0].Method) {
+		log.Printf("ERROR: capture of order in wrong state %s", emitOrder(order, true))
 		BadRequestError(tx, w, "order not in capturable state")
 		return
 	}

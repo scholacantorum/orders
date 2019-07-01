@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -58,6 +59,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	// ticket sales for that event.
 	if eventID != "" {
 		if event = tx.FetchEvent(eventID); event == nil {
+			log.Printf("ERROR: no products for event %q", eventID)
 			NotFoundError(tx, w)
 			return
 		}
