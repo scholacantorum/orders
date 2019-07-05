@@ -47,4 +47,4 @@ const store = new Vuex.Store({
 export default store
 
 // TEMPORARY FOR TESTING
-store.commit('login', { auth: '9999-9999-9999', username: 'sroth', allow: { card: true, cash: true, willcall: true }, stripeKey: 'pk_test_QPwvhWbGaakWn7DGcco8J5Nd' })
+// store.commit('login', { auth: '9999-9999-9999', username: 'sroth', allow: { card: true, cash: true, willcall: true }, stripeKey: 'pk_test_QPwvhWbGaakWn7DGcco8J5Nd' })
