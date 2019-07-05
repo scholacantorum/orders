@@ -18,11 +18,11 @@ var goInstall = sh.RunCmd(mg.GoCmd(), "install")
 var Default = Sandbox
 
 func Sandbox() {
-	mg.Deps(UpdateOrdersSheet, SandboxOrders, SandboxPaymentForms, SandboxScanner)
+	mg.Deps(UpdateOrdersSheet, SandboxOrders, SandboxPaymentForms, SandboxAtTheDoor)
 }
 
 func Production() {
-	mg.Deps(UpdateOrdersSheet, ProductionOrders, ProductionPaymentForms, ProductionScanner)
+	mg.Deps(UpdateOrdersSheet, ProductionOrders, ProductionPaymentForms, ProductionAtTheDoor)
 }
 
 func UpdateOrdersSheet() error {
@@ -174,19 +174,19 @@ func membersPaymentForms(path string) error {
 	return sh.Copy(path+"/recordings.html", "../payment-forms/dist/recordings.html")
 }
 
-func SandboxScanner() error {
-	return scanner("/home/scholacantorum/orders-test.scholacantorum.org/scanner")
+func SandboxAtTheDoor() error {
+	return atTheDoor("/home/scholacantorum/orders-test.scholacantorum.org/door")
 }
 
-func ProductionScanner() error {
-	return scanner("/home/scholacantorum/orders.scholacantorum.org/scanner")
+func ProductionAtTheDoor() error {
+	return atTheDoor("/home/scholacantorum/orders.scholacantorum.org/door")
 }
 
-func scanner(path string) error {
+func atTheDoor(path string) error {
 	if err := sh.Rm(path); err != nil {
 		return err
 	}
-	return sh.Run("cp", "-rp", "../scanner/dist", path)
+	return sh.Run("cp", "-rp", "../door/dist", path)
 }
 
 func ResetSandbox() error {

@@ -601,7 +601,7 @@ func validatePayment(order *model.Order) bool {
 	case model.OrderInPerson:
 		switch pmt.Type {
 		case model.PaymentCard:
-			if !tokenRE.MatchString(pmt.Method) {
+			if !tokenRE.MatchString(pmt.Method) && !methodRE.MatchString(pmt.Method) {
 				return false
 			}
 		case model.PaymentCardPresent:

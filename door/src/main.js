@@ -3,10 +3,12 @@ import 'mutationobserver-shim'
 import Vue from 'vue'
 import './plugins/axios'
 import './plugins/bootstrap-vue'
-import Main from './Main.vue'
+import App from './App.vue'
+import store from './store'
 
 Vue.config.productionTip = false
 
 new Vue({
-  render: h => h(Main),
-}).$mount('#main')
+  store,
+  render: h => h(App)
+}).$mount('#app')
