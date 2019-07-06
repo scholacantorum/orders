@@ -16,25 +16,20 @@ import (
 
 // UseTicket is the API used by the scanner and at-the-door sales apps to get
 // ticket information and mark tickets as being used.  It has two modes,
-// distinguished by query parameters.
+// distinguished by request method.
 //
-// In "natural" mode, it figures out the number of tickets used, available, and
-// naturally consumed in each ticket class, and returns that information.  For
-// the scanner app (method=POST), it automatically consumes the natural numbers
-// of tickets; for the at-the-door sales app (method=GET), it does not, but
-// returns the counts as if it had so that the app can present them for
-// approval.
+// In the GET method, it figures out the number of tickets used, available, and
+// naturally consumed in each ticket class, and returns that information.
 //
-// In "explicit" mode, the scan=, class=, and used= parameters dictate the new
+// In the POST method, the scan=, class=, and used= parameters dictate the new
 // usage count of one or more ticket classes.  The counts may go up or down from
 // their current values, but they can't go lower than the usage count at the
-// time of the previous "natural" call.
+// time of the previous GET call.
 func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID, token string) {
 	var (
 		session *model.Session
 		order   *model.Order
 		event   *model.Event
-		scan    string
 		now     = time.Now()
 	)
 	// Must have PrivScanTickets to use this API.
@@ -46,17 +41,12 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		NotFoundError(tx, w)
 		return
 	}
-	// Find out whether we're in natural or explicit mode.
-	if scan = r.FormValue("scan"); scan != "" && r.Method != http.MethodPost {
-		commit(tx)
-		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	// Get the requested order.  It could be either an order number or an
-	// order token.  If we're in explicit mode, it could also be the word
+	// order token.  If we're in POST mode, it could also be the word
 	// "free", meaning that we should create an anonymous order containing
 	// only free ticket class usage.
-	if token == "free" && scan == "free" {
+	r.ParseForm()
+	if token == "free" && r.Method == http.MethodPost {
 		order = &model.Order{
 			Source:  model.OrderInPerson,
 			Created: now,
@@ -75,20 +65,19 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	}
 	// The rest of the processing differs between natural and explicit
 	// modes.
-	if scan == "" {
-		useTicketNatural(tx, session, w, event, order, now, r.Method == http.MethodPost)
-	} else {
-		useTicketExplicit(tx, session, w, r, event, order, now)
+	switch r.Method {
+	case http.MethodGet:
+		useTicketGet(tx, session, w, event, order, now)
+	case http.MethodPost:
+		useTicketPost(tx, session, w, r, event, order, now)
 	}
 }
 
-// useTicketNatural handles natural UseTicket requests, i.e., the ones made when
-// a ticket is first scanned.  If autoUse is true, these consume the "natural"
-// number of tickets out of each ticket class on the order.  Regardless, it
-// supplies the UI with information about classes and ticket counts.
-func useTicketNatural(
-	tx db.Tx, session *model.Session, w http.ResponseWriter, event *model.Event,
-	order *model.Order, now time.Time, autoUse bool,
+// useTicketGet handles UseTicket GET requests, i.e., the ones made when a
+// ticket is first scanned.  It supplies the UI with information about classes
+// and ticket counts.
+func useTicketGet(
+	tx db.Tx, session *model.Session, w http.ResponseWriter, event *model.Event, order *model.Order, now time.Time,
 ) {
 	// Information collected and returned about each ticket class.
 	type class struct {
@@ -137,7 +126,9 @@ func useTicketNatural(
 		for _, ol := range clines {
 			ol.Scan = scan
 			ol.MinUsed = 0
-			cdata.used += ol.AutoUse
+			if ol == order.Lines[0] {
+				cdata.used++
+			}
 			cdata.max += ol.Quantity * ol.Product.TicketCount
 			for _, t := range ol.Tickets {
 				if !t.Used.IsZero() {
@@ -159,9 +150,6 @@ func useTicketNatural(
 			}
 		} else if free[cname] != nil {
 			cdata.max = 1000
-		}
-		if cdata.used > cdata.min && autoUse {
-			consumeTickets(clines, event, now, cdata.used-cdata.min)
 		}
 	}
 	// Clean up and emit results.
@@ -190,10 +178,6 @@ func useTicketNatural(
 							jw.Prop("overflow", true)
 						}
 					})
-					if autoUse {
-						log.Printf("%s USE TICKETS order:%d event:%s %v",
-							session.Username, order.ID, event.ID, class)
-					}
 				}
 			})
 		})
@@ -201,10 +185,10 @@ func useTicketNatural(
 	jw.Close()
 }
 
-// useTicketExplicit handles explicit UseTicket requests, i.e., those invoked by
-// the UI when the user changes the number of tickets used for a particular
-// class of a particular order.
-func useTicketExplicit(
+// useTicketPost handles UseTicket POST requests, i.e., those invoked by the UI
+// when the user changes the number of tickets used for a particular class of a
+// particular order.
+func useTicketPost(
 	tx db.Tx, session *model.Session, w http.ResponseWriter, r *http.Request,
 	event *model.Event, order *model.Order, now time.Time,
 ) {
