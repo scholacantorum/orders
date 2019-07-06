@@ -5,7 +5,7 @@ it.
 
 <template>
   <View :style="{ flex: 1, justifyContent: 'space-between' }">
-    <Summary :order="order"/>
+    <Summary :order="order" />
     <View :style="{ margin: 12 }">
       <Text
         :style="{ fontSize: 24, fontWeight: 'bold', color: '#f90', lineHeight: 30, textAlign: 'center' }"
@@ -18,7 +18,7 @@ it.
         :title="confirmed ? 'Saving...' : 'Confirmed'"
         :onPress="onConfirm"
       />
-      <Button :bstyle="{ width: '40%' }" secondary title="Cancel" :onPress="onCancel"/>
+      <Button :bstyle="{ width: '40%' }" secondary title="Cancel" :onPress="onCancel" />
     </View>
   </View>
 </template>
@@ -50,6 +50,11 @@ export default {
       this.confirmed = true
       try {
         const revised = await backend.placeOrder(this.order)
+        this.$store.commit('sold', {
+          count: revised.lines.reduce((accum, line) => line.quantity + accum, 0),
+          amount: revised.payments[0].amount,
+          method: revised.payments[0].method,
+        })
         this.onPaid(revised)
       } catch (err) {
         Alert.alert('Server Error', err)

@@ -3,19 +3,19 @@ Ticket:Quantity displays a ticket product name and gets the quantity for it.
 -->
 
 <template>
-  <View :style="{ flexDirection: 'row', alignItems: 'center' }">
+  <View :style="{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }">
     <Text :style="{ fontSize: 24, flex: 1, marginLeft: 6 }">{{ product.name }}</Text>
     <Button
-      :bstyle="{ width: 36, paddingTop: 6, paddingBottom: 6 }"
+      :bstyle="{ minWidth: 36, width: '5%', paddingTop: 6, paddingBottom: 6 }"
       :disabled="disabled"
       title="–"
       :onPress="onDown"
     />
     <Text
-      :style="{ fontSize: 36, fontWeight: 'bold', width: 30, textAlign: 'center' }"
+      :style="{ fontSize: 36, fontWeight: 'bold', minWidth: 36, width: '5%', textAlign: 'center' }"
     >{{ value || '0' }}</Text>
     <Button
-      :bstyle="{ width: 36, paddingTop: 6, paddingBottom: 6 }"
+      :bstyle="{ minWidth: 36, width: '5%', paddingTop: 6, paddingBottom: 6 }"
       :disabled="disabled"
       title="+"
       :onPress="onUp"

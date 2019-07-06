@@ -69,9 +69,12 @@ General tab, under Signing, change the Team to your Apple ID.
 
 ### Build and run the app
 
-To run on an iPhone simulator on your Mac:
+To run on an iPhone X simulator on your Mac:
 
 * Run `react-native run-ios` in the `AtTheDoor` directory.
+* You can run on simulators of other iOS devices by adding `--simulator="..."`
+  and giving the name of the device (e.g.
+  `iPad Pro (12.9-inch) (2nd generation)`).
 
 To run on a real iOS device in debug mode:
 

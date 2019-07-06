@@ -5,14 +5,14 @@ collected from the card reader.  It returns the revised intent.
 
 <template>
   <View :style="{ flex: 1, justifyContent: 'space-between' }">
-    <Summary :order="order"/>
+    <Summary :order="order" />
     <View :style="{ margin: 12 }">
       <Text
         :style="{ fontSize: 24, fontWeight: 'bold', color: '#f90', lineHeight: 30, textAlign: 'center' }"
       >Processing payment...</Text>
-      <ActivityIndicator size="large" :style="{ marginTop: 12 }"/>
+      <ActivityIndicator size="large" :style="{ marginTop: 12 }" />
     </View>
-    <View/>
+    <View />
   </View>
 </template>
 
@@ -32,6 +32,11 @@ export default {
   async mounted() {
     try {
       const intent = await reader.processPayment()
+      this.$store.commit('sold', {
+        count: this.order.lines.reduce((accum, line) => line.quantity + accum, 0),
+        amount: this.order.payments[0].amount,
+        method: 'card',
+      })
       this.onProcessed(intent)
     } catch (err) {
       Alert.alert('Payment Error', err.error)

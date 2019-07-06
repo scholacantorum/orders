@@ -11,7 +11,7 @@ const backend = {
   // successful or an error string if the login is invalid. It throws an error
   // message string if the login attempt failed due to a network or server
   // error.
-  async login(username, password, testmode) {
+  async login(username, password, testmode, allow) {
     let error
     const baseURL = `https://orders${testmode ? '-test' : ''}.scholacantorum.org/api`
     const url = `${baseURL}/login`
@@ -33,10 +33,14 @@ const backend = {
       throw `Server error ${resp.status}`
     }
     const result = await resp.json()
-    if (!result.privInPersonSales)
+    if (!result.privScanTickets)
       return 'Not authorized to use this app'
+    if ((allow.card || allow.cash) && !result.privInPersonSales)
+      return 'Not authorized to sell tickets'
+    if (allow.willcall && !result.privViewOrders)
+      return 'Not authorized to view will call list'
     Stripe.setOptions({ publishableKey: result.stripePublicKey })
-    store.commit('login', { auth: result.token, baseURL, username })
+    store.commit('login', { auth: result.token, allow, baseURL, username })
     return null
   },
 

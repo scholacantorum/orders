@@ -12,10 +12,10 @@ ScanTicket scans the barcode of a ticket and can mark it as used.
       :onMountError="onMountError"
     />
     <View :style="{ flexDirection: 'row', justifyContent: 'center', margin: 12 }">
-      <Button :bstyle="{ width: '40%', fontSize: 20 }" secondary title="Cancel" :onPress="onDone"/>
+      <Button :bstyle="{ width: '40%', fontSize: 20 }" secondary title="Cancel" :onPress="onDone" />
     </View>
   </View>
-  <UseTickets v-else :orderID="selected" :onCancel="onDone" :onDone="onDone"/>
+  <UseTickets v-else :orderID="selected" :onCancel="onUseDone" :onDone="onUseDone" />
 </template>
 
 <script>
@@ -60,6 +60,7 @@ export default {
       }
       this.selected = evt.data.substr(evt.data.length - 14)
     },
+    onUseDone() { this.selected = null },
   },
 }
 </script>

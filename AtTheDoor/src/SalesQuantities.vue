@@ -19,24 +19,29 @@ terminate the quantity selection.
     </View>
     <View :style="{ flexDirection: 'row', justifyContent: 'space-evenly', marginTop: 24 }">
       <Button
-        :bstyle="{ width: 80, fontSize: 20 }"
+        :bstyle="{ minWidth: 80, width: '20%', maxWidth: 200, fontSize: 20 }"
         :disabled="!qtyTotal"
         title="Cash"
         :onPress="onCash"
       />
       <Button
-        :bstyle="{ width: 80, fontSize: 20 }"
+        :bstyle="{ minWidth: 80, width: '20%', maxWidth: 200, fontSize: 20 }"
         :disabled="!salesTotal"
         title="Check"
         :onPress="onCheck"
       />
       <Button
-        :bstyle="{ width: 80, fontSize: 20 }"
+        :bstyle="{ minWidth: 80, width: '20%', maxWidth: 200, fontSize: 20 }"
         :disabled="!salesTotal"
         title="Card"
         :onPress="onCard"
       />
-      <Button :bstyle="{ width: 80, fontSize: 20 }" secondary title="Cancel" :onPress="onCancel"/>
+      <Button
+        :bstyle="{ minWidth: 80, width: '20%', maxWidth: 200, fontSize: 20 }"
+        secondary
+        title="Cancel"
+        :onPress="onCancel"
+      />
     </View>
   </View>
 </template>

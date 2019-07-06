@@ -5,14 +5,14 @@ manually entered.  It returns the revised order.
 
 <template>
   <View :style="{ flex: 1, justifyContent: 'space-between' }">
-    <Summary :order="order"/>
+    <Summary :order="order" />
     <View :style="{ margin: 12 }">
       <Text
         :style="{ fontSize: 24, fontWeight: 'bold', color: '#f90', lineHeight: 30, textAlign: 'center' }"
       >Processing payment...</Text>
-      <ActivityIndicator size="large" :style="{ marginTop: 12 }"/>
+      <ActivityIndicator size="large" :style="{ marginTop: 12 }" />
     </View>
-    <View/>
+    <View />
   </View>
 </template>
 
@@ -37,6 +37,11 @@ export default {
         payments: [{ type: 'card', method: this.token, amount: this.order.payments[0].amount }],
       }
       order = await backend.placeOrder(order)
+      this.$store.commit('sold', {
+        count: order.lines.reduce((accum, line) => line.quantity + accum, 0),
+        amount: order.payments[0].amount,
+        method: 'card',
+      })
       this.onSuccess(order)
     } catch (err) {
       Alert.alert('Order Error', err, () => { this.onFailure() })
