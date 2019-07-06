@@ -158,7 +158,7 @@ Phone: (650) 254-1700</p></div></body><html>
 		img, _ = mw.CreatePart(hdr)
 		if qr, err = qrcode.Encode(
 			fmt.Sprintf("%s/ticket/%s", config.Get("ordersURL"), order.Token),
-			qrcode.Medium, 200); err != nil {
+			qrcode.Highest, 200); err != nil {
 			log.Printf("ERROR: can't create QR code for order %d: %s", order.ID, err)
 			return
 		}
