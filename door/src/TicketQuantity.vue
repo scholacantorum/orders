@@ -12,9 +12,9 @@ div
     div(:class="priceClass" v-text="priceFmt")
   .tqty(v-if="showUse")
     .tqty-and-use and use
-    b-button.tqty-button(variant="primary" @click="onUseDown") –
+    b-button.tqty-button(variant="info" @click="onUseDown") –
     .tqty-qty(v-text="use || '0'")
-    b-button.tqty-button(variant="primary" @click="onUseUp") +
+    b-button.tqty-button(variant="info" @click="onUseUp") +
     div.tqty-amount &nbsp;
 </template>
 

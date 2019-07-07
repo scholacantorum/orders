@@ -87,14 +87,14 @@ export default {
       this.onCancel()
     },
     onCaptureFailed() { this.onPaid(this.myOrder, false) },
-    onCaptured(order) { this.onPaid(order, true) },
+    onCaptured(order) { this.onPaid(order, !this.order.email) },
     onIntent(intent) { this.intent = intent },
     onManualEntry() {
       backend.cancelOrder(this.myOrder.id)
       this.manual = true
     },
     onManualOrderFailure() { this.token = null },
-    onManualOrderSuccess(order) { this.onPaid(order, true) },
+    onManualOrderSuccess(order) { this.onPaid(order, !this.order.email) },
     onManualToken(token) { this.token = token },
     onOrderCreated({ order, intent }) {
       this.myOrder = order

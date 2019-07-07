@@ -103,6 +103,8 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	// If we do have to charge a card through Stripe, do it now.
 	if len(order.Payments) == 1 {
 		switch order.Payments[0].Type {
+		case model.PaymentOther:
+			receipt = order.Email != ""
 		case model.PaymentCard:
 			success, card, message = stripe.ChargeCard(order, order.Payments[0])
 			tx = db.Begin()

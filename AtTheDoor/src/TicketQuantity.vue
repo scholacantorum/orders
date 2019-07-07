@@ -26,7 +26,7 @@ Ticket:Quantity displays a ticket product name and gets the quantity for it.
     <View v-if="showUse" :style="{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }">
       <Text :style="{ fontSize: 24, flex: 1, marginRight: 6, textAlign: 'right' }">and use</Text>
       <Button
-        :bstyle="{ minWidth: 36, width: '5%', paddingTop: 6, paddingBottom: 6 }"
+        :bstyle="{ minWidth: 36, width: '5%', paddingTop: 6, paddingBottom: 6, backgroundColor: '#17a2b8' }"
         :disabled="disabled"
         title="–"
         :onPress="onUseDown"
@@ -35,7 +35,7 @@ Ticket:Quantity displays a ticket product name and gets the quantity for it.
         :style="{ fontSize: 36, fontWeight: 'bold', minWidth: 36, width: '5%', textAlign: 'center' }"
       >{{ use || '0' }}</Text>
       <Button
-        :bstyle="{ minWidth: 36, width: '5%', paddingTop: 6, paddingBottom: 6 }"
+        :bstyle="{ minWidth: 36, width: '5%', paddingTop: 6, paddingBottom: 6, backgroundColor: '#17a2b8' }"
         :disabled="disabled"
         title="+"
         :onPress="onUseUp"
