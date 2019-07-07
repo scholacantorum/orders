@@ -1,24 +1,22 @@
 <!--
-SalesPaymentCash executes the cash payment flow for the order given to it.
+SalesPaymentCheck executes the check payment flow for the order given to it.
 -->
 
 <template lang="pug">
-#paycash
+#paycheck
   Summary(:order="order")
-  .paycash-row
-    .paycash-label Amount Due
-    #paycash-due(v-text="`$${due}`")
-  .paycash-row
-    .paycash-label Cash Received
-    input#paycash-received(v-model="received" autocomplete="off" :formatter="numFormatter" inputmode="numeric" pattern="[0-9]*")
-    b-button.paycash-round(v-for="v in rounded" :key="v" variant="outline-primary" @click="setReceived(v)" v-text="`$${v}`")
-  .paycash-row
-    .paycash-label Change
-    #paycash-change(v-text="`$${change}`")
-    b-form-checkbox#paycash-donate.ml-3(v-model="donate" :disabled="!change" size="lg" switch) Keep as donation
-  #paycash-buttons
-    b-button.paycash-button(:disabled="!canConfirm" variant="primary" @click="onConfirmed" v-text="confirmed ? 'Saving...' : 'Confirm'")
-    b-button.paycash-button(:disabled="confirmed" @click="$emit('cancel')") Cancel
+  .paycheck-row
+    .paycheck-label Amount Due
+    #paycheck-due(v-text="`$${due}`")
+  .paycheck-row
+    .paycheck-label Check Amount
+    input#paycheck-received(v-model="received" autocomplete="off" :formatter="numFormatter" inputmode="numeric" pattern="[0-9]*")
+  .paycheck-row(v-if="donation")
+    .paycheck-label Donation
+    #paycheck-donation(v-text="`$${donation}`")
+  #paycheck-buttons
+    b-button.paycheck-button(:disabled="!canConfirm" variant="primary" @click="onConfirmed" v-text="confirmed ? 'Saving...' : 'Confirm'")
+    b-button.paycheck-button(:disabled="confirmed" @click="$emit('cancel')") Cancel
 </template>
 
 <script>
@@ -29,28 +27,17 @@ export default {
   props: {
     order: Object,
   },
-  data: () => ({ confirmed: false, donate: false, received: 0 }),
+  data: () => ({ confirmed: false, received: 0 }),
   mounted() {
     this.received = this.order.payments[0].amount / 100
   },
   computed: {
     canConfirm() { return (this.received >= this.due) && !this.confirmed },
-    change() {
+    donation() {
       if (this.received < this.due) return 0
       return this.received - this.due
     },
     due() { return this.order.payments[0].amount / 100 },
-    rounded() {
-      const a = this.order.payments[0].amount / 100
-      const list = [a]
-      const a5 = Math.ceil(a / 5) * 5
-      if (a5 !== a) list.push(a5)
-      const a10 = Math.ceil(a / 10) * 10
-      if (a10 !== a5) list.push(a10)
-      const a20 = Math.ceil(a / 20) * 20
-      if (a20 !== a10) list.push(a20)
-      return list
-    },
   },
   methods: {
     numFormatter(text) { return text.replace(/[^0-9]/g, '') },
@@ -58,15 +45,15 @@ export default {
       this.confirmed = true
       try {
         let order = { ...this.order }
-        if (this.change && this.donate) {
+        if (this.donation) {
           order.lines = [...order.lines]
           order.lines.push({
             product: 'donation',
             quantity: 1,
-            price: this.change * 100,
+            price: this.donation * 100,
           })
           order.payments = [{ ...order.payments[0] }]
-          order.payments[0].amount += this.change * 100
+          order.payments[0].amount += this.donation * 100
         }
         const revised = (await this.$axios.post('/api/order', order, {
           headers: { 'Auth': this.$store.state.auth },
@@ -95,35 +82,32 @@ export default {
 </script>
 
 <style lang="stylus">
-#paycash
+#paycheck
   display flex
   flex-direction column
-.paycash-row
+.paycheck-row
   display flex
   align-self center
   align-items center
   margin 0.75rem 0.75rem 0
   width 30rem
-.paycash-label
+.paycheck-label
   width 10rem
   font-size 1.25rem
-#paycash-due, #paycash-change, #paycash-received
+#paycheck-due, #paycheck-donation, #paycheck-received
   width 5rem
   text-align right
   font-size 1.25rem
-#paycash-received
+#paycheck-received
   margin-left 5px
   padding 5px
   border 1px solid #ccc
-.paycash-round
-  margin-left 0.5rem
-  width 4rem
-  font-size 1.25rem
-#paycash-buttons
+#paycheck-buttons
   display flex
   justify-content space-evenly
   margin-bottom 0.75rem
-.paycash-button
+.paycheck-button
+  margin-top 0.75rem
   max-width 12rem
   width 40%
   font-size 1.25rem
