@@ -90,7 +90,7 @@ export default {
   align-self center
   align-items center
   margin 0.75rem 0.75rem 0
-  width 30rem
+  width 15rem
 .paycheck-label
   width 10rem
   font-size 1.25rem

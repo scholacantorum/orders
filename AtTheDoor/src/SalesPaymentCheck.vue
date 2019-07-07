@@ -6,20 +6,20 @@ SalesPaymentCheck executes the check payment flow for the order given to it.
   <View>
     <Summary :order="order" />
     <View
-      :style="{ alignSelf: 'center', width: 480, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
+      :style="{ alignSelf: 'center', width: 240, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
     >
       <Text :style="{ fontSize: 20, width: 160 }">Amount Due</Text>
       <Text :style="{ fontSize: 20, width: 80, textAlign: 'right' }">${{due}}</Text>
     </View>
     <View
-      :style="{ alignSelf: 'center', width: 480, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
+      :style="{ alignSelf: 'center', width: 240, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
     >
       <Text :style="{ fontSize: 20, width: 160 }">Check Amount</Text>
       <TextInput v-model="received" :style="{ fontSize: 20, width: 80, padding: 5 }"></TextInput>
     </View>
     <View
       v-if="donation"
-      :style="{ alignSelf: 'center', width: 480, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
+      :style="{ alignSelf: 'center', width: 240, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
     >
       <Text :style="{ fontSize: 20, width: 160 }">Donation</Text>
       <Text :style="{ fontSize: 20, width: 80, textAlign: 'right' }">${{donation}}</Text>

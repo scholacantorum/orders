@@ -39,7 +39,7 @@ export default {
       return true
     },
     needNameEmail() {
-      return this.$store.state.products.some(p => (this.sellqty[p.id] || 0) > (this.useqty[p.id] || 0))
+      return this.$store.state.products.some(p => (this.sellqty[p.id] || 0) * p.ticketCount > (this.useqty[p.id] || 0))
     },
     sellQtyTotal() {
       return this.$store.state.products.reduce((accum, product) => accum + (this.sellqty[product.id] || 0), 0)

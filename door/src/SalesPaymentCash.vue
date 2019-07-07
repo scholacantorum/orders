@@ -15,7 +15,7 @@ SalesPaymentCash executes the cash payment flow for the order given to it.
   .paycash-row
     .paycash-label Change
     #paycash-change(v-text="`$${change}`")
-    b-form-checkbox#paycash-donate.ml-3(v-model="donate" :disabled="!change" size="lg" switch) Keep as donation
+    b-form-checkbox#paycash-donate.ml-3(v-model="donate" :disabled="!change" size="lg" switch) Donation
   #paycash-buttons
     b-button.paycash-button(:disabled="!canConfirm" variant="primary" @click="onConfirmed" v-text="confirmed ? 'Saving...' : 'Confirm'")
     b-button.paycash-button(:disabled="confirmed" @click="$emit('cancel')") Cancel
@@ -42,13 +42,11 @@ export default {
     due() { return this.order.payments[0].amount / 100 },
     rounded() {
       const a = this.order.payments[0].amount / 100
-      const list = [a]
+      const list = []
       const a5 = Math.ceil(a / 5) * 5
       if (a5 !== a) list.push(a5)
-      const a10 = Math.ceil(a / 10) * 10
-      if (a10 !== a5) list.push(a10)
       const a20 = Math.ceil(a / 20) * 20
-      if (a20 !== a10) list.push(a20)
+      if (a20 !== a5) list.push(a20)
       return list
     },
   },
@@ -103,7 +101,7 @@ export default {
   align-self center
   align-items center
   margin 0.75rem 0.75rem 0
-  width 30rem
+  width 24rem
 .paycash-label
   width 10rem
   font-size 1.25rem
