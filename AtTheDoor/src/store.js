@@ -26,6 +26,7 @@ const store = new Vuex.Store({
     logout(state) {
       state.auth = state.baseURL = state.username = state.event = state.products = null
       state.allow = {}
+      state.admitted = state.sold = state.cash = state.check = 0
     },
     event(state, { event, products }) {
       state.event = event
