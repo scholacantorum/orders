@@ -44,6 +44,7 @@ export default {
         })
         this.$emit('paid', revised)
       } catch (err) {
+        this.confirmed = false
         if (err.response && err.response.status === 401) {
           this.$store.commit('logout')
           window.alert('Login session expired')

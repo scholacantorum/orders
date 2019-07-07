@@ -7,10 +7,10 @@ terminate the quantity selection.
 
 <template lang="pug">
 #quantities
-  TicketQuantity(v-for="product in $store.state.products" :key="product.id" :product="product" :value="quantities[product.id]" @change="onChange")
+  TicketQuantity(v-for="product in $store.state.products" :key="product.id" :count="product.ticketCount" :product="product" :sell="sellqty[product.id]" :use="useqty[product.id]" @change="onChange")
   #quantities-total(v-text="`TOTAL $${salesTotal / 100}`")
   #quantities-buttons
-    b-button.quantities-button(v-if="$store.state.allow.cash" :disabled="!qtyTotal" variant="primary" @click="onCash") Cash
+    b-button.quantities-button(v-if="$store.state.allow.cash" :disabled="!sellQtyTotal" variant="primary" @click="onCash") Cash
     b-button.quantities-button(v-if="$store.state.allow.cash" :disabled="!salesTotal" variant="primary" @click="onCheck") Check
     b-button.quantities-button(v-if="$store.state.allow.card" :disabled="!salesTotal" variant="primary" @click="onCard") Card
     b-button.quantities-button(@click="$emit('done')") Cancel
@@ -21,21 +21,22 @@ import TicketQuantity from './TicketQuantity'
 
 export default {
   components: { TicketQuantity },
-  data: () => ({ quantities: {} }),
+  data: () => ({ sellqty: {}, useqty: {} }),
   computed: {
-    qtyTotal() {
-      return this.$store.state.products.reduce((accum, product) => accum + (this.quantities[product.id] || 0), 0)
+    sellQtyTotal() {
+      return this.$store.state.products.reduce((accum, product) => accum + (this.sellqty[product.id] || 0), 0)
     },
     salesTotal() {
-      return this.$store.state.products.reduce((accum, product) => accum + product.price * (this.quantities[product.id] || 0), 0)
+      return this.$store.state.products.reduce((accum, product) => accum + product.price * (this.sellqty[product.id] || 0), 0)
     },
   },
   methods: {
     onCard() { this.sendOrder('card') },
     onCash() { this.sendOrder('other', 'Cash') },
     onCheck() { this.sendOrder('other', 'Check') },
-    onChange({ product, value }) {
-      this.$set(this.quantities, product.id, value)
+    onChange({ product, sell, use }) {
+      this.$set(this.sellqty, product.id, sell)
+      this.$set(this.useqty, product.id, use)
     },
     sendOrder(type, method) {
       this.$emit('order', {
@@ -44,10 +45,10 @@ export default {
           type, method,
           amount: this.salesTotal,
         }],
-        lines: this.$store.state.products.filter(p => this.quantities[p.id]).map(p => ({
+        lines: this.$store.state.products.filter(p => this.sellqty[p.id]).map(p => ({
           product: p.id,
-          quantity: this.quantities[p.id],
-          used: this.quantities[p.id],
+          quantity: this.sellqty[p.id],
+          used: this.useqty[p.id],
           usedAt: this.$store.state.event.id,
           price: p.price,
         }))

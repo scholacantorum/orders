@@ -15,10 +15,11 @@ import (
 )
 
 type getPricesData struct {
-	id      model.ProductID
-	name    string
-	message string
-	price   int
+	id          model.ProductID
+	name        string
+	message     string
+	price       int
+	ticketCount int
 }
 
 // GetPrices returns the prices and availability of one or more products, or the
@@ -102,6 +103,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 			pd.message = "This event is sold out."
 		} else if pd.message = noSalesMessage(sku, privs); pd.message == "" {
 			pd.price = sku.Price
+			pd.ticketCount = product.TicketCount
 		}
 		pdata = append(pdata, &pd)
 		// The masterSKU determines the message to be shown in lieu of
@@ -248,6 +250,7 @@ func emitGetPrices(jw json.Writer, session *model.Session, couponMatch bool, pda
 							jw.Prop("message", pd.message)
 						} else {
 							jw.Prop("price", pd.price)
+							jw.Prop("ticketCount", pd.ticketCount)
 						}
 					})
 				}

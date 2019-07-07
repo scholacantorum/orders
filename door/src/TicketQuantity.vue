@@ -3,33 +3,54 @@ TicketQuantity displays a ticket product name and gets the quantity for it.
 -->
 
 <template lang="pug">
-.tqty
-  .tqty-name(v-text="product.name")
-  b-button.tqty-button(variant="primary" @click="onDown") –
-  .tqty-qty(v-text="value || '0'")
-  b-button.tqty-button(variant="primary" @click="onUp") +
-  div(:class="priceClass" v-text="priceFmt")
+div
+  .tqty
+    .tqty-name(v-text="product.name")
+    b-button.tqty-button(variant="primary" @click="onSellDown") –
+    .tqty-qty(v-text="sell || '0'")
+    b-button.tqty-button(variant="primary" @click="onSellUp") +
+    div(:class="priceClass" v-text="priceFmt")
+  .tqty(v-if="showUse")
+    .tqty-and-use and use
+    b-button.tqty-button(variant="primary" @click="onUseDown") –
+    .tqty-qty(v-text="use || '0'")
+    b-button.tqty-button(variant="primary" @click="onUseUp") +
+    div.tqty-amount &nbsp;
 </template>
 
 <script>
 export default {
   props: {
     product: Object,
-    value: Number,
+    count: Number,
+    sell: Number,
+    use: Number,
   },
   computed: {
-    priceClass() { return this.value ? 'tqty-amount' : 'tqty-price' },
+    priceClass() { return this.sell ? 'tqty-amount' : 'tqty-price' },
     priceFmt() {
-      if (this.value) return `$${this.value * this.product.price / 100}`
+      if (this.sell) return `$${this.sell * this.product.price / 100}`
       return `$${this.product.price / 100}`
     },
+    showUse() { return (this.sell && this.count > 1) || this.sell > 1 },
   },
   methods: {
-    onDown() {
-      if (this.value) this.$emit('change', { product: this.product, value: this.value - 1 })
+    onSellDown() {
+      if (!this.sell) return
+      const sell = this.sell - 1
+      const use = Math.min(sell * this.count, this.use)
+      this.$emit('change', { product: this.product, sell, use })
     },
-    onUp() {
-      this.$emit('change', { product: this.product, value: (this.value || 0) + 1 })
+    onSellUp() {
+      this.$emit('change', { product: this.product, sell: (this.sell || 0) + 1, use: (this.use || 0) + 1 })
+    },
+    onUseDown() {
+      if (!this.use) return
+      this.$emit('change', { product: this.product, sell: this.sell, use: this.use - 1 })
+    },
+    onUseUp() {
+      if (this.use >= this.count * this.sell) return
+      this.$emit('change', { product: this.product, sell: this.sell, use: (this.use || 0) + 1 })
     },
   },
 }
@@ -42,6 +63,11 @@ export default {
 .tqty-name
   flex auto
   margin-left 0.5rem
+  font-size 1.5rem
+.tqty-and-use
+  flex auto
+  margin-right 0.5rem
+  text-align right
   font-size 1.5rem
 .tqty-button
   flex none

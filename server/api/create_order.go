@@ -533,7 +533,7 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 			if line.Used == 0 && line.UsedAt != "" {
 				return false
 			}
-			if line.Used < 0 || line.Used > line.Quantity {
+			if line.Used < 0 || line.Used > line.Quantity*line.Product.TicketCount {
 				return false
 			}
 			if line.Used != 0 {
