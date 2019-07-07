@@ -4,6 +4,11 @@ SellTickets displays the ticket sales sequence.
 
 <template>
   <SInput v-if="!order" :onOrder="onOrder" :onCancel="onDone" />
+  <PaymentCash
+    v-else-if="!order.id && order.payments[0].type === 'other' && order.payments[0].method === 'Cash'"
+    :order="order"
+    :onDone="onDone"
+  />
   <PaymentOther
     v-else-if="!order.id && order.payments[0].type === 'other'"
     :order="order"
@@ -16,12 +21,13 @@ SellTickets displays the ticket sales sequence.
 
 <script>
 import PaymentCard from './SalesPaymentCard'
+import PaymentCash from './SalesPaymentCash'
 import PaymentOther from './SalesPaymentOther'
 import SInput from './SalesInput'
 import Receipt from './SalesReceipt'
 
 export default {
-  components: { PaymentCard, PaymentOther, Receipt, SInput },
+  components: { PaymentCard, PaymentCash, PaymentOther, Receipt, SInput },
   props: {
     onDone: Function,
   },
