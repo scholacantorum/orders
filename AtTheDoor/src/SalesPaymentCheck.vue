@@ -16,8 +16,10 @@ SalesPaymentCheck executes the check payment flow for the order given to it.
     >
       <Text :style="{ fontSize: 20, width: 160 }">Check Amount</Text>
       <TextInput
-        :value="received ? received.toString() : ''"
+        clearTextOnFocus
+        keyboardType="numeric"
         :style="{ fontSize: 20, width: 80, padding: 5, textAlign: 'right', borderWidth: 1, borderColor: '#ccc', marginLeft: 6 }"
+        :value="received ? received.toString() : ''"
         :onChangeText="setReceived"
       ></TextInput>
     </View>

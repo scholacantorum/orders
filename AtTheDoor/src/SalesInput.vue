@@ -24,14 +24,18 @@ terminate the quantity selection.
         <Text :style="{ fontSize: 20, flex: 1 }">Name</Text>
         <TextInput
           v-model="name"
+          :autoCapitalize="'words'"
           :autoCorrect="false"
           :style="{ flex: 5, fontSize: 20, borderWidth: 1, borderColor: '#ccc', padding: 6 }"
+          returnKeyType="next"
           textContentType="none"
+          :onSubmitEditing="onSubmitName"
         />
       </View>
       <View :style="{ flexDirection: 'row', marginTop: 6 }">
         <Text :style="{ fontSize: 20, flex: 1 }">Email</Text>
         <TextInput
+          ref="email"
           v-model="email"
           :autoCapitalize="'none'"
           :autoCorrect="false"
@@ -115,6 +119,7 @@ export default {
       this.$set(this.useqty, product.id, use)
     },
     onCheck() { this.sendOrder('other', 'Check') },
+    onSubmitName() { this.$refs.email.focus() },
     sendOrder(type, method) {
       this.onOrder({
         source: 'inperson',

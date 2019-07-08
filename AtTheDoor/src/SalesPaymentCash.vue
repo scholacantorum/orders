@@ -16,8 +16,10 @@ SalesPaymentCash executes the cash payment flow for the order given to it.
     >
       <Text :style="{ fontSize: 20, width: 160 }">Cash Received</Text>
       <TextInput
-        :value="received ? received.toString() : ''"
+        clearTextOnFocus
+        keyboardType="numeric"
         :style="{ fontSize: 20, width: 80, padding: 5, textAlign: 'right', borderWidth: 1, borderColor: '#ccc', marginLeft: 6 }"
+        :value="received ? received.toString() : ''"
         :onChangeText="setReceived"
       ></TextInput>
       <Button
