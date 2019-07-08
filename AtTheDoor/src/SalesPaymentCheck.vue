@@ -15,7 +15,11 @@ SalesPaymentCheck executes the check payment flow for the order given to it.
       :style="{ alignSelf: 'center', width: 240, flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 12, marginRight: 12 }"
     >
       <Text :style="{ fontSize: 20, width: 160 }">Check Amount</Text>
-      <TextInput v-model="received" :style="{ fontSize: 20, width: 80, padding: 5 }"></TextInput>
+      <TextInput
+        :value="received ? received.toString() : ''"
+        :style="{ fontSize: 20, width: 80, padding: 5, textAlign: 'right', borderWidth: 1, borderColor: '#ccc', marginLeft: 6 }"
+        :onChangeText="setReceived"
+      ></TextInput>
     </View>
     <View
       v-if="donation"
@@ -24,7 +28,9 @@ SalesPaymentCheck executes the check payment flow for the order given to it.
       <Text :style="{ fontSize: 20, width: 160 }">Donation</Text>
       <Text :style="{ fontSize: 20, width: 80, textAlign: 'right' }">${{donation}}</Text>
     </View>
-    <View :style="{ flexDirection: 'row', justifyContent: 'space-evenly', marginBottom: 12 }">
+    <View
+      :style="{ flexDirection: 'row', justifyContent: 'space-evenly', marginTop: 12, marginBottom: 12 }"
+    >
       <Button
         :bstyle="{ width: '40%' }"
         :disabled="!canConfirm"
@@ -37,7 +43,10 @@ SalesPaymentCheck executes the check payment flow for the order given to it.
 </template>
 
 <script>
+import { Alert } from 'react-native'
+import Button from './Button'
 import Summary from './SalesSummary'
+import backend from './backend'
 
 export default {
   components: { Button, Summary },
@@ -58,7 +67,7 @@ export default {
     due() { return this.order.payments[0].amount / 100 },
   },
   methods: {
-    async onConfirmed() {
+    async onConfirm() {
       this.confirmed = true
       try {
         let order = { ...this.order }
@@ -70,12 +79,9 @@ export default {
             price: this.donation * 100,
           })
           order.payments = [{ ...order.payments[0] }]
-          order.payments[0].amount += this.change * 100
+          order.payments[0].amount += this.donation * 100
         }
-        const revised = (await this.$axios.post('/api/order', order, {
-          headers: { 'Auth': this.$store.state.auth },
-        })).data
-        if (revised.error) throw revised.error
+        const revised = await backend.placeOrder(order)
         this.$store.commit('sold', {
           count: this.order.lines.reduce((accum, line) => line.quantity + accum, 0),
           amount: revised.payments[0].amount,
@@ -84,16 +90,13 @@ export default {
         this.onDone()
       } catch (err) {
         this.confirmed = false
-        if (err.response && err.response.status === 401) {
-          this.$store.commit('logout')
-          window.alert('Login session expired')
-          return
-        }
-        console.error('Error placing order', err)
-        window.alert(`Server error: ${err.toString()}`)
+        Alert.alert('Server error', err)
       }
     },
-    setReceived(v) { this.received = v },
+    setReceived(v) {
+      if (v === '') this.received = 0
+      else if (parseInt(v)) this.received = parseInt(v)
+    },
   },
 }
 </script>

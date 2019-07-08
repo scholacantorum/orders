@@ -20,23 +20,23 @@ terminate the quantity selection.
       <Text :style="{ fontSize: 24, paddingRight: 6 }">TOTAL ${{ salesTotal / 100 }}</Text>
     </View>
     <View v-if="needNameEmail" :style="{ marginLeft: 6, marginRight: 6 }">
-      <View :style="{ flexDirection: 'row' }">
+      <View :style="{ flexDirection: 'row', marginTop: 6 }">
         <Text :style="{ fontSize: 20, flex: 1 }">Name</Text>
         <TextInput
           v-model="name"
           :autoCorrect="false"
-          :style="{ flex: 5, fontSize: 20, borderWidth: 1, borderColor: '#ccc' }"
+          :style="{ flex: 5, fontSize: 20, borderWidth: 1, borderColor: '#ccc', padding: 6 }"
           textContentType="none"
         />
       </View>
-      <View :style="{ flexDirection: 'row' }">
+      <View :style="{ flexDirection: 'row', marginTop: 6 }">
         <Text :style="{ fontSize: 20, flex: 1 }">Email</Text>
         <TextInput
           v-model="email"
           :autoCapitalize="'none'"
           :autoCorrect="false"
           keyboardType="email-address"
-          :style="{ flex: 5, fontSize: 20, borderWidth: 1, borderColor: '#ccc' }"
+          :style="{ flex: 5, fontSize: 20, borderWidth: 1, borderColor: '#ccc', padding: 6 }"
           textContentType="none"
           type="email"
         />
