@@ -153,7 +153,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(emitOrder(order, false))
 	if receipt && order.Email != "" {
-		emitReceipt(order)
+		EmitReceipt(order, false)
 	}
 	if order.Flags&model.OrderValid != 0 {
 		updateGoogleSheet(order)

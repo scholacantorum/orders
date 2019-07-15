@@ -18,15 +18,19 @@ var goInstall = sh.RunCmd(mg.GoCmd(), "install")
 var Default = Sandbox
 
 func Sandbox() {
-	mg.Deps(UpdateOrdersSheet, SandboxOrders, SandboxPaymentForms, SandboxAtTheDoor)
+	mg.Deps(UpdateOrdersSheet, ResendReceipt, SandboxOrders, SandboxPaymentForms, SandboxAtTheDoor)
 }
 
 func Production() {
-	mg.Deps(UpdateOrdersSheet, ProductionOrders, ProductionPaymentForms, ProductionAtTheDoor)
+	mg.Deps(UpdateOrdersSheet, ResendReceipt, ProductionOrders, ProductionPaymentForms, ProductionAtTheDoor)
 }
 
 func UpdateOrdersSheet() error {
 	return goInstall("./cmd/update-orders-sheet")
+}
+
+func ResendReceipt() error {
+	return goInstall("./cmd/resend-receipt")
 }
 
 func SandboxOrders() error {

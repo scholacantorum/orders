@@ -50,5 +50,5 @@ func SendOrderReceipt(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID 
 	commit(tx)
 	log.Printf("- RESEND RECEIPT for order %d to %s", orderID, order.Email)
 	w.WriteHeader(http.StatusNoContent)
-	emitReceipt(order)
+	EmitReceipt(order, false)
 }

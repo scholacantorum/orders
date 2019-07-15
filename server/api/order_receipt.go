@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"mime/quotedprintable"
 	"net/textproto"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -20,11 +21,13 @@ import (
 	"scholacantorum.org/orders/model"
 )
 
-// emitReceipt emails a receipt for an order.  This may be for a new order or a
-// revised one.  This is an asynchronous operation; the actual email delivery is
-// handled by a separate subprocess after this function returns.  Errors are
+// EmitReceipt emails a receipt for an order.  This may be for a new order or a
+// revised one.  If synch is false, this is an asynchronous operation; the
+// actual email delivery is handled by a separate subprocess after this function
+// returns.  If synch is true, the email delivery is still handled by a
+// separate subprocess but this function waits for it to finish.  Errors are
 // logged.
-func emitReceipt(order *model.Order) {
+func EmitReceipt(order *model.Order, synch bool) {
 	var (
 		buf      bytes.Buffer
 		mw       *multipart.Writer
@@ -176,6 +179,13 @@ Phone: (650) 254-1700</p></div></body><html>
 		emailTo = append(emailTo, "info@scholacantorum.org")
 	}
 	cmd = exec.Command(config.Get("bin")+"/send-raw-email", emailTo...)
+	if synch {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		// For asynch, they go to /dev/null, which is necessary so that
+		// this parent process can exit (and the CGI caller can get a
+		// response) before the child finishes.
+	}
 	if pipe, err = cmd.StdinPipe(); err != nil {
 		log.Printf("ERROR: can't send receipt for order %d: can't send email: %s", order.ID, err)
 		return
@@ -186,7 +196,12 @@ Phone: (650) 254-1700</p></div></body><html>
 	}
 	pipe.Write(buf.Bytes())
 	pipe.Close()
-	// Note that we are intentionally not waiting for the subprocess to
+	if synch {
+		if err = cmd.Wait(); err != nil {
+			log.Printf("ERROR: can't send receipt for order %d: can't send email: %s", order.ID, err)
+		}
+	}
+	// Otherwise we are intentionally not waiting for the subprocess to
 	// finish.  This CGI script will exit immediately, so that the user gets
 	// a fast response to their order.  The subprocess will continue as an
 	// orphan until the email is sent, and its zombie will be reaped by the
