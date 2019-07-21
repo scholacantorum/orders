@@ -12,3 +12,8 @@ new Vue({
   store,
   render: h => h(App)
 }).$mount('#app')
+
+window.addEventListener('beforeunload', evt => {
+  evt.preventDefault()
+  evt.returnValue = 'Leaving this page will log you out.'
+})
