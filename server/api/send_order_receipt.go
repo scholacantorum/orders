@@ -46,6 +46,7 @@ func SendOrderReceipt(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID 
 			}
 			tx.SaveCard(card, order.Name, order.Email)
 		}
+		tx.SaveOrder(order)
 	}
 	commit(tx)
 	log.Printf("- RESEND RECEIPT for order %d to %s", orderID, order.Email)
