@@ -49,5 +49,8 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	log.Printf("- CAPTURE ORDER %s", emitOrder(order, true))
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(emitOrder(order, false))
+	if order.Email != "" {
+		EmitReceipt(order, false)
+	}
 	updateGoogleSheet(order)
 }
