@@ -12,7 +12,7 @@ used at the event, and lets the user consume some of them.
       .willcall-order(v-for="order in filteredOrders" :key="order.id" @click="onSelect(order.id)")
         | {{ order.name }}
         span.willcall-order-num(v-text="`#${order.id}`")
-  b-button#willcall-cancel(@click="$emit('cancel')") Cancel
+  b-button#willcall-cancel(@click="$emit('done')") Cancel
 UseTickets(v-else :orderID="selected" @cancel="onUseCancel" @done="onUseDone")
 </template>
 
