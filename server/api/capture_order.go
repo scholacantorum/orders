@@ -14,10 +14,11 @@ import (
 // by capturing the (already authorized) payment in the order.
 func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model.OrderID) {
 	var (
-		session *model.Session
-		order   *model.Order
-		card    string
-		err     error
+		session        *model.Session
+		order          *model.Order
+		card           string
+		tentativeEmail string
+		err            error
 	)
 	// Get current session data, if any.
 	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
@@ -44,13 +45,16 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	}
 	order.Flags |= model.OrderValid
 	tx.SaveOrder(order)
-	_, order.Email = tx.FetchCard(card)
+	_, tentativeEmail = tx.FetchCard(card)
 	commit(tx)
 	log.Printf("- CAPTURE ORDER %s", emitOrder(order, true))
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(emitOrder(order, false))
 	if order.Email != "" {
 		EmitReceipt(order, false)
 	}
 	updateGoogleSheet(order)
+	if order.Email == "" {
+		order.Email = tentativeEmail
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(emitOrder(order, false))
 }
