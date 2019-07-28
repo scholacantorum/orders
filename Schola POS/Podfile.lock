@@ -1,0 +1,20 @@
+PODS:
+  - Stripe (15.0.1)
+  - StripeTerminal (1.0.0)
+
+DEPENDENCIES:
+  - Stripe
+  - StripeTerminal (= 1.0.0)
+
+SPEC REPOS:
+  https://github.com/cocoapods/specs.git:
+    - Stripe
+    - StripeTerminal
+
+SPEC CHECKSUMS:
+  Stripe: 2c4d0a88817361a102886315ff452d90f65e898b
+  StripeTerminal: e3e7bb513066c9adebba6e7cea8c798b4286ed40
+
+PODFILE CHECKSUM: 0555b792d0d8eb8bdc877f1d1172a1c4289710d8
+
+COCOAPODS: 1.7.1
