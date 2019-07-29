@@ -6,7 +6,7 @@ Login displays the login page.
 form#login(@submit.prevent="onSubmit")
   #login-header Please log in.
   b-form-group(label="Username" label-for="login-username" label-cols="4")
-    b-form-input#login-username(v-model="username" autocomplete="username" autofocus trim)
+    b-form-input#login-username(v-model="username" autocapitalize="none" autocomplete="username" autofocus trim)
   b-form-group(label="Password" label-for="login-password" label-cols="4")
     b-form-input#login-password(v-model="password" type="password" autocomplete="password")
   b-form-group#login-allow-row(label="Allow" label-cols="4")
