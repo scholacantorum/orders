@@ -21,7 +21,7 @@ export default {
         return `${line.quantity}× ${name}`
       })
     },
-    salesTotal() { return this.order.payments[0].amount },
+    salesTotal() { return this.order.payments ? this.order.payments[0].amount : 0 },
   },
 }
 </script>

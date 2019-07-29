@@ -72,8 +72,8 @@ export default {
         if (revised.error) throw revised.error
         this.$store.commit('sold', {
           count: this.order.lines.reduce((accum, line) => line.quantity + accum, 0),
-          amount: revised.payments[0].amount,
-          method: revised.payments[0].method,
+          amount: this.order.payments[0].amount,
+          method: this.order.payments[0].method,
         })
         this.$emit('paid', revised)
       } catch (err) {
