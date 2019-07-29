@@ -532,9 +532,6 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 			}
 		case model.ProdTicket:
 			line.AutoUse = line.Quantity
-			if line.Used == 0 && line.UsedAt != "" {
-				return false
-			}
 			if line.Used < 0 || line.Used > line.Quantity*line.Product.TicketCount {
 				return false
 			}
@@ -564,9 +561,9 @@ func validatePayment(order *model.Order) bool {
 	for _, ol := range order.Lines {
 		total += ol.Price * ol.Quantity
 	}
-	// If this is a free order, there shouldn't be any payment.
-	if total == 0 {
-		return len(order.Payments) == 0
+	// If this is a free order, it's OK if there is no payment.
+	if total == 0 && len(order.Payments) == 0 {
+		return true
 	}
 	// Otherwise, there should be exactly one payment.
 	if len(order.Payments) != 1 {
@@ -577,6 +574,16 @@ func validatePayment(order *model.Order) bool {
 	var pmt = order.Payments[0]
 	if pmt.ID != 0 || pmt.Stripe != "" || !pmt.Created.IsZero() || pmt.Flags != 0 || pmt.Amount != total {
 		return false
+	}
+	// If this is a free order and has a payment, its type must be "other"
+	// (generally with a method of "Cash", but we don't check that).  We
+	// remove it; no point in storing a zero payment.
+	if pmt.Amount == 0 {
+		if pmt.Type != model.PaymentOther {
+			return false
+		}
+		order.Payments = order.Payments[:0]
+		return true
 	}
 	// It also needs to have a type and method consistent with the order
 	// source.
