@@ -59,7 +59,7 @@ class SalesReceipt: UIViewController {
         emailTextField.enablesReturnKeyAutomatically = true
         emailTextField.returnKeyType = .done
         emailTextField.borderStyle = .roundedRect
-        NotificationCenter.default.addObserver(self, selector: #selector(textChange(_:)), name: UITextField.textDidChangeNotification, object: view)
+        NotificationCenter.default.addObserver(self, selector: #selector(textChange(_:)), name: UITextField.textDidChangeNotification, object: emailTextField)
         view.addSubview(emailTextField)
 
         sendReceiptButton = UIButton()
