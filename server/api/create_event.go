@@ -62,6 +62,8 @@ func parseCreateEvent(r io.Reader) (e *model.Event, err error) {
 			return json.IntHandler(func(i int) { e.MembersID = i })
 		case "name":
 			return json.StringHandler(func(s string) { e.Name = s })
+		case "series":
+			return json.StringHandler(func(s string) { e.Series = s })
 		case "start":
 			return json.TimeHandler(func(t time.Time) { e.Start = t })
 		case "capacity":
@@ -84,6 +86,7 @@ func emitCreatedEvent(e *model.Event) []byte {
 			jw.Prop("membersID", e.MembersID)
 		}
 		jw.Prop("name", e.Name)
+		jw.Prop("series", e.Series)
 		jw.Prop("start", e.Start.Format(time.RFC3339))
 		if e.Capacity != 0 {
 			jw.Prop("capacity", e.Capacity)

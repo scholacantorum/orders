@@ -39,8 +39,8 @@ const store = new Vuex.Store({
       state.sold += count
       state.admitted += count
       switch (method) {
-        case 'Cash': state.cash += amount; break
-        case 'Check': state.check += amount; break;
+        case 'cash': state.cash += amount; break
+        case 'check': state.check += amount; break;
       }
     },
   },

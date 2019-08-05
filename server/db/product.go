@@ -8,11 +8,11 @@ import (
 )
 
 // productColumns is the list of columns of the product table.
-var productColumns = `id, name, shortname, type, receipt, ticket_count, ticket_class`
+var productColumns = `id, series, name, shortname, type, receipt, ticket_count, ticket_class`
 
 // scanProduct scans a product table row.
 func (tx Tx) scanProduct(scanner interface{ Scan(...interface{}) error }, p *model.Product) error {
-	return scanner.Scan(&p.ID, &p.Name, &p.ShortName, &p.Type, &p.Receipt, &p.TicketCount, &p.TicketClass)
+	return scanner.Scan(&p.ID, &p.Series, &p.Name, &p.ShortName, &p.Type, &p.Receipt, &p.TicketCount, &p.TicketClass)
 }
 
 // SaveProduct saves a product to the database.
@@ -22,8 +22,8 @@ func (tx Tx) SaveProduct(p *model.Product) {
 	)
 	q.WriteString(`INSERT OR REPLACE INTO product (`)
 	q.WriteString(productColumns)
-	q.WriteString(`) VALUES (?,?,?,?,?,?,?)`)
-	panicOnExecError(tx.tx.Exec(q.String(), p.ID, p.Name, p.ShortName, p.Type, p.Receipt, p.TicketCount, p.TicketClass))
+	q.WriteString(`) VALUES (?,?,?,?,?,?,?,?)`)
+	panicOnExecError(tx.tx.Exec(q.String(), p.ID, p.Series, p.Name, p.ShortName, p.Type, p.Receipt, p.TicketCount, p.TicketClass))
 	panicOnExecError(tx.tx.Exec(`DELETE FROM product_event WHERE product=?`, p.ID))
 	for _, pe := range p.Events {
 		panicOnNoRows(tx.tx.Exec(
@@ -98,7 +98,7 @@ func (tx Tx) FetchProductsByEvent(event *model.Event) (products []*model.Product
 		err      error
 	)
 	prows, err = tx.tx.Query(`
-SELECT p.id, p.name, p.shortname, p.type, p.receipt, p.ticket_count, p.ticket_class
+SELECT p.id, p.series, p.name, p.shortname, p.type, p.receipt, p.ticket_count, p.ticket_class
 FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=? ORDER BY pe.priority`, event.ID)
 	panicOnError(err)
 	for prows.Next() {

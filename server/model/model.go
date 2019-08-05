@@ -12,6 +12,7 @@ type Event struct {
 	ID        EventID
 	MembersID int
 	Name      string
+	Series    string
 	Start     time.Time
 	Capacity  int
 }
@@ -97,6 +98,12 @@ type OrderLine struct {
 type PaymentID int
 
 type PaymentFlags byte
+
+const (
+	// PaymentInitial marks the initial payment on an order, for ease of
+	// queries.
+	PaymentInitial PaymentFlags = 1 << iota
+)
 
 type PaymentType string
 
@@ -184,6 +191,7 @@ const (
 
 type Product struct {
 	ID          ProductID
+	Series      string
 	Name        string
 	ShortName   string
 	Type        ProductType

@@ -97,6 +97,9 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	if len(order.Payments) == 0 || order.Payments[0].Type == model.PaymentOther {
 		order.Flags |= model.OrderValid
 	}
+	if len(order.Payments) == 1 {
+		order.Payments[0].Flags |= model.PaymentInitial
+	}
 	// Save the order to the database.
 	tx.SaveOrder(order)
 	commit(tx)
@@ -576,7 +579,7 @@ func validatePayment(order *model.Order) bool {
 		return false
 	}
 	// If this is a free order and has a payment, its type must be "other"
-	// (generally with a method of "Cash", but we don't check that).  We
+	// (generally with a subtype of "cash", but we don't check that).  We
 	// remove it; no point in storing a zero payment.
 	if pmt.Amount == 0 {
 		if pmt.Type != model.PaymentOther {
@@ -618,7 +621,7 @@ func validatePayment(order *model.Order) bool {
 				return false
 			}
 		case model.PaymentOther:
-			if pmt.Method == "" {
+			if (pmt.Subtype != "cash" && pmt.Subtype != "check") || pmt.Method != "" {
 				return false
 			}
 		default:

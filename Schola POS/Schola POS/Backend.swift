@@ -23,6 +23,7 @@ struct Order: Codable {
 }
 struct OrderPayment: Codable {
     var type: String
+    var subtype: String?
     var method: String?
     var amount: Int
 }

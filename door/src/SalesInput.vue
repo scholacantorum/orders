@@ -49,20 +49,20 @@ export default {
     },
   },
   methods: {
-    onCard() { this.sendOrder('card') },
-    onCash() { this.sendOrder('other', 'Cash') },
-    onCheck() { this.sendOrder('other', 'Check') },
+    onCard() { this.sendOrder('card', 'manual') },
+    onCash() { this.sendOrder('other', 'cash') },
+    onCheck() { this.sendOrder('other', 'check') },
     onChange({ product, sell, use }) {
       this.$set(this.sellqty, product.id, sell)
       this.$set(this.useqty, product.id, use)
     },
-    sendOrder(type, method) {
+    sendOrder(type, subtype) {
       this.$emit('order', {
         source: 'inperson',
         name: this.name,
         email: this.email,
         payments: [{
-          type, method,
+          type, subtype,
           amount: this.salesTotal,
         }],
         lines: this.$store.state.products.filter(p => this.sellqty[p.id]).map(p => ({

@@ -73,7 +73,7 @@ export default {
         this.$store.commit('sold', {
           count: this.order.lines.reduce((accum, line) => line.quantity + accum, 0),
           amount: this.order.payments[0].amount,
-          method: this.order.payments[0].method,
+          method: this.order.payments[0].subtype,
         })
         this.$emit('paid', revised)
       } catch (err) {

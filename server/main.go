@@ -232,6 +232,18 @@ func router(w http.ResponseWriter, r *http.Request) {
 					methodNotAllowedError(txh, w)
 				}
 			}
+		case "report":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodGet:
+					api.RunReport(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
 		case "stripe":
 			switch shiftPath(r) {
 			case "connectTerminal":

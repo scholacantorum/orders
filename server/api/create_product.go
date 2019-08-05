@@ -102,6 +102,8 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 		switch key {
 		case "id":
 			return json.StringHandler(func(s string) { p.ID = model.ProductID(s) })
+		case "series":
+			return json.StringHandler(func(s string) { p.Series = s })
 		case "name":
 			return json.StringHandler(func(s string) { p.Name = s })
 		case "shortname":
@@ -210,6 +212,7 @@ func emitProduct(p *model.Product) []byte {
 	)
 	jw.Object(func() {
 		jw.Prop("id", string(p.ID))
+		jw.Prop("series", p.Series)
 		jw.Prop("name", p.Name)
 		jw.Prop("shortname", p.ShortName)
 		jw.Prop("type", string(p.Type))

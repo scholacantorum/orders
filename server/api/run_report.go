@@ -1,0 +1,166 @@
+package api
+
+import (
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/rothskeller/json"
+
+	"scholacantorum.org/orders/auth"
+	"scholacantorum.org/orders/db"
+	"scholacantorum.org/orders/model"
+)
+
+// RunReport runs a report, handling GET /api/report requests.
+func RunReport(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+	var (
+		def    *model.ReportDefinition
+		result *model.ReportResults
+	)
+	// Verify permissions.
+	if auth.GetSession(tx, w, r, model.PrivViewOrders) == nil {
+		return
+	}
+	// Get the report definition.
+	if def = parseReportDef(tx, r); def == nil {
+		BadRequestError(tx, w, "invalid report definition")
+		return
+	}
+	result = tx.RunReport(def)
+	// Send back the results.
+	commit(tx)
+	w.Header().Set("Content-Type", "application/json")
+	emitReport(w, result)
+}
+
+func parseReportDef(tx db.Tx, r *http.Request) (def *model.ReportDefinition) {
+	def = new(model.ReportDefinition)
+	r.ParseForm()
+	for _, os := range r.Form["orderSource"] {
+		switch os := model.OrderSource(os); os {
+		case model.OrderFromPublic, model.OrderFromMembers, model.OrderFromGala, model.OrderFromOffice, model.OrderInPerson:
+			def.OrderSources = append(def.OrderSources, os)
+		default:
+			return nil
+		}
+	}
+	def.Customer = strings.ToLower(strings.TrimSpace(r.FormValue("customer")))
+	if before := r.FormValue("createdBefore"); before != "" {
+		if t, err := time.ParseInLocation("2006-01-02T15:04:05", before, time.Local); err != nil {
+			return nil
+		} else {
+			def.CreatedBefore = t
+		}
+	}
+	if after := r.FormValue("createdAfter"); after != "" {
+		if t, err := time.ParseInLocation("2006-01-02T15:04:05", after, time.Local); err != nil {
+			return nil
+		} else {
+			def.CreatedAfter = t
+		}
+	}
+	def.OrderCoupons = r.Form["orderCoupon"]
+	for _, pid := range r.Form["product"] {
+		if tx.FetchProduct(model.ProductID(pid)) == nil {
+			return nil
+		}
+		def.Products = append(def.Products, model.ProductID(pid))
+	}
+	def.PaymentTypes = r.Form["paymentType"]
+	def.TicketClasses = r.Form["ticketClass"]
+	for _, eid := range r.Form["usedAtEvent"] {
+		if eid != "" && tx.FetchEvent(model.EventID(eid)) == nil {
+			return nil
+		}
+		def.UsedAtEvents = append(def.UsedAtEvents, model.EventID(eid))
+	}
+	return def
+}
+
+func emitReport(w http.ResponseWriter, result *model.ReportResults) {
+	var jw = json.NewWriter(w)
+	jw.Object(func() {
+		if result.Lines != nil {
+			jw.Prop("lines", func() {
+				jw.Array(func() {
+					for _, r := range result.Lines {
+						jw.Object(func() {
+							jw.Prop("orderID", int(r.OrderID))
+							jw.Prop("orderTime", r.OrderTime.Format(time.RFC3339))
+							jw.Prop("name", r.Name)
+							jw.Prop("email", r.Email)
+							jw.Prop("quantity", r.Quantity)
+							jw.Prop("product", r.Product)
+							jw.Prop("usedAtEvent", string(r.UsedAtEvent))
+							jw.Prop("orderSource", string(r.OrderSource))
+							jw.Prop("paymentType", r.PaymentType)
+							jw.Prop("amount", r.Amount)
+						})
+					}
+				})
+			})
+		}
+		jw.Prop("orderSources", func() {
+			jw.Array(func() {
+				for os, c := range result.OrderSources {
+					jw.Object(func() {
+						jw.Prop("os", string(os))
+						jw.Prop("c", c)
+					})
+				}
+			})
+		})
+		jw.Prop("orderCoupons", func() {
+			emitStringCounts(jw, result.OrderCoupons)
+		})
+		jw.Prop("products", func() {
+			jw.Array(func() {
+				for _, prod := range result.Products {
+					jw.Object(func() {
+						jw.Prop("id", string(prod.ID))
+						jw.Prop("name", prod.Name)
+						jw.Prop("series", prod.Series)
+						jw.Prop("ptype", string(prod.Type))
+						jw.Prop("count", prod.Count)
+					})
+				}
+			})
+		})
+		jw.Prop("paymentTypes", func() {
+			emitStringCounts(jw, result.PaymentTypes)
+		})
+		jw.Prop("ticketClasses", func() {
+			emitStringCounts(jw, result.TicketClasses)
+		})
+		jw.Prop("usedAtEvents", func() {
+			jw.Array(func() {
+				for _, event := range result.UsedAtEvents {
+					jw.Object(func() {
+						jw.Prop("id", string(event.ID))
+						jw.Prop("series", event.Series)
+						if event.Start.IsZero() {
+							jw.Prop("start", "")
+						} else {
+							jw.Prop("start", event.Start.Format(time.RFC3339))
+						}
+						jw.Prop("name", event.Name)
+						jw.Prop("count", event.Count)
+					})
+				}
+			})
+		})
+	})
+	jw.Close()
+}
+
+func emitStringCounts(jw json.Writer, sc model.StringCounts) {
+	jw.Array(func() {
+		for s, c := range sc {
+			jw.Object(func() {
+				jw.Prop("n", s)
+				jw.Prop("c", c)
+			})
+		}
+	})
+}

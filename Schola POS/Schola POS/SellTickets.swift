@@ -326,21 +326,21 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
     }
 
     @objc func cashButton(_ sender: UIButton) {
-        let order = createOrder(paymentType: "other", paymentMethod: "Cash")
+        let order = createOrder(paymentType: "other", paymentSubtype: "cash")
         navigationController!.pushViewController(SalesPaymentCash(order: order), animated: true)
     }
 
     @objc func checkButton(_ sender: UIButton) {
-        let order = createOrder(paymentType: "other", paymentMethod: "Check")
+        let order = createOrder(paymentType: "other", paymentSubtype: "check")
         navigationController!.pushViewController(SalesPaymentCheck(order: order), animated: true)
     }
 
     @objc func cardButton(_ sender: UIButton) {
         if Terminal.shared.connectionStatus == .connected {
-            let order = createOrder(paymentType: "card-present", paymentMethod: nil)
+            let order = createOrder(paymentType: "card-present", paymentSubtype: nil)
             navigationController!.pushViewController(SalesPaymentCardPresent(order: order), animated: true)
         } else {
-            let order = createOrder(paymentType: "card", paymentMethod: nil)
+            let order = createOrder(paymentType: "card", paymentSubtype: "manual")
             navigationController!.pushViewController(SalesPaymentCard(order: order), animated: true)
         }
     }
@@ -349,10 +349,10 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
         navigationController!.popViewController(animated: true)
     }
 
-    func createOrder(paymentType: String, paymentMethod: String?) -> Order {
+    func createOrder(paymentType: String, paymentSubtype: String?) -> Order {
         let name = showingNameEmail ? nameTextField.text : nil
         let email = showingNameEmail ? emailTextField.text : nil
-        var payment = OrderPayment(type: paymentType, method: paymentMethod, amount: 0)
+        var payment = OrderPayment(type: paymentType, subtype: paymentSubtype, method: nil, amount: 0)
         var lines: [OrderLine] = []
         for (index, prod) in store.products.enumerated() {
             if sellqty[index] > 0 {

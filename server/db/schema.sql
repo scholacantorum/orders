@@ -100,8 +100,14 @@ CREATE INDEX order_line_product_index ON order_line (product);
 CREATE TABLE product (
 
     -- Unique identifier.  A text identifier is used so that it can be
-    -- hard-coded in purchase forms when appropriate.
+    -- hard-coded in purchase forms when appropriate.  Care should be taken to
+    -- ensure that IDs sort in a reasonable order within their product type.
     id text PRIMARY KEY,
+
+    -- Series with which the product is associated.  This is usually a "20YY-YY"
+    -- string for a regular season or a "20YY Summer" string for a summer sing
+    -- series, or "" for products not associated with a series.
+    series text NOT NULL DEFAULT '',
 
     -- Full name of the product, as it should appear where there is no context.
     name text NOT NULL,
@@ -197,6 +203,10 @@ CREATE TABLE event (
     -- Name of the event (as it should be shown to a customer on a receipt).  Do
     -- not include the date in the name.
     name text NOT NULL,
+
+    -- Name of the series to which the event belongs.  This is generally
+    -- "20XX-YY" or "20YY Summer".
+    series text NOT NULL,
 
     -- Start time of the event.
     start text NOT NULL,
