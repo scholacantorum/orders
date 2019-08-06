@@ -101,6 +101,9 @@ func emitReport(w http.ResponseWriter, result *model.ReportResults) {
 				})
 			})
 		}
+		jw.Prop("orderCount", result.OrderCount)
+		jw.Prop("itemCount", result.ItemCount)
+		jw.Prop("totalAmount", result.TotalAmount)
 		jw.Prop("orderSources", func() {
 			jw.Array(func() {
 				for os, c := range result.OrderSources {

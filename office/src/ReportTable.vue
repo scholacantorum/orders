@@ -4,15 +4,13 @@ ReportTable displays the table of report results.
 
 <template lang="pug">
 #report-table
-  #report-table-box
-    b-table(
-      borderless
-      :fields="fields"
-      :items="lines"
-      small
-      striped
-    )
-  #report-table-stats(v-text="stats")
+  b-table(
+    borderless
+    :fields="fields"
+    :items="lines"
+    small
+    striped
+  )
 </template>
 
 <script>
@@ -53,36 +51,15 @@ export default {
       },
       {
         key: 'amount', label: 'Amount', sortable: true, tdClass: 'report-table-right',
-        formatter: a => `$${Math.floor(a / 100)}`,
+        formatter: a => `$${a.toFixed(2)}`,
       },
     ],
   }),
-  computed: {
-    stats() {
-      let lastID = 0
-      let orders = 0
-      let items = 0
-      let amount = 0
-      this.lines.forEach(l => {
-        if (l.orderID !== lastID) {
-          orders++
-          lastID = l.orderID
-        }
-        items += l.quantity
-        amount += l.amount
-      })
-      return `Matched ${orders} order${orders !== 1 ? 's' : ''}, ${items} item${items !== 1 ? 's' : ''}, total amount $${Math.floor(amount / 100)}.`
-    },
-  },
 }
 </script>
 
 <style lang="stylus">
 #report-table
-  display flex
-  flex-direction column
-  height 100%
-#report-table-box
   flex auto
   overflow auto
   td

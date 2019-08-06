@@ -57,6 +57,18 @@ type ReportDefinition struct {
 // ReportResults contains the results of running a report.
 type ReportResults struct {
 
+	// OrderCount gives the number of orders matching the report criteria.
+	OrderCount int
+
+	// ItemCount gives the number of purchased items matching the report
+	// criteria.
+	ItemCount int
+
+	// TotalAmount gives the sum of the amounts (in dollars) of the lines
+	// matching the report criteria.  Note that this may not be a whole
+	// dollar.
+	TotalAmount float64
+
 	// Lines gives the matching report lines.  It is nil if no report
 	// criteria were given, or if the criteria match too many lines.  It is
 	// an empty slice if no purchases match the report criteria.
@@ -105,7 +117,7 @@ type ReportLine struct {
 	UsedAtEvent EventID
 	OrderSource OrderSource
 	PaymentType string
-	Amount      int
+	Amount      float64
 }
 
 // A ReportProductCount provides the statistical and hierarchical information

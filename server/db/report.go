@@ -49,6 +49,7 @@ type reportOrder struct {
 	flags       model.OrderFlags
 	coupon      string
 	paymentType string
+	counted     bool
 }
 
 // reportLine contains the information we cache about each order line while
@@ -81,9 +82,10 @@ var paymentTypeMap = map[string]string{
 	"card,google_pay":              "Wallet,Google Pay",
 	"card,manual":                  "Card,Typed",
 	"card-present":                 "Card Present,",
+	"card-present,":                "Card Present,Unknown",
 	"card-present,contact_emv":     "Card,Inserted",
-	"card-present,contactless_emv": "Card,Tapped/Phone",
-	"card-present,contactless_magstripe_mode": "Card,Tapped/Phone",
+	"card-present,contactless_emv": "Card,Tapped",
+	"card-present,contactless_magstripe_mode": "Card,Tapped",
 	"card-present,magnetic_stripe_fallback":   "Card,Swiped",
 	"card-present,magnetic_stripe_track2":     "Card,Swiped",
 	"other":                                   "Other ",
@@ -143,7 +145,7 @@ func (tx Tx) RunReport(def *model.ReportDefinition) *model.ReportResults {
 		)
 		panicOnError(rows.Scan(&pid, &prod.ptype, &prod.series, &prod.name, &prod.tclass, &prod.tcount))
 		if prod.tcount == 0 {
-			prod.tcount = 1 // so that we can unconditionally multiply by it
+			prod.tcount = 1 // so that we can unconditionally multiply and divide by it
 		}
 		products[pid] = &prod
 	}
@@ -210,15 +212,53 @@ FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
 
 		// If all of the criteria match, add this line into the report
 		// results.
-		if result.Lines != nil && lineMatches(def, &ol, critAll) != 0 {
-			if len(result.Lines) >= maxReportSize {
-				result.Lines = nil
-			} else if len(def.UsedAtEvents) != 0 {
-				// One line for each event that tickets were
-				// used at (and that was requested in the
-				// report), with quantity for that event.
+		if lineMatches(def, &ol, critAll) != 0 {
+			if !order.counted {
+				result.OrderCount++
+				order.counted = true
+			}
+			if len(def.UsedAtEvents) != 0 {
 				for _, eid := range def.UsedAtEvents {
-					if c := ol.tusage[eid]; c != 0 {
+					result.ItemCount += ol.tusage[eid]
+					result.TotalAmount += float64(ol.tusage[eid]*ol.price) / float64(ol.prod.tcount) / 100.0
+				}
+			} else if ol.tusage != nil {
+				for _, c := range ol.tusage {
+					result.ItemCount += c
+					result.TotalAmount += float64(c*ol.price) / float64(ol.prod.tcount) / 100.0
+				}
+			} else {
+				result.ItemCount += ol.qty * ol.prod.tcount
+				result.TotalAmount += float64(ol.qty*ol.price) / 100.0
+			}
+			if result.Lines != nil && len(result.Lines) >= maxReportSize {
+				result.Lines = nil
+			}
+			if result.Lines != nil {
+				if len(def.UsedAtEvents) != 0 {
+					// One line for each event that tickets were
+					// used at (and that was requested in the
+					// report), with quantity for that event.
+					for _, eid := range def.UsedAtEvents {
+						if c := ol.tusage[eid]; c != 0 {
+							result.Lines = append(result.Lines, &model.ReportLine{
+								OrderID:     ol.order.id,
+								OrderTime:   ol.order.created,
+								Name:        ol.order.name,
+								Email:       ol.order.email,
+								Quantity:    c,
+								Product:     ol.prod.name,
+								UsedAtEvent: eid,
+								OrderSource: ol.order.source,
+								PaymentType: ol.order.paymentType,
+								Amount:      float64(c*ol.price) / float64(ol.prod.tcount) / 100.0,
+							})
+						}
+					}
+				} else if ol.tusage != nil {
+					// One line for each event that tickets were
+					// used at (including not used), with quantity.
+					for eid, c := range ol.tusage {
 						result.Lines = append(result.Lines, &model.ReportLine{
 							OrderID:     ol.order.id,
 							OrderTime:   ol.order.created,
@@ -229,40 +269,23 @@ FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
 							UsedAtEvent: eid,
 							OrderSource: ol.order.source,
 							PaymentType: ol.order.paymentType,
-							Amount:      c * ol.price,
+							Amount:      float64(c*ol.price) / float64(ol.prod.tcount) / 100.0,
 						})
 					}
-				}
-			} else if ol.tusage != nil {
-				// One line for each event that tickets were
-				// used at (including not used), with quantity.
-				for eid, c := range ol.tusage {
+				} else {
+					// One line for the order line.
 					result.Lines = append(result.Lines, &model.ReportLine{
 						OrderID:     ol.order.id,
 						OrderTime:   ol.order.created,
 						Name:        ol.order.name,
 						Email:       ol.order.email,
-						Quantity:    c,
+						Quantity:    ol.qty * ol.prod.tcount,
 						Product:     ol.prod.name,
-						UsedAtEvent: eid,
 						OrderSource: ol.order.source,
 						PaymentType: ol.order.paymentType,
-						Amount:      c * ol.price,
+						Amount:      float64(ol.qty*ol.price) / 100.0,
 					})
 				}
-			} else {
-				// One line for the order line.
-				result.Lines = append(result.Lines, &model.ReportLine{
-					OrderID:     ol.order.id,
-					OrderTime:   ol.order.created,
-					Name:        ol.order.name,
-					Email:       ol.order.email,
-					Quantity:    ol.qty * ol.prod.tcount,
-					Product:     ol.prod.name,
-					OrderSource: ol.order.source,
-					PaymentType: ol.order.paymentType,
-					Amount:      ol.qty * ol.price,
-				})
 			}
 		}
 

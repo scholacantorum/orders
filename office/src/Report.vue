@@ -10,10 +10,12 @@ Split#report
     ReportCriteria(v-else :stats="report" @update="onUpdate")
   SplitArea(:size="90")
     #report-message(v-if="!report")
-    #report-message(v-else-if="!haveParams") For a list of orders, please provide search criteria.
-    #report-message(v-else-if="!report.lines") Too many results; please narrow the search criteria.
-    #report-message(v-else-if="!report.lines.length") No orders match your search criteria.
-    ReportTable(v-else :lines="report.lines")
+    #report-results
+      #report-message(v-if="!haveParams") For a list of orders, please provide search criteria.
+      #report-message(v-else-if="!report.lines") Too many results; please narrow the search criteria.
+      #report-message(v-else-if="!report.lines.length") No orders match your search criteria.
+      ReportTable(v-else :lines="report.lines")
+      #report-stats(v-text="stats")
 </template>
 
 <script>
@@ -29,6 +31,11 @@ export default {
   }),
   mounted() {
     this.runReport(null)
+  },
+  computed: {
+    stats() {
+      return `Matched ${this.report.orderCount} ${this.report.orderCount === 1 ? 'order' : 'orders'}, ${this.report.itemCount} ${this.report.itemCount === 1 ? 'item' : 'items'}, total amount $${this.report.totalAmount.toFixed(2)}.`
+    },
   },
   methods: {
     onUpdate(params) {
@@ -56,6 +63,15 @@ export default {
   margin-top 2em
   text-align center
 #report-message
+  flex auto
   margin 0.5em
+  font-weight bold
+#report-results
+  display flex
+  flex-direction column
+  height 100%
+#report-stats
+  flex none
+  margin 0.5em 0.5em 0.5em 0.3em // 0.3 to match padding on table cells
   font-weight bold
 </style>
