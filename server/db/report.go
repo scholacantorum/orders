@@ -193,6 +193,7 @@ FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
 			order = &reportOrder{id: oid}
 			panicOnError(orderStmt.QueryRow(oid).Scan(&order.source, &order.name, &order.email,
 				(*Time)(&order.created), &order.flags, &order.coupon, &ptype, &psubtype))
+			order.coupon = strings.ToUpper(order.coupon)
 			if mapped := paymentTypeMap[ptype.String+","+psubtype.String]; mapped != "" {
 				order.paymentType = mapped
 			} else if mapped := paymentTypeMap[ptype.String]; mapped != "" {

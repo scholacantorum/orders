@@ -1,4 +1,0 @@
-Case insensitive customer names and coupon codes.
-Don't show UsedAt column when no ticket products are included.
-Don't show columns when their contents are the same, matching a criterion.
-Put auth token in cookie (door app, really).

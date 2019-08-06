@@ -60,7 +60,11 @@ func parseReportDef(tx db.Tx, r *http.Request) (def *model.ReportDefinition) {
 			def.CreatedAfter = t
 		}
 	}
-	def.OrderCoupons = r.Form["orderCoupon"]
+	for _, v := range r.Form["orderCoupon"] {
+		if v := strings.TrimSpace(v); v != "" {
+			def.OrderCoupons = append(def.OrderCoupons, strings.ToUpper(v))
+		}
+	}
 	for _, pid := range r.Form["product"] {
 		if tx.FetchProduct(model.ProductID(pid)) == nil {
 			return nil
