@@ -5,27 +5,31 @@ ReportCriteria
 <template lang="pug">
 #report-criteria
   #report-criteria-heading Report Criteria
-  .report-criteria-section Customer
-  input#report-criteria-customer(v-model.lazy.trim="customer" type="text" placeholder="Name or Email")
-  .report-criteria-section Order Dates
-  .report-criteria-date-box
-    | From
-    input.report-criteria-date(v-model="createdAfter" type="date" placeholder="From Date")
-  .report-criteria-date-box
-    | To
-    input.report-criteria-date(v-model="createdBefore" type="date" placeholder="To Date")
-  .report-criteria-section Products
-  TreeSelect(:tree="productsTree" :value="selectedProducts" @change="onChangeProducts")
-  .report-criteria-section Tickets Used At
-  TreeSelect(:tree="usedAtEventsTree" :value="selectedUsedAtEvents" @change="onChangeUsedAtEvents")
-  .report-criteria-section Ticket Classes
-  TreeSelect(:tree="ticketClassList" :value="selectedTicketClasses" @change="onChangeTicketClasses")
-  .report-criteria-section Order Sources
-  TreeSelect(:tree="orderSourcesList" :value="selectedOrderSources" @change="onChangeOrderSources")
-  .report-criteria-section Payment Types
-  TreeSelect(:tree="paymentTypesTree" :value="selectedPaymentTypes" @change="onChangePaymentTypes")
-  .report-criteria-section Coupon Codes
-  TreeSelect(:tree="orderCouponsList" :value="selectedOrderCoupons" @change="onChangeOrderCoupons")
+  #report-criteria-scroll
+    .report-criteria-section Customer
+    input#report-criteria-customer(v-model.lazy.trim="customer" type="text" placeholder="Name or Email")
+    .report-criteria-section Order Dates
+    .report-criteria-date-box
+      | From
+      input.report-criteria-date(v-model="createdAfter" type="date" placeholder="From Date")
+    .report-criteria-date-box
+      | To
+      input.report-criteria-date(v-model="createdBefore" type="date" placeholder="To Date")
+    .report-criteria-section Products
+    TreeSelect(:tree="productsTree" :value="selectedProducts" @change="onChangeProducts")
+    .report-criteria-section Tickets Used At
+    TreeSelect(:tree="usedAtEventsTree" :value="selectedUsedAtEvents" @change="onChangeUsedAtEvents")
+    .report-criteria-section Ticket Classes
+    TreeSelect(:tree="ticketClassList" :value="selectedTicketClasses" @change="onChangeTicketClasses")
+    .report-criteria-section Order Sources
+    TreeSelect(:tree="orderSourcesList" :value="selectedOrderSources" @change="onChangeOrderSources")
+    .report-criteria-section Payment Types
+    TreeSelect(:tree="paymentTypesTree" :value="selectedPaymentTypes" @change="onChangePaymentTypes")
+    .report-criteria-section Coupon Codes
+    TreeSelect(:tree="orderCouponsList" :value="selectedOrderCoupons" @change="onChangeOrderCoupons")
+  #report-criteria-buttons
+    b-button(variant="outline-primary" @click="onReset") Reset
+    b-button(variant="primary" @click="onSearch") Search
 </template>
 
 <script>
@@ -131,38 +135,26 @@ export default {
       return tree
     },
   },
-  watch: {
-    createdAfter: 'startUpdateTimer',
-    createdBefore: 'startUpdateTimer',
-    customer: 'startUpdateTimer',
-  },
   methods: {
-    onChangeOrderCoupons(list) {
-      this.selectedOrderCoupons = list
-      this.startUpdateTimer()
+    onChangeOrderCoupons(list) { this.selectedOrderCoupons = list },
+    onChangeOrderSources(list) { this.selectedOrderSources = list },
+    onChangePaymentTypes(list) { this.selectedPaymentTypes = list },
+    onChangeProducts(list) { this.selectedProducts = list },
+    onChangeTicketClasses(list) { this.selectedTicketClasses = list },
+    onChangeUsedAtEvents(list) { this.selectedUsedAtEvents = list },
+    onReset() {
+      this.customer = ''
+      this.createdAfter = ''
+      this.createdBefore = ''
+      this.selectedOrderCoupons = []
+      this.selectedOrderSources = []
+      this.selectedPaymentTypes = []
+      this.selectedProducts = []
+      this.selectedTicketClasses = []
+      this.selectedUsedAtEvents = []
+      this.onSearch()
     },
-    onChangeOrderSources(list) {
-      this.selectedOrderSources = list
-      this.startUpdateTimer()
-    },
-    onChangePaymentTypes(list) {
-      this.selectedPaymentTypes = list
-      this.startUpdateTimer()
-    },
-    onChangeProducts(list) {
-      this.selectedProducts = list
-      this.startUpdateTimer()
-    },
-    onChangeTicketClasses(list) {
-      this.selectedTicketClasses = list
-      this.startUpdateTimer()
-    },
-    onChangeUsedAtEvents(list) {
-      this.selectedUsedAtEvents = list
-      this.startUpdateTimer()
-    },
-    sendUpdate() {
-      this.updateTimer = null
+    onSearch() {
       const params = new URLSearchParams()
       if (this.customer) params.append("customer", this.customer)
       if (this.createdAfter) params.append("createdAfter", this.createdAfter + "T00:00:00")
@@ -181,24 +173,25 @@ export default {
       }
       return Object.keys(tree).sort((a, b) => (tree[a].id || tree[a].label).localeCompare(tree[b].id || tree[b].label)).map(key => tree[key])
     },
-    startUpdateTimer() {
-      if (this.updateTimer) window.clearTimeout(this.updateTimer)
-      this.updateTimer = window.setTimeout(this.sendUpdate, 1500)
-    },
   },
 }
 </script>
 
 <style lang="stylus">
 #report-criteria
-  overflow-y auto
+  display flex
+  flex-direction column
   margin 0.5em
   width calc(100% - 1em)
   height calc(100% - 1em)
 #report-criteria-heading
+  flex none
   color #0153A5
   font-weight bold
   font-size larger
+#report-criteria-scroll
+  flex 1
+  overflow-y auto
 .report-criteria-section
   overflow hidden
   margin-top 0.8em
@@ -217,4 +210,9 @@ export default {
 .report-criteria-date
   margin-bottom 2px
   width calc(100% - 3em)
+#report-criteria-buttons
+  display flex
+  flex none
+  justify-content space-around
+  margin-top 0.5em
 </style>
