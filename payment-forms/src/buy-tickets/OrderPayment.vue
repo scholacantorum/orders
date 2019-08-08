@@ -1,5 +1,6 @@
 <!--
 OrderPayment gets the payment method.  Its properties are:
+  - couponMatch - indicates whether the coupon code in the form is valid
   - send - function that will send the order to the server.  It is called with
     a hash containing:
       - name - the customer name
@@ -90,6 +91,7 @@ let stripe // handle to Stripe API, set in mounted()
 
 export default {
   props: {
+    couponMatch: Boolean,
     send: Function,
     stripeKey: String,
     total: Number,
@@ -217,7 +219,7 @@ export default {
       // browser starts its payment request UI.
       this.submitted = true
       this.message = null
-      if (this.total === null) {
+      if (this.total === null || !this.couponMatch) {
         evt.preventDefault()
         return
       }
@@ -232,7 +234,7 @@ export default {
       // Otherwise, validate the form.
       this.submitted = true
       this.message = null
-      if (this.total === null || this.nameState !== null || this.emailState !== null || this.cardError) return
+      if (this.total === null || this.nameState !== null || this.emailState !== null || this.cardError || !this.couponMatch) return
 
       // The form is valid, so ask the card element for a payment method.
       this.submitting = true

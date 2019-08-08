@@ -6,8 +6,8 @@ Dialog is the dialog box that opens when someone clicks "Buy Tickets".
 b-modal(ref="modal" :title="title" no-close-on-backdrop hide-footer @shown="onShown" @hide="onHide")
   Confirmation(v-if="orderID" :key="seq" :orderID="orderID" @close="onClose")
   OrderForm(v-else :key="seq" ref="form"
-    :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey"
-    @success="onOrderSuccess" @cancel="onClose" @submitting="onSubmitting"
+    :coupon="coupon" :couponMatch="couponMatch" :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey"
+    @coupon="onCouponChange" @success="onOrderSuccess" @cancel="onClose" @submitting="onSubmitting"
   )
 </template>
 
@@ -18,6 +18,8 @@ import OrderForm from './OrderForm'
 export default {
   components: { Confirmation, OrderForm },
   props: {
+    coupon: String,
+    couponMatch: Boolean,
     ordersURL: String,
     products: Array,
     stripeKey: String,
@@ -30,6 +32,7 @@ export default {
   }),
   methods: {
     onClose() { this.$refs.modal.hide() },
+    onCouponChange(coupon) { this.$emit('coupon', coupon) },
     onHide(evt) { if (this.submitting) evt.preventDefault() },
     onOrderSuccess(orderID) {
       this.orderID = orderID

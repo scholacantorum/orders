@@ -14,6 +14,7 @@ tr.buy-tickets-qty-row
         ref="input" :value="value || ''" :state="state" :disabled="disabled"
         type="number" placeholder="0" min="0"
         @input="$emit('input', Math.max(parseInt($event) || 0), 0)"
+        @focus="$event.target.select()"
       )
     td.buy-tickets-qty-row-price &times;${{ price / 100 }}
     td.buy-tickets-qty-row-amount(v-text="value ? `$${price * value / 100}` : ''")
@@ -32,7 +33,6 @@ export default {
   },
   methods: {
     focus() { this.$refs.input.focus() },
-    onQtyChange(evt) { this.$emit('input', parseInt(evt.target.value) || 0) },
   },
 }
 </script>

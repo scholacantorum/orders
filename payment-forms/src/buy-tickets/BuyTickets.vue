@@ -6,7 +6,15 @@ orderable, and an optional message otherwise.
 <template lang="pug">
 div(v-if="message" v-text="message")
 div(v-else-if="products")
-  Dialog(ref="dialog" :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey" :title="title")
+  Dialog(ref="dialog"
+    :coupon="coupon"
+    :couponMatch="couponMatch"
+    :ordersURL="ordersURL"
+    :products="products"
+    :stripeKey="stripeKey"
+    :title="title"
+    @coupon="onChangeCoupon"
+  )
   b-btn(variant="primary" @click="onBuyTickets" v-text="buttonLabel")
   span.buy-tickets-price(v-if="priceLabel" v-text="priceLabel")
 </template>
@@ -22,26 +30,9 @@ export default {
     title: String,
   },
   components: { Dialog },
-  data: () => ({ coupon: '', couponMatch: true, message: null, products: null }),
-  async mounted() {
-    const params = new (URLSearchParams)
-    this.productIDs.forEach(p => { params.append("p", p) })
-    let result
-    try {
-      result = (await this.$axios({
-        method: 'GET',
-        url: `${this.ordersURL}/api/prices`,
-        params,
-      })).data
-    } catch (err) {
-      console.error(err)
-      return
-    }
-    if (typeof result === 'string') this.message = result
-    if (typeof result === 'object') {
-      this.products = result.products
-      this.couponMatch = result.coupon
-    }
+  data: () => ({ coupon: '', couponMatch: null, message: null, products: null }),
+  mounted() {
+    this.getPrices()
   },
   computed: {
     buttonLabel() {
@@ -54,8 +45,33 @@ export default {
     },
   },
   methods: {
+    async getPrices() {
+      this.couponMatch = null // signal that we're retrieving prices
+      const params = new (URLSearchParams)
+      this.productIDs.forEach(p => { params.append("p", p) })
+      params.append("coupon", this.coupon)
+      let result
+      try {
+        result = (await this.$axios({
+          method: 'GET',
+          url: `${this.ordersURL}/api/prices`,
+          params,
+        })).data
+      } catch (err) {
+        console.error(err)
+        this.couponMatch = this.coupon === ''
+        return
+      }
+      this.message = (typeof result === 'string') ? result : null
+      this.products = (typeof result === 'object') ? result.products : null
+      this.couponMatch = (typeof result === 'object') ? result.coupon : (this.coupon === '')
+    },
     onBuyTickets() {
       this.$refs.dialog.show()
+    },
+    onChangeCoupon(coupon) {
+      this.coupon = coupon
+      this.getPrices()
     },
   },
 }

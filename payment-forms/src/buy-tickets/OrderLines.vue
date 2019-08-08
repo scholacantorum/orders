@@ -19,9 +19,9 @@ b-container.px-0.mb-3(fluid)
   )
     table#buy-tickets-form-quantities
       OrderLinesQty(
-        v-for="ol in lines" ref="qty" :key="ol.product"
-        v-model="ol.quantity" :name="ol.productName" :message="ol.message"
-        :price="ol.price" :state="state" :disabled="disabled"
+        v-for="p in products" ref="qty" :key="p.id"
+        v-model="quantities[p.id]" :name="p.name" :message="p.message"
+        :price="p.price" :state="state" :disabled="disabled"
       )
   OrderLinesDonation(v-model="donation" :disabled="disabled")
   OrderLinesTotal(:total="total")
@@ -41,54 +41,63 @@ export default {
   },
   data: () => ({
     donation: 0,
-    lines: [],
+    quantities: {},
   }),
   watch: {
     donation: 'emitLines',
     hasOne: 'emitLines',
-    products: { immediate: true, handler: 'fillLines' },
+    products: { immediate: true, handler: 'fillQuantities' },
+    quantities: { deep: true, handler: 'emitLines' },
   },
   computed: {
-    hasOne() { return !!this.lines.some(ol => ol.quantity) },
+    hasOne() {
+      return this.products.some(p => !p.message && this.quantities[p.id])
+    },
     state() {
       if (!this.submitted || this.hasOne) return null
       return false
     },
     total() {
-      return this.lines.reduce((t, ol) => t + ol.quantity * (ol.price || 0), 0) + this.donation * 100
+      return this.products.reduce((t, p) => t + (p.message ? 0 : ((p.price * this.quantities[p.id]) || 0)), 0) + this.donation * 100
     },
   },
   methods: {
     emitLines() {
-      if (!this.hasOne) {
+      if (!this.products || !this.hasOne) {
         this.$emit('lines', null)
-      } else if (!this.donation) {
-        this.$emit('lines', this.lines)
-      } else {
-        this.$emit('lines', [...this.lines, {
-          product: 'donation', price: this.donation * 100, quantity: 1,
-        }])
+        return
       }
+      const lines = []
+      this.products.forEach(p => {
+        if (p.message) return
+        lines.push({
+          product: p.id,
+          price: p.price,
+          quantity: this.quantities[p.id] || 0,
+        })
+      })
+      if (this.donation) {
+        lines.push({
+          product: 'donation', price: this.donation * 100, quantity: 1,
+        })
+      }
+      this.$emit('lines', lines)
     },
-    fillLines() {
+    fillQuantities() {
       if (!this.products) return
       let validProductCount = 0
-      let lastValidProductLine
-      this.lines = []
+      let lastValidProduct
+      let seenQty = false
       this.products.forEach(p => {
-        this.lines.push({
-          product: p.id,
-          productName: p.name,
-          message: p.message,
-          price: p.price,
-          quantity: 0,
-        })
+        if (!this.quantities[p.id]) this.$set(this.quantities, p.id, 0)
+        if (this.quantities[p.id]) seenQty = true
         if (!p.message) {
           validProductCount++
-          lastValidProductLine = this.lines[this.lines.length - 1]
+          lastValidProduct = p.id
         }
       })
-      if (validProductCount === 1) lastValidProductLine.quantity = 1
+      if (!seenQty && validProductCount === 1) this.quantities[lastValidProduct] = 1
+      this.emitLines()
     },
     focus() { this.$refs.qty[0].focus() },
   },

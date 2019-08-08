@@ -4,20 +4,30 @@ OrderForm is the ticket order form displayed in the dialog box.
 
 <template lang="pug">
 b-form(novalidate @submit.prevent="onSubmit")
-  OrderLines(ref="lines" :disabled="submitting" :products="products" :submitted="submitted" @lines="onLines")
+  OrderLines(ref="lines"
+    :disabled="submitting" :products="products" :submitted="submitted"
+    @lines="onLines"
+  )
+  OrderDiscount(ref="discount"
+    :coupon="coupon" :couponMatch="couponMatch" :disabled="submitting"
+    @coupon="onCouponChange"
+  )
   OrderPayment(ref="pmt"
-    :send="onSend" :stripeKey="stripeKey" :total="total"
+    :couponMatch="couponMatch" :send="onSend" :stripeKey="stripeKey" :total="total"
     @cancel="onCancel" @submitted="onSubmitted" @submitting="onSubmitting"
   )
 </template>
 
 <script>
+import OrderDiscount from './OrderDiscount'
 import OrderLines from './OrderLines'
 import OrderPayment from './OrderPayment'
 
 export default {
-  components: { OrderLines, OrderPayment },
+  components: { OrderDiscount, OrderLines, OrderPayment },
   props: {
+    coupon: String,
+    couponMatch: Boolean,
     ordersURL: String,
     products: Array,
     stripeKey: String,
@@ -38,13 +48,14 @@ export default {
   },
   methods: {
     onCancel() { this.$emit('cancel') },
+    onCouponChange(coupon) { this.$emit('coupon', coupon) },
     onLines(lines) { this.lines = lines },
     onSubmit() { this.$refs.pmt.submit() },
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ name, email, subtype, method }) {
       const result = await this.$axios.post(`${this.ordersURL}/api/order`, JSON.stringify({
-        source: 'public', name, email,
+        source: 'public', name, email, coupon: this.coupon,
         lines: this.lines.filter(ol => ol.quantity && !ol.message).map(ol => ({
           product: ol.product,
           quantity: ol.quantity,
