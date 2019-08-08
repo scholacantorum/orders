@@ -26,19 +26,22 @@ export default {
 
 <style lang="stylus">
 #buy-tickets-donation-row
-  width 100%
+  width calc(100% + 4px) // line up with unboxed numbers
 #buy-tickets-donation-label
   vertical-align middle
   font-size 14px
   line-height 1.2
 #buy-tickets-donation-amount-cell
-  width 4em
+  width 4.5em
   vertical-align middle
   white-space nowrap
   font-weight bold
 #buy-tickets-donation-amount
   display inline
-  width calc(100% - 1ch + 8px)
   text-align right
   font-weight bold
+  -moz-appearance textfield
+  &::-webkit-outer-spin-button, &::-webkit-inner-spin-button
+    margin 0
+    -webkit-appearance none
 </style>

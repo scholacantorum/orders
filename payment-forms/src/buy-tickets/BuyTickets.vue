@@ -8,6 +8,7 @@ div(v-if="message" v-text="message")
 div(v-else-if="products")
   Dialog(ref="dialog" :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey" :title="title")
   b-btn(variant="primary" @click="onBuyTickets" v-text="buttonLabel")
+  span.buy-tickets-price(v-if="priceLabel" v-text="priceLabel")
 </template>
 
 <script>
@@ -46,6 +47,11 @@ export default {
     buttonLabel() {
       return this.title.includes('Subscription') ? 'Buy Subscriptions' : 'Buy Tickets'
     },
+    priceLabel() {
+      if (!this.products || !this.products.length || !this.products[0].price) return null
+      if (this.products.some(p => p.price !== this.products[0].price)) return null
+      return `$${this.products[0].price / 100} each`
+    },
   },
   methods: {
     onBuyTickets() {
@@ -55,4 +61,7 @@ export default {
 }
 </script>
 
-<style lang="stylus"></style>
+<style lang="stylus">
+.buy-tickets-price
+  margin-left 0.3em
+</style>

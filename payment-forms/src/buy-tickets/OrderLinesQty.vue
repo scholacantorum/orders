@@ -53,6 +53,10 @@ export default {
   vertical-align middle
 .buy-tickets-qty-row-qty
   text-align right
+  -moz-appearance textfield
+  &::-webkit-outer-spin-button, &::-webkit-inner-spin-button
+    margin 0
+    -webkit-appearance none
   &.is-invalid
     // Override the red X that Bootstrap adds since there isn't room for it.
     padding-right 0.75rem
