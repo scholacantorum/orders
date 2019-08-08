@@ -7,7 +7,7 @@ orderable, and an optional message otherwise.
 div(v-if="message" v-text="message")
 div(v-else-if="products")
   Dialog(ref="dialog" :ordersURL="ordersURL" :products="products" :stripeKey="stripeKey" :title="title")
-  b-btn(variant="primary" @click="onBuyTickets") Buy Tickets
+  b-btn(variant="primary" @click="onBuyTickets" v-text="buttonLabel")
 </template>
 
 <script>
@@ -41,6 +41,11 @@ export default {
       this.products = result.products
       this.couponMatch = result.coupon
     }
+  },
+  computed: {
+    buttonLabel() {
+      return this.title.includes('Subscription') ? 'Buy Subscriptions' : 'Buy Tickets'
+    },
   },
   methods: {
     onBuyTickets() {
