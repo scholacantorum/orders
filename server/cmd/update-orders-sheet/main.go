@@ -205,6 +205,9 @@ func main() {
 
 	// If there are remaining products that we didn't see, append them to
 	// the bottom of the sheet.
+	if len(order.Payments) == 0 {
+		order.Payments = []*model.Payment{{}}
+	}
 	for _, line := range lines {
 		requests = append(requests, &sheets.Request{AppendCells: &sheets.AppendCellsRequest{
 			SheetId: sheetnum,
