@@ -184,6 +184,10 @@ const (
 	// ProdAuctionItem is an auction item purchased at the gala or similar.
 	ProdAuctionItem = "auctionitem"
 
+	// ProdWardrobe is a concert dress or other wardrobe item sold to a
+	// singer.
+	ProdWardrobe = "wardrobe"
+
 	// ProdOther is an "other" product type, not allowed for new products
 	// but used for products in archive orders.
 	ProdOther = "other"

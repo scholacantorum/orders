@@ -533,6 +533,10 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 			if line.Quantity != 1 || line.Used != 0 || line.UsedAt != "" {
 				return false
 			}
+		case model.ProdWardrobe:
+			if line.Quantity < 1 || line.Used != 0 || line.UsedAt != "" {
+				return false
+			}
 		case model.ProdTicket:
 			line.AutoUse = line.Quantity
 			if line.Used < 0 || line.Used > line.Quantity*line.Product.TicketCount {
