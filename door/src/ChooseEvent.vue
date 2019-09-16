@@ -28,7 +28,7 @@ export default {
       try {
         const products = (await this.$axios.get('/api/prices', {
           headers: { 'Auth': this.$store.state.auth },
-          params: { event: event.id },
+          params: { event: event.id, source: 'inperson' },
         })).data.products.filter(p => !p.message)
         if (!products.length) {
           window.alert('No tickets are on sale for that event.')
