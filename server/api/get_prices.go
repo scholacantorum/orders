@@ -27,6 +27,7 @@ type getPricesData struct {
 // and the in-person sales app.
 func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
+		source      model.OrderSource
 		eventID     model.EventID
 		session     *model.Session
 		privs       model.Privilege
@@ -56,9 +57,21 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		}
 		privs = session.Privileges
 	}
+	// Get the order source.
+	if source = model.OrderSource(r.FormValue("source")); source == "" {
+		source = model.OrderFromPublic
+	}
+	if source != model.OrderFromPublic && source != model.OrderInPerson {
+		BadRequestError(tx, w, "invalid source")
+		return
+	}
 	// If the caller specified an event, get the list of products offering
 	// ticket sales for that event.
 	if eventID != "" {
+		if source != model.OrderInPerson {
+			BadRequestError(tx, w, "invalid source")
+			return
+		}
 		if event = tx.FetchEvent(eventID); event == nil {
 			log.Printf("ERROR: no products for event %q", eventID)
 			NotFoundError(tx, w)
@@ -86,7 +99,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		pd.name = product.ShortName
 		// Find the best SKU for this product.
 		for _, s := range product.SKUs {
-			if !interestingSKU(product, s, privs, coupon, event != nil) {
+			if !interestingSKU(product, s, coupon, source) {
 				continue
 			}
 			if s.Coupon == coupon {
@@ -153,20 +166,17 @@ func getEventProducts(tx db.Tx, event *model.Event) (productIDs []string) {
 // interestingSKU returns true if the SKU's criteria are met, or come close.
 // "Close", in this context, means that all criteria are met except for the
 // sales range, and one of the following is true:
-//   - The caller has PrivInPersonSales
+//   - The source is OrderInPerson
 //   - The sales range is in the future
 //   - The product is a ticket to an event that starts today or later
-func interestingSKU(product *model.Product, sku *model.SKU, privs model.Privilege, coupon string, inPerson bool) bool {
-	if sku.Flags&model.SKUMembersOnly != 0 && privs == 0 {
-		return false
-	}
-	if sku.Flags&model.SKUInPerson != 0 && !inPerson {
+func interestingSKU(product *model.Product, sku *model.SKU, coupon string, source model.OrderSource) bool {
+	if source != sku.Source {
 		return false
 	}
 	if sku.Coupon != "" && sku.Coupon != coupon {
 		return false
 	}
-	if privs&model.PrivInPersonSales != 0 {
+	if source == model.OrderInPerson {
 		return true
 	}
 	var now = time.Now()

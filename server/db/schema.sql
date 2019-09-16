@@ -140,34 +140,36 @@ CREATE TABLE product (
 -- Each product in the product table has one or more SKUs in the sku table,
 -- representing different price points or purchase methods for the product.  A
 -- product represents what the customer gets in return for their order; a SKU
--- represents the pricing scheme by which they ordered it.
+-- represents the method and pricing scheme by which they ordered it.
 --
 -- Although not expressed in SQL, the code enforces a uniqueness constraint on
--- this table:  for any given combination of product, coupon, and flags, there
--- cannot be overlapping sales_start..sales_end ranges.  When choosing which SKU
--- to use for a given order, the following algorithm is used:
---   - SKUs with flags set are not considered unless the criteria specified by
---     those flags are met.
---   - For each flag whose criteria are met, if there are SKUs with that flag
---     set, SKUs without that flag are not considered.
+-- this table:  for any given combination of product, source, coupon, and flags,
+-- there cannot be overlapping sales_start..sales_end ranges.  When choosing
+-- which SKU to use for a given order, the following algorithm is used:
+--   - If the order source is not "office", SKUs with a different source are not
+--     considered.
 --   - If the caller supplied a coupon code, and there are any SKUs with that
 --     coupon code, no SKUs without that coupon code are considered.
---   - If the caller does not have PrivManageOrders privilege, only SKUs whose
+--   - If the order source is not "office", only SKUs whose
 --     sales_start..sales_end range contains the current moment are considered.
---   - If the caller does have PrivManageOrders privilege, preference is given
---     to the SKU whose sales_start..sales_end range contains the current
---     moment, then to the one whose range is before the current moment and
---     closest to it, and finally to the one whose range is after the current
---     moment and closest to it.
+--   - If the order source is "office", preference is given to the SKU whose
+--     sales_start..sales_end range contains the current moment, then to the one
+--     whose range is before the current moment and closest to it, and finally
+--     to the one whose range is after the current moment and closest to it.
 CREATE TABLE sku (
 
     -- Identifier of the product that can be purchased with this SKU.
     product text NOT NULL REFERENCES product ON DELETE CASCADE,
 
+    -- Source to which this SKU applies.  Orders can be placed with this SKU
+    -- only from this source (or from the office, which can use any SKU).
+    source text NOT NULL,
+
     -- Coupon code for this SKU.  In order to place an order with this SKU, the
     -- customer must specify this coupon code.  Each product should have a SKU
     -- with an empty coupon code, which is used when the customer doesn't
-    -- specify a recognized coupon code.
+    -- specify a recognized coupon code.  Non-empty values are relevant only for
+    -- source "public".
     coupon text NOT NULL DEFAULT '' COLLATE NOCASE,
 
     -- Start and end times for the time frame during which this SKU can be

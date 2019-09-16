@@ -226,6 +226,7 @@ type Session struct {
 }
 
 type SKU struct {
+	Source     OrderSource
 	Coupon     string
 	SalesStart time.Time
 	SalesEnd   time.Time
@@ -246,21 +247,6 @@ func (s *SKU) InSalesRange(t time.Time) int {
 }
 
 type SKUFlags byte
-
-const (
-	// SKUMembersOnly means that this SKU is only available when the order
-	// is being placed on the members site, by a logged-in member.
-	SKUMembersOnly SKUFlags = 1 << iota
-
-	// SKUInPerson means that this SKU is only available through the
-	// in-person (at the door) sales app.
-	SKUInPerson
-
-	// SKUHidden means that this SKU is orderable but does not appear in
-	// public (unauthenticated) UIs.  This is typically used for free
-	// products, e.g. student entry tickets.
-	SKUHidden
-)
 
 type TicketID int
 

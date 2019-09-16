@@ -73,13 +73,20 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for i, sku := range product.SKUs {
+		switch sku.Source {
+		case model.OrderFromPublic, model.OrderFromMembers, model.OrderFromGala, model.OrderFromOffice, model.OrderInPerson:
+		default:
+			BadRequestError(tx, w, "invalid SKU source")
+			return
+		}
 		if sku.Price < 0 || (!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
 			BadRequestError(tx, w, "invalid SKU parameters")
 			return
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
-			if prev.Flags&^model.SKUHidden == sku.Flags&^model.SKUHidden && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
+			if prev.Source == sku.Source && prev.Flags == sku.Flags && prev.Coupon == sku.Coupon &&
+				overlappingDates(prev, sku) {
 				BadRequestError(tx, w, "overlapping SKUs")
 				return
 			}
@@ -136,30 +143,14 @@ func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
 func parseCreateProductSKU(sku *model.SKU) json.Handlers {
 	return json.ObjectHandler(func(key string) json.Handlers {
 		switch key {
+		case "source":
+			return json.StringHandler(func(s string) { sku.Source = model.OrderSource(s) })
 		case "coupon":
 			return json.StringHandler(func(s string) { sku.Coupon = s })
 		case "salesStart":
 			return json.TimeHandler(func(t time.Time) { sku.SalesStart = t })
 		case "salesEnd":
 			return json.TimeHandler(func(t time.Time) { sku.SalesEnd = t })
-		case "membersOnly":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					sku.Flags |= model.SKUMembersOnly
-				}
-			})
-		case "inPerson":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					sku.Flags |= model.SKUInPerson
-				}
-			})
-		case "hidden":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					sku.Flags |= model.SKUHidden
-				}
-			})
 		case "price":
 			return json.IntHandler(func(i int) { sku.Price = i })
 		default:
@@ -227,6 +218,7 @@ func emitProduct(p *model.Product) []byte {
 			jw.Array(func() {
 				for _, sku := range p.SKUs {
 					jw.Object(func() {
+						jw.Prop("source", sku.Source)
 						if sku.Coupon != "" {
 							jw.Prop("coupon", sku.Coupon)
 						}
@@ -235,15 +227,6 @@ func emitProduct(p *model.Product) []byte {
 						}
 						if !sku.SalesEnd.IsZero() {
 							jw.Prop("salesEnd", sku.SalesEnd.Format(time.RFC3339))
-						}
-						if sku.Flags&model.SKUMembersOnly != 0 {
-							jw.Prop("membersOnly", true)
-						}
-						if sku.Flags&model.SKUInPerson != 0 {
-							jw.Prop("inPerson", true)
-						}
-						if sku.Flags&model.SKUHidden != 0 {
-							jw.Prop("hidden", true)
 						}
 						jw.Prop("price", sku.Price)
 					})

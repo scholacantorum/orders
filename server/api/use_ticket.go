@@ -328,7 +328,7 @@ func getFreeClasses(tx db.Tx, event *model.Event) (fc map[string]*model.Product)
 	fc = make(map[string]*model.Product)
 	for _, p := range tx.FetchProductsByEvent(event) {
 		for _, sku := range p.SKUs {
-			if interestingSKU(p, sku, 0, "", false) && sku.Price == 0 {
+			if interestingSKU(p, sku, "", model.OrderInPerson) && sku.Price == 0 {
 				fc[p.TicketClass] = p
 			}
 		}

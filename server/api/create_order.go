@@ -64,7 +64,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Resolve the products and SKUs and validate the prices.
-	if !resolveSKUs(tx, order, privs) {
+	if !resolveSKUs(tx, order) {
 		log.Printf("ERROR: invalid products or prices in order %s", emitOrder(order, true))
 		BadRequestError(tx, w, "invalid products or prices")
 		return
@@ -294,7 +294,7 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 // and verifying the amount of the order line, following the SKU rules
 // documented in db/schema.sql. It returns true if everything
 // resolved successfully and false otherwise.
-func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege) bool {
+func resolveSKUs(tx db.Tx, order *model.Order) bool {
 	var couponMatch bool
 
 	for _, line := range order.Lines {
@@ -310,7 +310,7 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege) bool {
 			continue
 		}
 		for _, s := range line.Product.SKUs {
-			if !matchSKU(order, privs, s) {
+			if !matchSKU(order, s) {
 				continue
 			}
 			if s.Coupon != "" {
@@ -333,17 +333,14 @@ func resolveSKUs(tx db.Tx, order *model.Order, privs model.Privilege) bool {
 
 // matchSKU returns true if all of the criteria for the SKU are met by the order
 // being placed.
-func matchSKU(order *model.Order, privs model.Privilege, sku *model.SKU) bool {
-	if sku.Flags&model.SKUMembersOnly != 0 && privs == 0 {
-		return false
-	}
-	if sku.Flags&model.SKUInPerson != 0 && order.Source != model.OrderInPerson {
+func matchSKU(order *model.Order, sku *model.SKU) bool {
+	if sku.Source != order.Source && order.Source != model.OrderFromOffice {
 		return false
 	}
 	if sku.Coupon != "" && !strings.EqualFold(sku.Coupon, order.Coupon) {
 		return false
 	}
-	if privs&model.PrivManageOrders != 0 {
+	if order.Source == model.OrderFromOffice {
 		return true
 	}
 	if !sku.SalesStart.IsZero() && sku.SalesStart.After(time.Now()) {
@@ -364,18 +361,6 @@ func betterSKU(sku1, sku2 *model.SKU) *model.SKU {
 		return sku1
 	}
 	if sku1 == nil {
-		return sku2
-	}
-	if sku1.Flags&model.SKUInPerson != 0 && sku2.Flags&model.SKUInPerson == 0 {
-		return sku1
-	}
-	if sku1.Flags&model.SKUInPerson == 0 && sku2.Flags&model.SKUInPerson != 0 {
-		return sku2
-	}
-	if sku1.Flags&model.SKUMembersOnly != 0 && sku2.Flags&model.SKUMembersOnly == 0 {
-		return sku1
-	}
-	if sku1.Flags&model.SKUMembersOnly == 0 && sku2.Flags&model.SKUMembersOnly != 0 {
 		return sku2
 	}
 	if sku1.Coupon != "" && sku2.Coupon == "" {
