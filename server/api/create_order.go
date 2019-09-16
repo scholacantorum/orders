@@ -424,8 +424,6 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 		return false
 	}
 
-	// An address is needed for orders that consist only of a donation.  (It
-	// is not required for ticket orders with an additional donation line.)
 	// If any of the address fields is set, they must all be set, and they
 	// need to match the appropriate regular expressions.
 	if (order.Address != "" || order.City != "" || order.State != "" || order.Zip != "") &&
@@ -439,9 +437,6 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 		return false
 	}
 	if order.Customer != "" && !customerRE.MatchString(order.Customer) {
-		return false
-	}
-	if len(order.Lines) == 1 && order.Lines[0].Product.Type == model.ProdDonation && order.Address == "" {
 		return false
 	}
 
