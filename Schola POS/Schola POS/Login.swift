@@ -114,7 +114,7 @@ class Login: UIViewController, UITextFieldDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        navigationItem.title = "Schola at the Door"
+        navigationItem.title = "Schola Point of Sale"
         view.backgroundColor = UIColor.white
         usernameTextField.delegate = self
         passwordTextField.delegate = self

@@ -114,7 +114,6 @@
 		882D572B22E2C79F00FFEB6B /* Schola POS */ = {
 			isa = PBXGroup;
 			children = (
-				887C2592232F2F0800CE68A0 /* SellMerchandise.swift */,
 				882D572C22E2C79F00FFEB6B /* AppDelegate.swift */,
 				882D573322E2C7A100FFEB6B /* Assets.xcassets */,
 				882D573822E2C7A100FFEB6B /* Info.plist */,
@@ -140,6 +139,7 @@
 				88E2A08D22EBC20D00D95DBA /* SalesReceipt.swift */,
 				88E2A09122ECAE1300D95DBA /* WillCall.swift */,
 				88E2A09722ED06D200D95DBA /* ScanTicket.swift */,
+				887C2592232F2F0800CE68A0 /* SellMerchandise.swift */,
 				88E2A09322ECBBA500D95DBA /* UseOrder.swift */,
 				88E2A09522ECDCB500D95DBA /* UseTicketClass.swift */,
 			);

@@ -67,8 +67,13 @@ class UseTicketClass: UIViewController {
         let max = usage.max < 1000 ? usage.max : ((usage.used + 6) / 6) * 6
         for bnum in 1...max {
             let button = UIButton()
-            button.setTitle("\(bnum)", for: .normal)
-            button.titleLabel!.font = UIFont.boldSystemFont(ofSize: 24.0)
+            if bnum <= usage.min {
+                button.setTitle("Used", for: .normal)
+                button.titleLabel!.font = UIFont.boldSystemFont(ofSize: 16.0)
+            } else {
+                button.setTitle("\(bnum - usage.min)", for: .normal)
+                button.titleLabel!.font = UIFont.boldSystemFont(ofSize: 24.0)
+            }
             button.layer.cornerRadius = 5.0
             button.addTarget(self, action: #selector(usageChange(_:)), for: .touchUpInside)
             inner.addSubview(button)
@@ -96,7 +101,7 @@ class UseTicketClass: UIViewController {
     }
 
     @objc func usageChange(_ sender: UIButton) {
-        let bnum = Int(sender.currentTitle!)!
+        let bnum = sender.currentTitle == "Used" ? usage.min : usage.min + Int(sender.currentTitle!)!
         if bnum < usage.min {
             return
         }

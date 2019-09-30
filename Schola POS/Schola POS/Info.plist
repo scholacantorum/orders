@@ -26,8 +26,6 @@
 	<string>Camera access is required to scan ticket barcodes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Location access is required in order to accept payments with the card reader.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Microphone access is required for support of future microphone-based card readers.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
