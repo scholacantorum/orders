@@ -165,7 +165,7 @@ class Backend: ConnectionTokenProvider {
     }
 
     func eventProducts(_ handler: @escaping ([Product]?, String?) -> Void) {
-        let url = URL(string: store.baseURL + "/prices?event=" + store.event.id.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!)
+        let url = URL(string: store.baseURL + "/prices?source=inperson&event=" + store.event.id.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!)
         var request = URLRequest(url: url!)
         request.setValue(store.auth, forHTTPHeaderField: "Auth")
         let task = URLSession.shared.dataTask(with: request) { data, response, error in

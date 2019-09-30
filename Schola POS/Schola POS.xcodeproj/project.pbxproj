@@ -11,6 +11,7 @@
 		882D572F22E2C79F00FFEB6B /* Login.swift in Sources */ = {isa = PBXBuildFile; fileRef = 882D572E22E2C79F00FFEB6B /* Login.swift */; };
 		882D573422E2C7A100FFEB6B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 882D573322E2C7A100FFEB6B /* Assets.xcassets */; };
 		882D573722E2C7A100FFEB6B /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 882D573522E2C7A100FFEB6B /* LaunchScreen.storyboard */; };
+		887C2593232F2F0900CE68A0 /* SellMerchandise.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887C2592232F2F0800CE68A0 /* SellMerchandise.swift */; };
 		88E2A07222E7EC6900D95DBA /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A07122E7EC6900D95DBA /* Backend.swift */; };
 		88E2A07422E80B4000D95DBA /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A07322E80B4000D95DBA /* Store.swift */; };
 		88E2A07622E8ADB300D95DBA /* TopNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A07522E8ADB300D95DBA /* TopNavigation.swift */; };
@@ -43,6 +44,7 @@
 		882D573322E2C7A100FFEB6B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		882D573622E2C7A100FFEB6B /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		882D573822E2C7A100FFEB6B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		887C2592232F2F0800CE68A0 /* SellMerchandise.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SellMerchandise.swift; sourceTree = "<group>"; };
 		88E2A07122E7EC6900D95DBA /* Backend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backend.swift; sourceTree = "<group>"; };
 		88E2A07322E80B4000D95DBA /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
 		88E2A07522E8ADB300D95DBA /* TopNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopNavigation.swift; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 		882D572B22E2C79F00FFEB6B /* Schola POS */ = {
 			isa = PBXGroup;
 			children = (
+				887C2592232F2F0800CE68A0 /* SellMerchandise.swift */,
 				882D572C22E2C79F00FFEB6B /* AppDelegate.swift */,
 				882D573322E2C7A100FFEB6B /* Assets.xcassets */,
 				882D573822E2C7A100FFEB6B /* Info.plist */,
@@ -269,6 +272,7 @@
 				88E2A07E22E8FAA400D95DBA /* TicketQuantity.swift in Sources */,
 				88E2A08022E9F0F700D95DBA /* SalesPaymentCash.swift in Sources */,
 				88E2A07C22E8D61400D95DBA /* SellTickets.swift in Sources */,
+				887C2593232F2F0900CE68A0 /* SellMerchandise.swift in Sources */,
 				88E2A09222ECAE1300D95DBA /* WillCall.swift in Sources */,
 				88E2A08222E9F21B00D95DBA /* SalesSummary.swift in Sources */,
 				882D572F22E2C79F00FFEB6B /* Login.swift in Sources */,
@@ -428,13 +432,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = XV8XLSPUSH;
+				DEVELOPMENT_TEAM = T9D234NLC2;
 				INFOPLIST_FILE = "Schola POS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.scholacantorum.orders.Schola-POS";
+				PRODUCT_BUNDLE_IDENTIFIER = org.scholacantorum.orders.ScholaPOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -447,13 +451,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = XV8XLSPUSH;
+				DEVELOPMENT_TEAM = T9D234NLC2;
 				INFOPLIST_FILE = "Schola POS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.scholacantorum.orders.Schola-POS";
+				PRODUCT_BUNDLE_IDENTIFIER = org.scholacantorum.orders.ScholaPOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

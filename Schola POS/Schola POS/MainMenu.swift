@@ -43,6 +43,16 @@ class MainMenu: UIViewController {
         view.addTarget(self, action: #selector(scanTicketButton(_:)), for: .touchUpInside)
         return view
     }()
+    lazy var sellMerchandiseButton: UIButton = {
+        let view = UIButton()
+        view.setTitle("Sell Merchandise", for: .normal)
+        view.titleLabel!.font = UIFont.boldSystemFont(ofSize: 30.0)
+        view.setTitleColor(UIColor.white, for: .normal)
+        view.layer.cornerRadius = 5.0
+        view.backgroundColor = scholaBlue
+        view.addTarget(self, action: #selector(sellMerchandiseButton(_:)), for: .touchUpInside)
+        return view
+    }()
     lazy var logoutButton: UIButton = {
         let view = UIButton()
         view.setTitle("Logout", for: .normal)
@@ -111,14 +121,19 @@ class MainMenu: UIViewController {
             topAnchor = willCallButton.bottomAnchor
         }
         view.addSubview(scanTicketButton)
+//        view.addSubview(sellMerchandiseButton)
         view.addSubview(logoutButton)
         view.addSubview(statsLabel)
         constraints.append(contentsOf: [
             scanTicketButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             scanTicketButton.topAnchor.constraint(equalTo: topAnchor, constant: 45.0),
             scanTicketButton.widthAnchor.constraint(equalTo: scanTicketButton.titleLabel!.widthAnchor, constant: 36.0),
+//            sellMerchandiseButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+//            sellMerchandiseButton.topAnchor.constraint(equalTo: scanTicketButton.bottomAnchor, constant: 45.0),
+//            sellMerchandiseButton.widthAnchor.constraint(equalTo: sellMerchandiseButton.titleLabel!.widthAnchor, constant: 36.0),
             logoutButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             logoutButton.topAnchor.constraint(equalTo: scanTicketButton.bottomAnchor, constant: 60.0),
+//            logoutButton.topAnchor.constraint(equalTo: sellMerchandiseButton.bottomAnchor, constant: 60.0),
             logoutButton.widthAnchor.constraint(equalTo: logoutButton.titleLabel!.widthAnchor, constant: 18.0),
             statsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             statsLabel.topAnchor.constraint(equalTo: logoutButton.bottomAnchor, constant: 9.0),
@@ -148,6 +163,10 @@ class MainMenu: UIViewController {
 
     @objc func scanTicketButton(_ sender: UIButton) {
         navigationController!.pushViewController(ScanTicket(), animated: true)
+    }
+
+    @objc func sellMerchandiseButton(_ sender: UIButton) {
+        navigationController!.pushViewController(SellMerchandise(), animated: true)
     }
 
     @objc func logoutButton(_ sender: UIButton) {
