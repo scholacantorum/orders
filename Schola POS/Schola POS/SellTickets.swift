@@ -293,7 +293,7 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
             if useqty[index] < prod.ticketCount*sellqty[index] {
                 showNameEmail = true
             }
-            if useqty[index] > 0 {
+            if sellqty[index] > 0 {
                 enableCash = true
                 if prod.price > 0 {
                     enableCheckCard = true
