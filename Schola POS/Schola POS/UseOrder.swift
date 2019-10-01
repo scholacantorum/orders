@@ -28,7 +28,8 @@ class UseOrder: UIViewController, UseTicketClassDelegate {
         super.viewDidLoad()
         view.backgroundColor = UIColor.white
         spinner = UIActivityIndicatorView()
-        spinner.style = .gray
+        spinner.style = .whiteLarge
+        spinner.color = .gray
         view.addSubview(spinner)
         NSLayoutConstraint.useAndActivateConstraints([
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),

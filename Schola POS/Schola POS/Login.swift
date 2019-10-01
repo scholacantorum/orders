@@ -204,7 +204,7 @@ class Login: UIViewController, UITextFieldDelegate {
             allowWillCallHBox.rightAnchor.constraint(equalTo: testModeHBox.rightAnchor),
             loginButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loginButton.topAnchor.constraint(equalTo: allowWillCallHBox.bottomAnchor, constant: 18.0),
-            loginButton.widthAnchor.constraint(equalToConstant: 100.0),
+            loginButton.widthAnchor.constraint(equalToConstant: 150.0),
             loginButton.heightAnchor.constraint(equalToConstant: 30.0),
             errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             errorLabel.topAnchor.constraint(equalTo: loginButton.bottomAnchor, constant: 18.0),
@@ -257,9 +257,13 @@ class Login: UIViewController, UITextFieldDelegate {
         allow.cash = allowCashSwitch.isOn
         allow.willcall = allowWillCallSwitch.isOn
         loggingIn = true
+        loginButton.isEnabled = false
+        loginButton.setTitle("Logging in...", for: .normal)
         backend.login(username, password, testmode, allow) { error in
             self.loggingIn = false
             DispatchQueue.main.async {
+                self.loginButton.isEnabled = true
+                self.loginButton.setTitle("Login", for: .normal)
                 if error != nil {
                     self.errorLabel.text = error
                 } else {

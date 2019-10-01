@@ -13,7 +13,7 @@ import UIKit
 
 class EventChooser: UITableViewController {
 
-    var events: [Event] = []
+    var events: [Event] = [Event(id: "", name: "(loading)", start: "", freeEntries: nil)]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -51,14 +51,22 @@ class EventChooser: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "eventCell", for: indexPath)
         let event = events[indexPath.row]
-        let firstSpace = event.start.firstIndex(of: "T")!
-        let date = event.start[..<firstSpace]
-        cell.textLabel!.text = date + " " + event.name
+        if event.start != "" {
+            let firstSpace = event.start.firstIndex(of: "T")!
+            let date = event.start[..<firstSpace]
+            cell.textLabel!.text = date + " " + event.name
+        } else {
+            cell.textLabel!.text = event.name
+        }
         return cell
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        store.event = events[indexPath.row]
+        let event = events[indexPath.row]
+        if event.id == "" {
+            return
+        }
+        store.event = event
         backend.eventProducts {products, error in
             DispatchQueue.main.async {
                 if let error = error {

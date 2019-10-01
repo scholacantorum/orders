@@ -20,7 +20,7 @@ class WillCallCell: UITableViewCell {
 class WillCall: UIViewController, UITableViewDataSource, UISearchBarDelegate, UITableViewDelegate {
 
     var orders: [WillCallOrder] = []
-    var filteredOrders: [WillCallOrder] = []
+    var filteredOrders: [WillCallOrder] = [WillCallOrder(id: 0, name: "(loading)")]
     var searchBar: UISearchBar!
     var tableView: UITableView!
 
@@ -94,13 +94,17 @@ class WillCall: UIViewController, UITableViewDataSource, UISearchBarDelegate, UI
         let cell = tableView.dequeueReusableCell(withIdentifier: "willCallCell", for: indexPath)
         let order = filteredOrders[indexPath.row]
         cell.textLabel!.text = order.name
-        cell.detailTextLabel!.text = "#\(order.id)"
+        if order.id != 0 {
+            cell.detailTextLabel!.text = "#\(order.id)"
+        }
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let order = filteredOrders[indexPath.row]
-        navigationController!.pushViewController(UseOrder(tokenOrID: "\(order.id)"), animated: true)
+        if order.id != 0 {
+            navigationController!.pushViewController(UseOrder(tokenOrID: "\(order.id)"), animated: true)
+        }
     }
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {

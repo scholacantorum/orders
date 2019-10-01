@@ -124,12 +124,16 @@ class SalesReceipt: UIViewController {
     }
 
     @objc func sendReceiptButton(_ sender: UIButton) {
+        sendReceiptButton.setTitle("Sending...", for: .normal)
+        sendReceiptButton.isEnabled = false
         backend.sendEmailReceipt(order: order, email: emailTextField.text!) { error in
             DispatchQueue.main.async {
                 if let error = error {
                     let alert = UIAlertController(title: "Server Error", message: error, preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
                     self.present(alert, animated: true, completion: nil)
+                    self.sendReceiptButton.isEnabled = true
+                    self.sendReceiptButton.setTitle("Send Receipt", for: .normal)
                 }
                 self.navigationController!.popToRootViewController(animated: true)
             }
