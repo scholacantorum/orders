@@ -5,14 +5,14 @@ ChooseEvent is the dialog for choosing what event we're serving.
 <template lang="pug">
 #event
   #event-heading Choose Event
-  b-spinner#event-spinner(v-if="!events")
+  b-spinner#event-spinner(v-if="choosing || !events")
   template(v-else)
     .event-tile(v-for="event in events" :key="event.id" @click="onClick(event)" v-text="`${event.start.substr(0, 10)} ${event.name}`")
 </template>
 
 <script>
 export default {
-  data: () => ({ events: null }),
+  data: () => ({ events: null, choosing: false }),
   async mounted() {
     try {
       this.events = (await this.$axios.get('/api/event?future=1&freeEntries=1', {
@@ -26,16 +26,19 @@ export default {
   methods: {
     async onClick(event) {
       try {
+        this.choosing = true
         const products = (await this.$axios.get('/api/prices', {
           headers: { 'Auth': this.$store.state.auth },
           params: { event: event.id, source: 'inperson' },
         })).data.products.filter(p => !p.message)
+        this.choosing = false
         if (!products.length) {
           window.alert('No tickets are on sale for that event.')
           return
         }
         this.$store.commit('event', { event, products })
       } catch (err) {
+        this.choosing = false
         console.error('Error getting event products', err)
         window.alert(`Server error: ${err.toString()}`)
       }

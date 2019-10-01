@@ -5,6 +5,7 @@ used at the event, and lets the user consume some of them.
 
 <template lang="pug">
 #willcall-spinner(v-if="!orders")
+  b-spinner
 #willcall(v-else-if="!selected")
   b-form-input#willcall-search(v-model="search" :autoCapitalize="none" autocomplete="off" :autoCorrect="false" placeholder="Search Will Call List")
   #willcall-orders
@@ -55,8 +56,8 @@ export default {
 
 <style lang="stylus">
 #willcall-spinner
-  align-self center
   margin-top 2rem
+  text-align center
 #willcall
   display flex
   flex-direction column

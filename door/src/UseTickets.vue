@@ -4,7 +4,8 @@ to be consumed.
 -->
 
 <template lang="pug">
-b-spinner#use-spinner(v-if="!order")
+#use-spinner(v-if="!order")
+  b-spinner
 #use(v-else)
   #use-order
     #use-order-name(v-text="order.name")
@@ -12,7 +13,7 @@ b-spinner#use-spinner(v-if="!order")
   #use-classes
     UseTicketClass(v-for="tclass in order.classes" :key="tclass.name" :tclass="tclass" @change="onClassChange")
   #use-buttons
-    b-button.use-button(:disabled="disabled" variant="primary" @click="onUseTickets") Use Tickets
+    b-button.use-button(:disabled="disabled" variant="primary" @click="onUseTickets" v-text="buttonText")
     b-button.use-button(@click="$emit('cancel')") Cancel
 </template>
 
@@ -24,7 +25,7 @@ export default {
   props: {
     orderID: String,
   },
-  data: () => ({ order: null }),
+  data: () => ({ order: null, using: false }),
   async mounted() {
     try {
       const order = (await this.$axios.get(`/api/event/${this.$store.state.event.id}/ticket/${this.orderID}`, {
@@ -47,7 +48,8 @@ export default {
     }
   },
   computed: {
-    disabled() { return this.order.classes.every(cl => cl.min === cl.used) }
+    buttonText() { return this.using ? 'Using...' : 'Use Tickets' },
+    disabled() { return this.using || this.order.classes.every(cl => cl.min === cl.used) }
   },
   methods: {
     onClassChange({ tclass, used }) {
@@ -56,6 +58,7 @@ export default {
     },
     async onUseTickets() {
       try {
+        this.using = true
         const body = new URLSearchParams()
         body.append('scan', this.order.scan)
         this.order.classes.forEach(cl => {
@@ -75,6 +78,7 @@ export default {
           window.alert('Login session expired')
           return
         }
+        this.using = false
         console.error('Error updating ticket usage', err)
         window.alert(`Server error: ${err.toString()}`)
       }
@@ -85,8 +89,8 @@ export default {
 
 <style lang="stylus">
 #use-spinner
-  align-self center
   margin-top 2rem
+  text-align center
 #use
   display flex
   flex auto
