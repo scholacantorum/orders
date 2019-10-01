@@ -7,7 +7,7 @@ UseTicketClass displays and changes the ticket usage for a single ticket class.
   .useclass-inner
     .useclass-name(v-text="tclass.name || 'General Admission'")
     .useclass-buttons
-      b-button.useclass-button(v-for="n in max" :key="n" :disabled="disabled(n)" :variant="variant(n)" @click="onClick(n)" v-text="n")
+      b-button.useclass-button(v-for="n in max" :key="n" :disabled="disabled(n)" :variant="variant(n)" @click="onClick(n)" v-text="buttonText(n)")
 </template>
 
 <script>
@@ -25,6 +25,10 @@ export default {
     },
   },
   methods: {
+    buttonText(n) {
+      if (n <= this.tclass.min) return 'Used'
+      return n - this.tclass.min
+    },
     disabled(n) { return n < this.tclass.min },
     onClick(n) {
       if (n < this.tclass.min) return
@@ -61,12 +65,14 @@ export default {
   flex-wrap wrap
 .useclass-button
   margin 0 6px 6px 0
-  padding 12px 6px
+  padding 0
   width 50px
   height 50px
   border-width 2px
   box-shadow none !important
   font-size 20px
+  &.btn-dark
+    font-size 16px
   &.btn-outline-success
     // override filled-in style when active or hovered
     background-color transparent !important
