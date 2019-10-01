@@ -109,6 +109,12 @@ class Login: UIViewController, UITextFieldDelegate {
         view.textColor = UIColor.red
         return view
     }()
+    lazy var versionLabel: UILabel = {
+        let view = UILabel()
+        view.text = "Version 2019-10-01"
+        view.textColor = UIColor.gray
+        return view
+    }()
 
     var loggingIn = false
 
@@ -139,6 +145,7 @@ class Login: UIViewController, UITextFieldDelegate {
         allowWillCallHBox.addSubview(allowWillCallLabel)
         view.addSubview(loginButton)
         view.addSubview(errorLabel)
+        view.addSubview(versionLabel)
         NSLayoutConstraint.useAndActivateConstraints([
             pleaseLogInLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             pleaseLogInLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 18.0),
@@ -208,6 +215,8 @@ class Login: UIViewController, UITextFieldDelegate {
             loginButton.heightAnchor.constraint(equalToConstant: 30.0),
             errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             errorLabel.topAnchor.constraint(equalTo: loginButton.bottomAnchor, constant: 18.0),
+            versionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            versionLabel.topAnchor.constraint(equalTo: errorLabel.bottomAnchor, constant: 18.0),
         ])
     }
 
