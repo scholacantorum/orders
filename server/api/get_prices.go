@@ -61,7 +61,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	if source = model.OrderSource(r.FormValue("source")); source == "" {
 		source = model.OrderFromPublic
 	}
-	if source != model.OrderFromPublic && source != model.OrderInPerson {
+	if source != model.OrderFromPublic && source != model.OrderInPerson && source != model.OrderFromMembers {
 		BadRequestError(tx, w, "invalid source")
 		return
 	}

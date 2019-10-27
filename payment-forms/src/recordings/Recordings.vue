@@ -24,6 +24,7 @@ export default {
     const params = new URLSearchParams()
     this.productIDs.forEach(p => { params.append("p", p) })
     params.append('auth', this.auth)
+    params.append('source', 'members')
     let result
     try {
       result = (await this.$axios({ method: 'GET', url: '/api/prices', params })).data
