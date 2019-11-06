@@ -20,7 +20,7 @@ b-container.px-0.mb-3(fluid)
     table#buy-tickets-form-quantities
       OrderLinesQty(
         v-for="p in products" ref="qty" :key="p.id"
-        v-model="quantities[p.id]" :name="p.name" :message="p.message"
+        v-model="quantities[p.id]" :name="p.name" :subname="p.subname" :message="p.message"
         :price="p.price" :state="state" :disabled="disabled"
       )
   OrderLinesDonation(v-model="donation" :disabled="disabled")
@@ -107,4 +107,5 @@ export default {
 <style lang="stylus">
 #buy-tickets-form-quantities
   width 100%
+  table-layout fixed
 </style>

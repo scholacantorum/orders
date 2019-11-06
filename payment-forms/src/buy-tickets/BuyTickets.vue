@@ -65,6 +65,14 @@ export default {
       this.message = (typeof result === 'string') ? result : null
       this.products = (typeof result === 'object') ? result.products : null
       this.couponMatch = (typeof result === 'object') ? result.coupon : (this.coupon === '')
+      if (this.products)
+        this.products.forEach(p => {
+          if (p.name && p.name.indexOf("\n") > 0) {
+            const parts = p.name.split("\n")
+            p.name = parts[0]
+            p.subname = parts[1]
+          }
+        })
     },
     onBuyTickets() {
       this.$refs.dialog.show()

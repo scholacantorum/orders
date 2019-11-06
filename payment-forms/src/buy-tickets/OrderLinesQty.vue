@@ -5,10 +5,14 @@ OrderLinesQty displays a single product and gets the quantity of it.
 <template lang="pug">
 tr.buy-tickets-qty-row
   template(v-if="message")
-    td.buy-tickets-qty-row-name(v-text="name")
+    td.buy-tickets-qty-row-names
+      .buy-tickets-qty-row-name(v-html="name")
+      .buy-tickets-qty-row-subname(v-if="subname" v-html="subname")
     td.buy-tickets-qty-row-message(colspan="4" v-if="message" v-text="message")
   template(v-else)
-    td.buy-tickets-qty-row-name(colspan="2" v-text="name")
+    td.buy-tickets-qty-row-names(colspan="2")
+      .buy-tickets-qty-row-name(v-html="name")
+      .buy-tickets-qty-row-subname(v-if="subname" v-html="subname")
     td.buy-tickets-qty-row-qty-cell
       b-form-input.buy-tickets-qty-row-qty(
         ref="input" :value="value || ''" :state="state" :disabled="disabled"
@@ -27,6 +31,7 @@ export default {
     disabled: Boolean,
     message: String,
     name: String,
+    subname: String,
     price: Number,
     state: Boolean,
     value: Number,
@@ -38,10 +43,21 @@ export default {
 </script>
 
 <style lang="stylus">
-.buy-tickets-qty-row-name
+.buy-tickets-qty-row-names
   padding 2px 0
+  width calc(100% - 4em - 9ch)
   vertical-align middle
-  line-height 1.2
+.buy-tickets-qty-row-name
+  overflow hidden
+  text-overflow ellipsis
+  white-space nowrap
+  line-height 1.1
+.buy-tickets-qty-row-subname
+  overflow hidden
+  text-overflow ellipsis
+  white-space nowrap
+  font-size 14px
+  line-height 1.1
 .buy-tickets-qty-row-message
   padding 2px 0 2px 6px
   color #888
