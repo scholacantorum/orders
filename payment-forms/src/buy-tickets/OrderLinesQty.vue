@@ -45,8 +45,18 @@ export default {
 <style lang="stylus">
 .buy-tickets-qty-row-names
   padding 2px 0
-  width calc(100% - 4em - 9ch)
+  width calc(100vw - 1rem - 2px - 2rem - 4em - 9ch)
+  // ................margin outside dialog
+  // .......................border of dialog
+  // .............................margin inside dialog
+  // ....................................other columns of table
   vertical-align middle
+  @media (min-width: 576px)
+    width calc(500px - 2px - 2rem - 4em - 9ch)
+    // ........width of dialog
+    // ................border of dialog
+    // ......................margin inside dialog
+    // .............................other columns of table
 .buy-tickets-qty-row-name
   overflow hidden
   text-overflow ellipsis
@@ -54,6 +64,7 @@ export default {
   line-height 1.1
 .buy-tickets-qty-row-subname
   overflow hidden
+  color #666
   text-overflow ellipsis
   white-space nowrap
   font-size 14px
