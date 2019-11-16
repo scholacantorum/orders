@@ -124,7 +124,7 @@ func EmitReceipt(order *model.Order, synch bool) {
 		} else {
 			method = p.Method
 		}
-		if p.Amount > 0 {
+		if p.Amount >= 0 {
 			fmt.Fprintf(htmlqp, "You paid $%.2f on %s via %s.", float64(p.Amount)/100.0,
 				p.Created.Format("January 2, 2006 at 3:04pm"), method)
 		} else {
