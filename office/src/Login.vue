@@ -34,7 +34,13 @@ export default {
           this.error = 'Not authorized to use this app'
           return
         }
-        this.$store.commit('login', { auth: resp.token, stripeKey: resp.stripePublicKey, username: this.username })
+        this.$store.commit('login', {
+          auth: resp.token,
+          stripeKey: resp.stripePublicKey,
+          username: this.username,
+          privSetupOrders: resp.privSetupOrders,
+          privManageOrders: resp.privManageOrders,
+        })
       } catch (err) {
         if (err.response && err.response.status === 401) {
           this.error = 'Login incorrect'
@@ -55,8 +61,8 @@ export default {
   flex-direction column
   align-self center
   align-items stretch
-  margin 1rem 0.5rem
-  min-width 20rem
+  margin 1rem auto
+  width 20rem
 #login-header
   align-self center
   margin-bottom 1rem

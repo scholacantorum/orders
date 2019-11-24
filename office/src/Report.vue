@@ -10,7 +10,7 @@ Split#report
     ReportCriteria(v-else :stats="report" @update="onUpdate")
   SplitArea(:size="90")
     #report-message(v-if="!report")
-    #report-results
+    #report-results(v-else)
       #report-message(v-if="!haveParams") For a list of orders, please provide search criteria.
       #report-message(v-else-if="!report.lines") Too many results; please narrow the search criteria.
       #report-message(v-else-if="!report.lines.length") No orders match your search criteria.
