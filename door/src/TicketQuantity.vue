@@ -5,7 +5,9 @@ TicketQuantity displays a ticket product name and gets the quantity for it.
 <template lang="pug">
 div
   .tqty
-    .tqty-name(v-text="product.name")
+    .tqty-name-box
+      .tqty-name(v-text="productName")
+      .tqty-subname(v-if="productSubName" v-text="productSubName")
     b-button.tqty-button(variant="primary" @click="onSellDown") –
     .tqty-qty(v-text="sell || '0'")
     b-button.tqty-button(variant="primary" @click="onSellUp") +
@@ -31,6 +33,11 @@ export default {
     priceFmt() {
       if (this.sell) return `$${this.sell * this.product.price / 100}`
       return `$${this.product.price / 100}`
+    },
+    productName() { return this.product.name.split('\n')[0] },
+    productSubName() {
+      const parts = this.product.name.split('\n')
+      return parts.length > 1 ? parts[1] : ''
     },
     showUse() { return (this.sell && this.count > 1) || this.sell > 1 },
   },
@@ -60,10 +67,15 @@ export default {
 .tqty
   display flex
   align-items center
-.tqty-name
+.tqty-name-box
+  display flex
   flex auto
+  flex-direction column
   margin-left 0.5rem
+.tqty-name
   font-size 1.5rem
+.tqty-subname
+  color #888
 .tqty-and-use
   flex auto
   margin-right 0.5rem
