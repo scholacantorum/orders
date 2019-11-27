@@ -115,11 +115,14 @@ const (
 	// PaymentCardPresent is a card-present Stripe card payment.
 	PaymentCardPresent = "card-present"
 
-	// PaymentCardSaved is an card-not-present Stripe card payment using a
-	// card previously saved on a Stripe Customer.
-	PaymentCardSaved = "card-saved"
+	// PaymentCash is a cash payment.
+	PaymentCash = "cash"
 
-	// PaymentOther is a non-Stripe payment, described in Method.
+	// PaymentCheck is a check payment, with the check number usually given
+	// in Method.
+	PaymentCheck = "check"
+
+	// PaymentOther is a nonstandard payment type, described in Method.
 	PaymentOther = "other"
 )
 

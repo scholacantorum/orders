@@ -50,8 +50,8 @@ export default {
   },
   methods: {
     onCard() { this.sendOrder('card', 'manual') },
-    onCash() { this.sendOrder('other', 'cash') },
-    onCheck() { this.sendOrder('other', 'check') },
+    onCash() { this.sendOrder('cash', '') },
+    onCheck() { this.sendOrder('check', '') },
     onChange({ product, sell, use }) {
       this.$set(this.sellqty, product.id, sell)
       this.$set(this.useqty, product.id, use)

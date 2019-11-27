@@ -13,6 +13,7 @@ import (
 	"net/textproto"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/skip2/go-qrcode"
 
@@ -119,10 +120,19 @@ func EmitReceipt(order *model.Order, synch bool) {
 		} else {
 			fmt.Fprint(htmlqp, "<br>")
 		}
-		if p.Type == model.PaymentOther {
-			method = p.Subtype
-		} else {
+		switch p.Type {
+		case model.PaymentCard, model.PaymentCardPresent, model.PaymentOther:
 			method = p.Method
+		case model.PaymentCash:
+			method = "cash"
+		case model.PaymentCheck:
+			if p.Method == "" {
+				method = "Check"
+			} else if strings.HasPrefix(strings.ToLower(p.Method), "check") {
+				method = p.Method
+			} else {
+				method = "Check " + p.Method
+			}
 		}
 		if p.Amount >= 0 {
 			fmt.Fprintf(htmlqp, "You paid $%.2f on %s via %s.", float64(p.Amount)/100.0,

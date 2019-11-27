@@ -278,16 +278,18 @@ CREATE TABLE payment (
     -- Identifier of the order to which this payment is associated.
     orderid integer NOT NULL REFERENCES orderT,
 
-    -- Type of the payment method, one of "card", "card-present", or "other".
+    -- Type of the payment method, one of "card", "card-present", "cash",
+    -- "check", or "other".
     type text NOT NULL,
 
     -- Subtype of the payment method: basically, how the card number was
-    -- provided.  Free form text, empty when not applicable.
+    -- provided.  Free form text.  Only used for types "card" or "card-present".
     subtype text NOT NULL,
 
     -- Text description of the payment method.  For "card" and "card-present"
-    -- payments, this is the card type and last 4 digits(e.g. "Visa 1234").  For
-    -- "other" payments, this is manual entry.
+    -- payments, this is the card type and last 4 digits (e.g. "Visa 1234").
+    -- For other types, this is manual entry.  It is generally empty for "cash",
+    -- the check number for "check", and free-form text for "other".
     method text NOT NULL,
 
     -- Stripe charge ID or refund ID, if the payment was processed through

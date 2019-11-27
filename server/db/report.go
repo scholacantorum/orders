@@ -81,6 +81,7 @@ var paymentTypeMap = map[string]string{
 	"card,apple_pay":               "Wallet,Apple Pay",
 	"card,google_pay":              "Wallet,Google Pay",
 	"card,manual":                  "Card,Typed",
+	"card,saved":                   "Card,Reuse Saved",
 	"card-present":                 "Card Present,",
 	"card-present,":                "Card Present,Unknown",
 	"card-present,contact_emv":     "Card,Inserted",
@@ -88,12 +89,10 @@ var paymentTypeMap = map[string]string{
 	"card-present,contactless_magstripe_mode": "Card,Tapped",
 	"card-present,magnetic_stripe_fallback":   "Card,Swiped",
 	"card-present,magnetic_stripe_track2":     "Card,Swiped",
+	"cash,":                                   "Cash",
+	"check,":                                  "Check",
 	"other":                                   "Other ",
 	"other,":                                  "Other",
-	"other,cash":                              "Cash",
-	"other,check":                             "Check",
-	"saved":                                   "Card, Reuse Saved ",
-	"saved,manual":                            "Card,Reuse Saved",
 }
 
 // RunReport executes the report defined by the supplied report definition.

@@ -94,8 +94,15 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	generateTickets(tx, order)
 	// If we don't have to charge a card through Stripe, the order is now
 	// complete.
-	if len(order.Payments) == 0 || order.Payments[0].Type == model.PaymentOther {
+	if len(order.Payments) == 0 {
 		order.Flags |= model.OrderValid
+	} else {
+		switch order.Payments[0].Type {
+		case model.PaymentCard, model.PaymentCardPresent:
+			break
+		default:
+			order.Flags |= model.OrderValid
+		}
 	}
 	if len(order.Payments) == 1 {
 		order.Payments[0].Flags |= model.PaymentInitial
@@ -106,7 +113,7 @@ func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	// If we do have to charge a card through Stripe, do it now.
 	if len(order.Payments) == 1 {
 		switch order.Payments[0].Type {
-		case model.PaymentOther:
+		case model.PaymentCash, model.PaymentCheck, model.PaymentOther:
 			receipt = order.Email != ""
 		case model.PaymentCard:
 			success, card, message = stripe.ChargeCard(order, order.Payments[0])
@@ -292,8 +299,10 @@ func validateOrderSourcePermissions(order *model.Order, session *model.Session) 
 
 // resolveSKUs walks through each line of the order, finding the listed product
 // and verifying the amount of the order line, following the SKU rules
-// documented in db/schema.sql. It returns true if everything
-// resolved successfully and false otherwise.
+// documented in db/schema.sql. It returns true if everything resolved
+// successfully and false otherwise. Note that if a coupon is specified in the
+// order but not used by any SKU, it is removed; this keeps the order reporting
+// system clean of invalid coupon codes.
 func resolveSKUs(tx db.Tx, order *model.Order) bool {
 	var couponMatch bool
 
@@ -562,11 +571,16 @@ func validatePayment(order *model.Order) bool {
 	if pmt.ID != 0 || pmt.Stripe != "" || !pmt.Created.IsZero() || pmt.Flags != 0 || pmt.Amount != total {
 		return false
 	}
-	// If this is a free order and has a payment, its type must be "other"
-	// (generally with a subtype of "cash", but we don't check that).  We
-	// remove it; no point in storing a zero payment.
+	// Some old clients have an old coding for cash and check.  (This can
+	// be removed when those clients are no longer in use.)
+	if pmt.Type == model.PaymentOther && (pmt.Subtype == "cash" || pmt.Subtype == "check") {
+		pmt.Type = model.PaymentType(pmt.Subtype)
+		pmt.Subtype = ""
+	}
+	// If this is a free order and has a payment, its type must be "cash".
+	// We remove it; no point in storing a zero payment.
 	if pmt.Amount == 0 {
-		if pmt.Type != model.PaymentOther {
+		if pmt.Type != model.PaymentCash {
 			return false
 		}
 		order.Payments = order.Payments[:0]
@@ -587,6 +601,8 @@ func validatePayment(order *model.Order) bool {
 			if !methodRE.MatchString(pmt.Method) {
 				return false
 			}
+		case model.PaymentCash, model.PaymentCheck:
+			// no-op
 		case model.PaymentOther:
 			if pmt.Method == "" {
 				return false
@@ -600,12 +616,8 @@ func validatePayment(order *model.Order) bool {
 			if !tokenRE.MatchString(pmt.Method) && !methodRE.MatchString(pmt.Method) {
 				return false
 			}
-		case model.PaymentCardPresent:
+		case model.PaymentCardPresent, model.PaymentCash, model.PaymentCheck:
 			if pmt.Method != "" {
-				return false
-			}
-		case model.PaymentOther:
-			if (pmt.Subtype != "cash" && pmt.Subtype != "check") || pmt.Method != "" {
 				return false
 			}
 		default:

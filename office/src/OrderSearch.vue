@@ -58,6 +58,7 @@ const productTypeLabels = {
   recording: 'Recordings',
   sheetmusic: 'Sheet Music',
   ticket: 'Tickets',
+  wardrobe: 'Wardrobe',
   other: '[other]',
 }
 

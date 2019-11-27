@@ -5,8 +5,8 @@ SellTickets displays the ticket sales sequence.
 <template lang="pug">
 SInput(v-if="!order" @order="onOrder" @cancel="$emit('done')")
 Receipt(v-else-if="done" :order="order" @done="$emit('done')")
-PaymentCash(v-else-if="!order.id && order.payments[0].type === 'other' && order.payments[0].subtype === 'cash'" :order="order" @paid="$emit('done')" @cancel="$emit('done')")
-PaymentCheck(v-else-if="!order.id && order.payments[0].type === 'other'" :order="order" @paid="$emit('done')" @cancel="$emit('done')")
+PaymentCash(v-else-if="!order.id && order.payments[0].type === 'cash'" :order="order" @paid="$emit('done')" @cancel="$emit('done')")
+PaymentCheck(v-else-if="!order.id && order.payments[0].type === 'check'" :order="order" @paid="$emit('done')" @cancel="$emit('done')")
 PaymentCard(v-else="!order.id" :order="order" @paid="onPaid" @cancel="$emit('done')")
 </template>
 
