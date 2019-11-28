@@ -176,9 +176,6 @@ func interestingSKU(product *model.Product, sku *model.SKU, coupon string, sourc
 	if sku.Coupon != "" && sku.Coupon != coupon {
 		return false
 	}
-	if source == model.OrderInPerson {
-		return true
-	}
 	var now = time.Now()
 	if sku.InSalesRange(now) <= 0 {
 		return true

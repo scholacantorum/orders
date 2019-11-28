@@ -72,6 +72,7 @@ export default {
   flex auto
   flex-direction column
   margin-left 0.5rem
+  line-height 1
 .tqty-name
   font-size 1.5rem
 .tqty-subname
