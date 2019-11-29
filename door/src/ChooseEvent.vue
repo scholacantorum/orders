@@ -27,7 +27,7 @@ export default {
     async onClick(event) {
       try {
         this.choosing = true
-        const products = (await this.$axios.get('/posapi/event/${event.id}/prices', {
+        const products = (await this.$axios.get(`/posapi/event/${event.id}/prices`, {
           headers: { 'Auth': this.$store.state.auth },
         })).data.products.filter(p => !p.message)
         this.choosing = false
