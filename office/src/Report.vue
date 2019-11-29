@@ -44,7 +44,7 @@ export default {
     },
     async runReport(params) {
       try {
-        this.report = (await this.$axios.get('/api/report', {
+        this.report = (await this.$axios.get('/ofcapi/report', {
           headers: { Auth: this.$store.state.auth },
           params,
         })).data

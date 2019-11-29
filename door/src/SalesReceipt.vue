@@ -34,7 +34,7 @@ export default {
       if (!this.validEmail || this.sending) return
       this.sending = true
       try {
-        await this.$axios.post(`/api/order/${this.order.id}/sendReceipt`, null, {
+        await this.$axios.post(`/posapi/order/${this.order.id}/sendReceipt`, null, {
           headers: { 'Auth': this.$store.state.auth },
           params: { email: this.email },
         })

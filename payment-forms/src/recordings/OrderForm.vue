@@ -50,7 +50,7 @@ export default {
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ subtype, method }) {
       const result = await this.$axios.post(
-        `/api/order?auth=${encodeURIComponent(this.auth)}`,
+        `/payapi/order?auth=${encodeURIComponent(this.auth)}`,
         JSON.stringify({
           source: 'members',
           name: this.user.name,

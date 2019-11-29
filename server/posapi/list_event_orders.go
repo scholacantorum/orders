@@ -1,4 +1,4 @@
-package api
+package posapi
 
 import (
 	"net/http"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -28,11 +29,11 @@ func ListEventOrders(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID m
 	}
 	// Get the event whose orders we're supposed to list.
 	if event = tx.FetchEvent(eventID); event == nil {
-		NotFoundError(tx, w)
+		api.NotFoundError(tx, w)
 		return
 	}
 	list = tx.FetchEventOrders(event)
-	commit(tx)
+	api.Commit(tx)
 	for i := range list {
 		list[i].Name = lastNameFirst(list[i].Name)
 	}

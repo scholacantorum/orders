@@ -68,7 +68,7 @@ class Backend: ConnectionTokenProvider {
     }
 
     func login(_ username: String, _ password: String, _ testmode: Bool, _ allow: Allow, handler: @escaping (String?) -> Void) {
-        let baseurl = "https://orders\(testmode ? "-test" : "").scholacantorum.org/api"
+        let baseurl = "https://orders\(testmode ? "-test" : "").scholacantorum.org/posapi"
         let url = URL(string: baseurl + "/login")
         var request = URLRequest(url: url!)
         request.httpMethod = "POST"

@@ -1,9 +1,10 @@
-package api
+package posapi
 
 import (
 	"log"
 	"net/http"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -27,18 +28,18 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	// Get the order whose payment we're supposed to capture.
 	if order = tx.FetchOrder(orderID); order == nil {
 		log.Printf("ERROR: capture of nonexistent order %d", orderID)
-		NotFoundError(tx, w)
+		api.NotFoundError(tx, w)
 		return
 	}
 	// Verify that the order is in the desired state.
 	if order.Flags&model.OrderValid != 0 || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
 		!intentRE.MatchString(order.Payments[0].Method) {
-		log.Printf("ERROR: capture of order in wrong state %s", emitOrder(order, true))
-		BadRequestError(tx, w, "order not in capturable state")
+		log.Printf("ERROR: capture of order in wrong state %s", api.EmitOrder(order, true))
+		api.BadRequestError(tx, w, "order not in capturable state")
 		return
 	}
 	if card, err = stripe.CapturePayment(order, order.Payments[0]); err != nil {
-		commit(tx)
+		api.Commit(tx)
 		log.Printf("ERROR: failed to capture payment for order %d: %s", order.ID, err)
 		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
 		return
@@ -46,15 +47,15 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	order.Flags |= model.OrderValid
 	tx.SaveOrder(order)
 	_, tentativeEmail = tx.FetchCard(card)
-	commit(tx)
-	log.Printf("- CAPTURE ORDER %s", emitOrder(order, true))
+	api.Commit(tx)
+	log.Printf("- CAPTURE ORDER %s", api.EmitOrder(order, true))
 	if order.Email != "" {
-		EmitReceipt(order, false)
+		api.EmitReceipt(order, false)
 	}
-	updateGoogleSheet(order)
+	api.UpdateGoogleSheet(order)
 	if order.Email == "" {
 		order.Email = tentativeEmail
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(emitOrder(order, false))
+	w.Write(api.EmitOrder(order, false))
 }

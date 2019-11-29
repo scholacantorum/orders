@@ -2,176 +2,23 @@ package api
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os/exec"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/rothskeller/json"
-
-	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 	"scholacantorum.org/orders/stripe"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-// PlaceOrder handles POST /api/order requests.
-func PlaceOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
-	var (
-		session *model.Session
-		order   *model.Order
-		privs   model.Privilege
-		success bool
-		card    string
-		message string
-		receipt bool
-		err     error
-		logverb = "PLACE"
-	)
-	// Get current session data, if any.
-	if auth.HasSession(r) {
-		if session = auth.GetSession(tx, w, r, 0); session == nil {
-			return
-		}
-		privs = session.Privileges
-	} else if token := r.FormValue("auth"); token != "" {
-		if session = auth.GetSessionMembersAuth(tx, w, r, token); session == nil {
-			return
-		}
-		privs = session.Privileges
-	}
-	// Read the order details from the request.
-	if order, err = parseCreateOrder(r.Body); err != nil {
-		log.Printf("ERROR: can't parse body of POST /api/order request: %s", err)
-		BadRequestError(tx, w, err.Error())
-		return
-	}
-	// Validate the order source and permissions.
-	if !validateOrderSourcePermissions(order, session) {
-		log.Printf("ERROR: forbidden order %s", emitOrder(order, true))
-		ForbiddenError(tx, w)
-		return
-	}
-	// Resolve the products and SKUs and validate the prices.
-	if !resolveSKUs(tx, order) {
-		log.Printf("ERROR: invalid products or prices in order %s", emitOrder(order, true))
-		BadRequestError(tx, w, "invalid products or prices")
-		return
-	}
-	// Validate the customer data.
-	if !validateCustomer(tx, order, session) {
-		log.Printf("ERROR: invalid customer data in order %s", emitOrder(order, true))
-		BadRequestError(tx, w, "invalid customer data")
-		return
-	}
-	// Make sure the rest of the order details are OK.
-	if !validateOrderDetails(tx, order, privs) {
-		log.Printf("ERROR: invalid parameters in order %s", emitOrder(order, true))
-		BadRequestError(tx, w, "invalid parameters")
-		return
-	}
-	// Calculate the order total and verify the payment.
-	if !validatePayment(order) {
-		log.Printf("ERROR: invalid payment in order %s", emitOrder(order, true))
-		BadRequestError(tx, w, "invalid payment")
-		return
-	}
-	// Assign a token to the order (after the new transaction is opened, to
-	// ensure uniqueness).
-	order.Token = newOrderToken(tx)
-	// Generate tickets if needed.
-	generateTickets(tx, order)
-	// If we don't have to charge a card through Stripe, the order is now
-	// complete.
-	if len(order.Payments) == 0 {
-		order.Flags |= model.OrderValid
-	} else {
-		switch order.Payments[0].Type {
-		case model.PaymentCard, model.PaymentCardPresent:
-			break
-		default:
-			order.Flags |= model.OrderValid
-		}
-	}
-	if len(order.Payments) == 1 {
-		order.Payments[0].Flags |= model.PaymentInitial
-	}
-	// Save the order to the database.
-	tx.SaveOrder(order)
-	commit(tx)
-	// If we do have to charge a card through Stripe, do it now.
-	if len(order.Payments) == 1 {
-		switch order.Payments[0].Type {
-		case model.PaymentCash, model.PaymentCheck, model.PaymentOther:
-			receipt = order.Email != ""
-		case model.PaymentCard:
-			success, card, message = stripe.ChargeCard(order, order.Payments[0])
-			tx = db.Begin()
-			if !success {
-				tx.DeleteOrder(order)
-				commit(tx)
-				if message == "" {
-					message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
-				}
-				log.Printf("ERROR: payment rejected (%q) in order %s", message, emitOrder(order, true))
-				sendError(tx, w, message)
-				return
-			}
-			order.Flags |= model.OrderValid
-			tx.SaveOrder(order)
-			tx.SaveCard(card, order.Name, order.Email)
-			receipt = order.Email != ""
-			order.Name, order.Email = tx.FetchCard(card)
-			commit(tx)
-		case model.PaymentCardPresent:
-			// For card present transactions, we have to create the
-			// order and notify Stripe before processing the card.
-			// Do that now, and return the (uncompleted) order with
-			// the payment intent in it.
-			success = stripe.CreatePaymentIntent(order)
-			tx = db.Begin()
-			if !success {
-				tx.DeleteOrder(order)
-				commit(tx)
-				sendError(tx, w, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
-				log.Printf("ERROR: can't create payment intent for order %s", emitOrder(order, true))
-				return
-			}
-			tx.SaveOrder(order)
-			commit(tx)
-			logverb = "CREATE"
-			receipt = false
-		}
-	}
-	// Log and return the completed order.
-	if session != nil {
-		log.Printf("%s %s ORDER %s", session.Username, logverb, emitOrder(order, true))
-	} else {
-		log.Printf("- %s ORDER %s", logverb, emitOrder(order, true))
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(emitOrder(order, false))
-	if receipt && order.Email != "" {
-		EmitReceipt(order, false)
-	}
-	if order.Flags&model.OrderValid != 0 {
-		updateGoogleSheet(order)
-	}
-}
-
-// parseCreateOrder reads the order details from the request body.
-func parseCreateOrder(r io.Reader) (o *model.Order, err error) {
+// ParseCreateOrder reads the order details from the request body.
+func ParseCreateOrder(r io.Reader) (o *model.Order, err error) {
 	var (
 		jr = json.NewReader(r)
 	)
@@ -259,42 +106,127 @@ func parseCreateOrderPayment(p *model.Payment) json.Handlers {
 	})
 }
 
-// validateOrderSourcePermissions returns whether the order has a valid source
-// and the caller has permission to create it.  It also fills in the customer
-// member ID when appropriate.
-func validateOrderSourcePermissions(order *model.Order, session *model.Session) bool {
-	switch order.Source {
-	case model.OrderFromPublic:
-		// Public site orders must not have a member ID or a session.
-		return order.Member == 0 // && session == nil TODO
-	case model.OrderFromMembers:
-		// Members site orders must have a session, and if a member ID
-		// is specified, it must match that of the session.
-		if session == nil || (order.Member != 0 && order.Member != session.Member) {
-			return false
-		}
-		order.Member = session.Member
-	case model.OrderFromGala:
-		// Gala site orders are not implemented yet.
-		return false // TODO
-	case model.OrderFromOffice:
-		// Office orders must have a session with appropriate privilege.
-		if session == nil || session.Privileges&model.PrivManageOrders == 0 || order.Member < 0 {
-			return false
-		}
-		if order.Member == 0 {
-			order.Member = session.Member
-		}
-	case model.OrderInPerson:
-		// In-person orders must have a session with appropriate
-		// privilege, and no member ID.
-		if session == nil || session.Privileges&model.PrivInPersonSales == 0 || order.Member != 0 {
-			return false
-		}
-	default:
-		return false
+// CreateOrderCommon is the common part of creating an order, shared by the
+// various APIs.  Each of them makes authorization and validity checks specific
+// to it, and then calls this function to perform the common checks and create
+// the order.
+func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, order *model.Order) {
+	var (
+		privs   model.Privilege
+		success bool
+		card    string
+		message string
+		receipt bool
+		logverb = "PLACE"
+	)
+	if session != nil {
+		privs = session.Privileges
 	}
-	return true
+	// Resolve the products and SKUs and validate the prices.
+	if !resolveSKUs(tx, order) {
+		log.Printf("ERROR: invalid products or prices in order %s", EmitOrder(order, true))
+		BadRequestError(tx, w, "invalid products or prices")
+		return
+	}
+	// Validate the customer data.
+	if !validateCustomer(tx, order, session) {
+		log.Printf("ERROR: invalid customer data in order %s", EmitOrder(order, true))
+		BadRequestError(tx, w, "invalid customer data")
+		return
+	}
+	// Make sure the rest of the order details are OK.
+	if !validateOrderDetails(tx, order, privs) {
+		log.Printf("ERROR: invalid parameters in order %s", EmitOrder(order, true))
+		BadRequestError(tx, w, "invalid parameters")
+		return
+	}
+	// Calculate the order total and verify the payment.
+	if !validatePayment(order) {
+		log.Printf("ERROR: invalid payment in order %s", EmitOrder(order, true))
+		BadRequestError(tx, w, "invalid payment")
+		return
+	}
+	// Assign a token to the order (after the new transaction is opened, to
+	// ensure uniqueness).
+	order.Token = newOrderToken(tx)
+	// Generate tickets if needed.
+	generateTickets(tx, order)
+	// If we don't have to charge a card through Stripe, the order is now
+	// complete.
+	if len(order.Payments) == 0 {
+		order.Flags |= model.OrderValid
+	} else {
+		switch order.Payments[0].Type {
+		case model.PaymentCard, model.PaymentCardPresent:
+			break
+		default:
+			order.Flags |= model.OrderValid
+		}
+	}
+	if len(order.Payments) == 1 {
+		order.Payments[0].Flags |= model.PaymentInitial
+	}
+	// Save the order to the database.
+	tx.SaveOrder(order)
+	Commit(tx)
+	// If we do have to charge a card through Stripe, do it now.
+	if len(order.Payments) == 1 {
+		switch order.Payments[0].Type {
+		case model.PaymentCash, model.PaymentCheck, model.PaymentOther:
+			receipt = order.Email != ""
+		case model.PaymentCard:
+			success, card, message = stripe.ChargeCard(order, order.Payments[0])
+			tx = db.Begin()
+			if !success {
+				tx.DeleteOrder(order)
+				Commit(tx)
+				if message == "" {
+					message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
+				}
+				log.Printf("ERROR: payment rejected (%q) in order %s", message, EmitOrder(order, true))
+				SendError(tx, w, message)
+				return
+			}
+			order.Flags |= model.OrderValid
+			tx.SaveOrder(order)
+			tx.SaveCard(card, order.Name, order.Email)
+			receipt = order.Email != ""
+			order.Name, order.Email = tx.FetchCard(card)
+			Commit(tx)
+		case model.PaymentCardPresent:
+			// For card present transactions, we have to create the
+			// order and notify Stripe before processing the card.
+			// Do that now, and return the (uncompleted) order with
+			// the payment intent in it.
+			success = stripe.CreatePaymentIntent(order)
+			tx = db.Begin()
+			if !success {
+				tx.DeleteOrder(order)
+				Commit(tx)
+				SendError(tx, w, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
+				log.Printf("ERROR: can't create payment intent for order %s", EmitOrder(order, true))
+				return
+			}
+			tx.SaveOrder(order)
+			Commit(tx)
+			logverb = "CREATE"
+			receipt = false
+		}
+	}
+	// Log and return the completed order.
+	if session != nil {
+		log.Printf("%s %s ORDER %s", session.Username, logverb, EmitOrder(order, true))
+	} else {
+		log.Printf("- %s ORDER %s", logverb, EmitOrder(order, true))
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(EmitOrder(order, false))
+	if receipt && order.Email != "" {
+		EmitReceipt(order, false)
+	}
+	if order.Flags&model.OrderValid != 0 {
+		UpdateGoogleSheet(order)
+	}
 }
 
 // resolveSKUs walks through each line of the order, finding the listed product
@@ -319,13 +251,13 @@ func resolveSKUs(tx db.Tx, order *model.Order) bool {
 			continue
 		}
 		for _, s := range line.Product.SKUs {
-			if !matchSKU(order, s) {
+			if !MatchingSKU(s, order.Coupon, order.Source, false) {
 				continue
 			}
 			if s.Coupon != "" {
 				couponMatch = true
 			}
-			sku = betterSKU(sku, s)
+			sku = BetterSKU(sku, s)
 		}
 		if sku == nil {
 			continue
@@ -340,76 +272,6 @@ func resolveSKUs(tx db.Tx, order *model.Order) bool {
 	return true
 }
 
-// matchSKU returns true if all of the criteria for the SKU are met by the order
-// being placed.
-func matchSKU(order *model.Order, sku *model.SKU) bool {
-	if sku.Source != order.Source && order.Source != model.OrderFromOffice {
-		return false
-	}
-	if sku.Coupon != "" && !strings.EqualFold(sku.Coupon, order.Coupon) {
-		return false
-	}
-	if order.Source == model.OrderFromOffice {
-		return true
-	}
-	if !sku.SalesStart.IsZero() && sku.SalesStart.After(time.Now()) {
-		return false
-	}
-	if !sku.SalesEnd.IsZero() && sku.SalesEnd.Before(time.Now()) {
-		return false
-	}
-	return true
-}
-
-// betterSKU returns the better SKU.
-func betterSKU(sku1, sku2 *model.SKU) *model.SKU {
-	var isr1, isr2 int
-	var now = time.Now()
-
-	if sku2 == nil {
-		return sku1
-	}
-	if sku1 == nil {
-		return sku2
-	}
-	if sku1.Coupon != "" && sku2.Coupon == "" {
-		return sku1
-	}
-	if sku1.Coupon == "" && sku2.Coupon != "" {
-		return sku2
-	}
-	isr1 = sku1.InSalesRange(now)
-	isr2 = sku2.InSalesRange(now)
-	if isr1 == 0 && isr2 == 0 {
-		if sku1.Price < sku2.Price {
-			return sku1
-		}
-		return sku2
-	}
-	if isr1 == 0 {
-		return sku1
-	}
-	if isr2 == 0 {
-		return sku2
-	}
-	if isr1 < 0 && isr2 > 0 {
-		return sku1
-	}
-	if isr2 < 0 && isr1 > 0 {
-		return sku2
-	}
-	if isr1 < 0 {
-		if sku1.SalesStart.Before(sku2.SalesStart) {
-			return sku1
-		}
-		return sku2
-	}
-	if sku1.SalesEnd.After(sku2.SalesEnd) {
-		return sku1
-	}
-	return sku2
-}
-
 var emailRE = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 var stateRE = regexp.MustCompile(`^[A-Z][A-Z]$`)
 var zipRE = regexp.MustCompile(`^\d{5}(?:-\d{4})?$`)
@@ -418,18 +280,10 @@ var customerRE = regexp.MustCompile(`^cus_[A-Za-z0-9]+$`)
 // validateCustomer returns whether the customer data in the order are valid.
 func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool {
 
-	// A name is needed for all orders except in-person sales.
-	if order.Name == "" && order.Source != model.OrderInPerson {
-		return false
-	}
-
-	// Ditto for email.  Email must also be a valid email address according
-	// to the regular expression above (which is the same RE used by
-	// <input type="email"> in HTML5).
+	// Email must be a valid email address according to the regular
+	// expression above (which is the same RE used by <input type="email">
+	// in HTML5).
 	if order.Email != "" && !emailRE.MatchString(order.Email) {
-		return false
-	}
-	if order.Email == "" && order.Source != model.OrderInPerson {
 		return false
 	}
 
@@ -464,10 +318,6 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 	}
 	return true
 }
-
-var methodRE = regexp.MustCompile(`^pm_[A-Za-z0-9_]+$`)
-var intentRE = regexp.MustCompile(`^pi_[A-Za-z0-9_]+$`)
-var tokenRE = regexp.MustCompile("^tok_[A-Za-z0-9_]*$")
 
 // validateOrderDetails returns whether the order details are valid.  Note that
 // this does not check authorization.  It also doesn't check anything specific
@@ -586,44 +436,6 @@ func validatePayment(order *model.Order) bool {
 		order.Payments = order.Payments[:0]
 		return true
 	}
-	// It also needs to have a type and method consistent with the order
-	// source.
-	switch order.Source {
-	case model.OrderFromPublic, model.OrderFromMembers:
-		if pmt.Type != model.PaymentCard || !methodRE.MatchString(pmt.Method) {
-			return false
-		}
-	case model.OrderFromGala:
-		return false // TODO not implemented
-	case model.OrderFromOffice:
-		switch pmt.Type {
-		case model.PaymentCard:
-			if !methodRE.MatchString(pmt.Method) {
-				return false
-			}
-		case model.PaymentCash, model.PaymentCheck:
-			// no-op
-		case model.PaymentOther:
-			if pmt.Method == "" {
-				return false
-			}
-		default:
-			return false
-		}
-	case model.OrderInPerson:
-		switch pmt.Type {
-		case model.PaymentCard:
-			if !tokenRE.MatchString(pmt.Method) && !methodRE.MatchString(pmt.Method) {
-				return false
-			}
-		case model.PaymentCardPresent, model.PaymentCash, model.PaymentCheck:
-			if pmt.Method != "" {
-				return false
-			}
-		default:
-			return false
-		}
-	}
 	pmt.Created = order.Created
 	return true
 }
@@ -679,20 +491,14 @@ func generateTickets(tx db.Tx, order *model.Order) {
 // that's unique.
 func newOrderToken(tx db.Tx) (token string) {
 	for token == "" || tx.FetchOrderByToken(token) != nil {
-		token = newToken()
+		token = NewToken()
 	}
 	return token
 }
 
-// newToken generates a random token string.
-func newToken() string {
-	tval := rand.Intn(1000000000000)
-	return fmt.Sprintf("%04d-%04d-%04d", tval/100000000, tval/10000%10000, tval%10000)
-}
-
-// emitOrder generates a JSON representation of the order.  If log is true, it
+// EmitOrder generates a JSON representation of the order.  If log is true, it
 // includes internal details.
-func emitOrder(o *model.Order, log bool) []byte {
+func EmitOrder(o *model.Order, log bool) []byte {
 	var (
 		buf bytes.Buffer
 		jw  = json.NewWriter(&buf)
@@ -802,7 +608,9 @@ func emitOrder(o *model.Order, log bool) []byte {
 	return buf.Bytes()
 }
 
-func updateGoogleSheet(order *model.Order) {
+// UpdateGoogleSheet starts a subprocess that updates the Google orders
+// spreadsheet with information about the specified order.
+func UpdateGoogleSheet(order *model.Order) {
 	var (
 		cmd *exec.Cmd
 		err error

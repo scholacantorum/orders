@@ -29,7 +29,7 @@ export default {
       body.append('username', this.username)
       body.append('password', this.password)
       try {
-        const resp = (await this.$axios.post('/api/login', body)).data
+        const resp = (await this.$axios.post('/ofcapi/login', body)).data
         if (!resp.privViewOrders) {
           this.error = 'Not authorized to use this app'
           return

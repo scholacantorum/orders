@@ -1,10 +1,11 @@
-package api
+package posapi
 
 import (
 	"net/http"
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -23,7 +24,7 @@ func GetStripeConnectTerminal(tx db.Tx, w http.ResponseWriter, r *http.Request) 
 	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
 		return
 	}
-	commit(tx)
+	api.Commit(tx)
 	if token = stripe.GetConnectionToken(); token == "" {
 		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
 		return

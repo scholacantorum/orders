@@ -1,7 +1,10 @@
 package api
 
 import (
+	"fmt"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/rothskeller/json"
 
@@ -30,8 +33,17 @@ func ForbiddenError(tx db.Tx, w http.ResponseWriter) {
 	http.Error(w, "403 Forbidden", http.StatusForbidden)
 }
 
-// sendError sends an error message as a JSON object with an "error" key.  For
+// SendError sends an error message as a JSON object with an "error" key.  For
 // convenience, it also rolls back the transaction.
+func SendError(tx db.Tx, w http.ResponseWriter, message string) {
+	tx.Rollback()
+	w.Header().Set("Content-Type", "application/json")
+	var jw = json.NewWriter(w)
+	jw.Object(func() {
+		jw.Prop("error", message)
+	})
+	jw.Close()
+}
 func sendError(tx db.Tx, w http.ResponseWriter, message string) {
 	tx.Rollback()
 	w.Header().Set("Content-Type", "application/json")
@@ -42,9 +54,30 @@ func sendError(tx db.Tx, w http.ResponseWriter, message string) {
 	jw.Close()
 }
 
-// commit commits the transaction.
+// Commit commits the transaction.
+func Commit(tx db.Tx) {
+	if err := tx.Commit(); err != nil {
+		panic(err)
+	}
+}
 func commit(tx db.Tx) {
 	if err := tx.Commit(); err != nil {
 		panic(err)
 	}
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+// NewToken generates a random token string.
+func NewToken() string {
+	tval := rand.Intn(1000000000000)
+	return fmt.Sprintf("%04d-%04d-%04d", tval/100000000, tval/10000%10000, tval%10000)
+}
+
+// AllowContentType responds to OPTIONS requests for APIs that take JSON bodies.
+func AllowContentType(tx db.Tx, w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	tx.Rollback()
 }

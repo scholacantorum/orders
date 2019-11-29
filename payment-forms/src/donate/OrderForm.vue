@@ -51,7 +51,7 @@ export default {
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ name, email, address, city, state, zip, subtype, method }) {
-      const result = await this.$axios.post(`${this.ordersURL}/api/order`, JSON.stringify({
+      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, JSON.stringify({
         source: 'public', name, email, address, city, state, zip,
         lines: [{ product: 'donation', quantity: 1, price: this.amount * 100 }],
         payments: [{ type: 'card', subtype, method, amount: this.amount * 100 }],

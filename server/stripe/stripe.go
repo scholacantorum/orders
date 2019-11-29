@@ -134,7 +134,7 @@ func GetConnectionToken() string {
 
 // CreatePaymentIntent creates a payment intent for an order, so that it can be
 // paid through Stripe Terminal.  It updates the Method field of the payment to
-// contain the payment intent ID.  It returns true if successful, false on
+// contain the payment intent secret.  It returns true if successful, false on
 // failure.
 func CreatePaymentIntent(order *model.Order) bool {
 	var (

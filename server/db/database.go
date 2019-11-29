@@ -17,7 +17,7 @@ func Open(path string) {
 		url string
 		err error
 	)
-	url = "file:" + path + "?cache=shared&mode=rw&_busy_timeout=1000&_txlock=immediate&_foreign_keys=1"
+	url = "file:" + path + "?mode=rw&_busy_timeout=1000&_txlock=immediate&_foreign_keys=1&_journal_mode=TRUNCATE"
 	if dbh, err = sql.Open("sqlite3", url); err != nil {
 		panic(err)
 	}

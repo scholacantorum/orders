@@ -1,4 +1,4 @@
-package api
+package ofcapi
 
 import (
 	"bytes"
@@ -9,12 +9,13 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
-// CreateEvent handles POST /api/event requests.
+// CreateEvent handles POST /ofcapi/event requests.
 func CreateEvent(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
 		session *model.Session
@@ -26,23 +27,23 @@ func CreateEvent(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if event, err = parseCreateEvent(r.Body); err != nil {
-		BadRequestError(tx, w, err.Error())
+		api.BadRequestError(tx, w, err.Error())
 		return
 	}
 	if event.ID == "" || event.MembersID < 0 || event.Name == "" || event.Start.IsZero() || event.Capacity < 0 {
-		BadRequestError(tx, w, "invalid parameters")
+		api.BadRequestError(tx, w, "invalid parameters")
 		return
 	}
 	if tx.FetchEvent(event.ID) != nil {
-		BadRequestError(tx, w, "duplicate event ID")
+		api.BadRequestError(tx, w, "duplicate event ID")
 		return
 	}
 	if event.MembersID != 0 && tx.FetchEventByMembersID(event.MembersID) != nil {
-		BadRequestError(tx, w, "membersID already in use")
+		api.BadRequestError(tx, w, "membersID already in use")
 		return
 	}
 	tx.SaveEvent(event)
-	commit(tx)
+	api.Commit(tx)
 	out = emitCreatedEvent(event)
 	log.Printf("%s CREATE EVENT %s", session.Username, out)
 	w.Header().Set("Content-Type", "application/json")

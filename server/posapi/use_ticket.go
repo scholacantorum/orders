@@ -1,4 +1,4 @@
-package api
+package posapi
 
 import (
 	"log"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -38,7 +39,7 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 	}
 	// Make sure the requisite event exists.
 	if event = tx.FetchEvent(eventID); event == nil {
-		NotFoundError(tx, w)
+		api.NotFoundError(tx, w)
 		return
 	}
 	// Get the requested order.  It could be either an order number or an
@@ -53,14 +54,14 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 			Flags:   model.OrderValid,
 			Name:    "Free Entry",
 		}
-		r.Form["scan"] = []string{newToken()}
+		r.Form["scan"] = []string{api.NewToken()}
 	} else if oid, err := strconv.Atoi(token); err == nil {
 		order = tx.FetchOrder(model.OrderID(oid))
 	} else {
 		order = tx.FetchOrderByToken(token)
 	}
 	if order == nil {
-		NotFoundError(tx, w)
+		api.NotFoundError(tx, w)
 		return
 	}
 	// The rest of the processing differs between natural and explicit
@@ -101,7 +102,7 @@ func useTicketGet(
 		free    map[string]*model.Product
 		jw      json.Writer
 		classes []*class
-		scan    = newToken()
+		scan    = api.NewToken()
 	)
 	// Get the order lines for each ticket class.
 	if lines = useTicketClassMap(order, event); lines == nil {
@@ -154,7 +155,7 @@ func useTicketGet(
 	}
 	// Clean up and emit results.
 	tx.SaveOrder(order)
-	commit(tx)
+	api.Commit(tx)
 	sort.Slice(classes, func(i, j int) bool {
 		return classes[i].name < classes[j].name
 	})
@@ -200,11 +201,11 @@ func useTicketPost(
 	)
 	// Get the order lines for the requested ticket class.
 	if linemap = useTicketClassMap(order, event); linemap == nil && len(order.Lines) != 0 {
-		BadRequestError(tx, w, "not a ticket order")
+		api.BadRequestError(tx, w, "not a ticket order")
 		return
 	}
 	if len(r.Form["class"]) != len(r.Form["used"]) {
-		BadRequestError(tx, w, "different numbers of class and used parameters")
+		api.BadRequestError(tx, w, "different numbers of class and used parameters")
 		return
 	}
 	for cidx, cname := range r.Form["class"] {
@@ -219,13 +220,13 @@ func useTicketPost(
 		)
 		lines = linemap[cname]
 		if wanted, err = strconv.Atoi(r.Form["used"][cidx]); err != nil || wanted < 0 {
-			BadRequestError(tx, w, "invalid used count")
+			api.BadRequestError(tx, w, "invalid used count")
 			return
 		}
 		// Check the desired count against the min and max usage for this class.
 		for _, ol := range lines {
 			if ol.Scan != scan {
-				BadRequestError(tx, w, "wrong scan session")
+				api.BadRequestError(tx, w, "wrong scan session")
 				return
 			}
 			max += ol.Quantity * ol.Product.TicketCount
@@ -237,7 +238,7 @@ func useTicketPost(
 			}
 		}
 		if wanted < min {
-			BadRequestError(tx, w, "reducing used count below minimum")
+			api.BadRequestError(tx, w, "reducing used count below minimum")
 			return
 		}
 		if wanted > max {
@@ -245,7 +246,7 @@ func useTicketPost(
 				free = getFreeClasses(tx, event)
 			}
 			if fp = free[cname]; fp == nil {
-				sendError(tx, w, "Ticket already used")
+				api.SendError(tx, w, "Ticket already used")
 				return
 			}
 			if ol := addFreeTickets(order, event, fp, scan, wanted-max); ol != nil {
@@ -265,7 +266,7 @@ func useTicketPost(
 	}
 	// Clean up and return success.
 	tx.SaveOrder(order)
-	commit(tx)
+	api.Commit(tx)
 	jw = json.NewWriter(w)
 	jw.Object(func() {
 		jw.Prop("id", int(order.ID))
@@ -276,7 +277,7 @@ func useTicketPost(
 
 // useTicketError sends an error for a UseTicket request with an invalid order.
 func useTicketError(tx db.Tx, w http.ResponseWriter, order *model.Order, message string) {
-	commit(tx)
+	api.Commit(tx)
 	w.Header().Set("Content-Type", "application/json")
 	jw := json.NewWriter(w)
 	jw.Object(func() {
@@ -328,7 +329,8 @@ func getFreeClasses(tx db.Tx, event *model.Event) (fc map[string]*model.Product)
 	fc = make(map[string]*model.Product)
 	for _, p := range tx.FetchProductsByEvent(event) {
 		for _, sku := range p.SKUs {
-			if interestingSKU(p, sku, "", model.OrderInPerson) && sku.Price == 0 {
+			if sku.Source == model.OrderInPerson && sku.Coupon == "" && sku.InSalesRange(time.Now()) == 0 &&
+				sku.Price == 0 {
 				fc[p.TicketClass] = p
 			}
 		}

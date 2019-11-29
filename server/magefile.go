@@ -48,6 +48,15 @@ func orders(path string) error {
 	if err := sh.Run("ln", "-f", path+"/api", path+"/ticket"); err != nil {
 		return err
 	}
+	if err := sh.Run("ln", "-f", path+"/api", path+"/ofcapi"); err != nil {
+		return err
+	}
+	if err := sh.Run("ln", "-f", path+"/api", path+"/payapi"); err != nil {
+		return err
+	}
+	if err := sh.Run("ln", "-f", path+"/api", path+"/posapi"); err != nil {
+		return err
+	}
 	return nil
 }
 

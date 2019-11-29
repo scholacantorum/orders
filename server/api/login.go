@@ -103,7 +103,7 @@ func Login(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	}
 	session.Privileges |= model.PrivLogin
 	session.Expires = time.Now().Add(3 * time.Hour)
-	session.Token = newToken()
+	session.Token = NewToken()
 	tx.SaveSession(&session)
 	commit(tx)
 	jw = json.NewWriter(w)

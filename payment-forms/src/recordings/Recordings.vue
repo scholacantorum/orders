@@ -27,7 +27,7 @@ export default {
     params.append('source', 'members')
     let result
     try {
-      result = (await this.$axios({ method: 'GET', url: '/api/prices', params })).data
+      result = (await this.$axios({ method: 'GET', url: '/payapi/prices', params })).data
     } catch (err) {
       console.error(err)
       window.parent.postMessage('close', '*')

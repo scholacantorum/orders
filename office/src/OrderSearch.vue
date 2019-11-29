@@ -176,7 +176,7 @@ export default {
     async getStats(params) {
       this.$emit('list', null)
       try {
-        this.stats = (await this.$axios.get('/api/report', {
+        this.stats = (await this.$axios.get('/ofcapi/report', {
           headers: { Auth: this.$store.state.auth },
           params,
         })).data

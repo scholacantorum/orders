@@ -1,4 +1,4 @@
-package api
+package ofcapi
 
 import (
 	"net/http"
@@ -7,12 +7,13 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
-// RunReport runs a report, handling GET /api/report requests.
+// RunReport runs a report, handling GET /ofcapi/report requests.
 func RunReport(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
 		def    *model.ReportDefinition
@@ -24,12 +25,12 @@ func RunReport(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	}
 	// Get the report definition.
 	if def = parseReportDef(tx, r); def == nil {
-		BadRequestError(tx, w, "invalid report definition")
+		api.BadRequestError(tx, w, "invalid report definition")
 		return
 	}
 	result = tx.RunReport(def)
 	// Send back the results.
-	commit(tx)
+	api.Commit(tx)
 	w.Header().Set("Content-Type", "application/json")
 	emitReport(w, result)
 }

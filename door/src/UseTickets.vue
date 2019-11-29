@@ -28,7 +28,7 @@ export default {
   data: () => ({ order: null, using: false }),
   async mounted() {
     try {
-      const order = (await this.$axios.get(`/api/event/${this.$store.state.event.id}/ticket/${this.orderID}`, {
+      const order = (await this.$axios.get(`/posapi/event/${this.$store.state.event.id}/ticket/${this.orderID}`, {
         headers: { 'Auth': this.$store.state.auth },
       })).data
       if (order.error) {
@@ -65,7 +65,7 @@ export default {
           body.append('class', cl.name)
           body.append('used', cl.used)
         })
-        await this.$axios.post(`/api/event/${this.$store.state.event.id}/ticket/${this.order.id}`, body, {
+        await this.$axios.post(`/posapi/event/${this.$store.state.event.id}/ticket/${this.order.id}`, body, {
           headers: {
             'Auth': this.$store.state.auth,
           },

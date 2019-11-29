@@ -1,9 +1,10 @@
-package api
+package posapi
 
 import (
 	"log"
 	"net/http"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -28,12 +29,12 @@ func SendOrderReceipt(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID 
 	}
 	// Get the order whose payment we're supposed to capture.
 	if order = tx.FetchOrder(orderID); order == nil {
-		NotFoundError(tx, w)
+		api.NotFoundError(tx, w)
 		return
 	}
 	// Verify that the order is in the desired state.
 	if order.Flags&model.OrderValid == 0 {
-		BadRequestError(tx, w, "order not complete")
+		api.BadRequestError(tx, w, "order not complete")
 		return
 	}
 	// Update the email address on the order if requested.
@@ -48,8 +49,8 @@ func SendOrderReceipt(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID 
 		}
 		tx.SaveOrder(order)
 	}
-	commit(tx)
+	api.Commit(tx)
 	log.Printf("- RESEND RECEIPT for order %d to %s", orderID, order.Email)
 	w.WriteHeader(http.StatusNoContent)
-	EmitReceipt(order, false)
+	api.EmitReceipt(order, false)
 }

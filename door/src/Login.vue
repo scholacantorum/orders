@@ -40,7 +40,7 @@ export default {
       body.append('password', this.password)
       this.loggingIn = true
       try {
-        const resp = (await this.$axios.post('/api/login', body)).data
+        const resp = (await this.$axios.post('/posapi/login', body)).data
         this.loggingIn = false
         if (!resp.privScanTickets) {
           this.error = 'Not authorized to use this app'

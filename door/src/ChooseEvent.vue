@@ -15,7 +15,7 @@ export default {
   data: () => ({ events: null, choosing: false }),
   async mounted() {
     try {
-      this.events = (await this.$axios.get('/api/event?future=1&freeEntries=1', {
+      this.events = (await this.$axios.get('/posapi/event?future=1&freeEntries=1', {
         headers: { 'Auth': this.$store.state.auth },
       })).data
     } catch (err) {
@@ -27,9 +27,8 @@ export default {
     async onClick(event) {
       try {
         this.choosing = true
-        const products = (await this.$axios.get('/api/prices', {
+        const products = (await this.$axios.get('/posapi/event/${event.id}/prices', {
           headers: { 'Auth': this.$store.state.auth },
-          params: { event: event.id, source: 'inperson' },
         })).data.products.filter(p => !p.message)
         this.choosing = false
         if (!products.length) {

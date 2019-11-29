@@ -1,4 +1,4 @@
-package api
+package posapi
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -19,12 +20,10 @@ type freeEntryData struct {
 // ListEvents handles GET /api/event requests.
 func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
-		session         *model.Session
-		events          []*model.Event
-		future          bool
-		wantFreeEntries bool
-		jw              json.Writer
-		freeEntries     = map[model.EventID][]string{}
+		session     *model.Session
+		events      []*model.Event
+		jw          json.Writer
+		freeEntries = map[model.EventID][]string{}
 	)
 	// Getting events needs PrivSetupOrders, PrivInPersonSales, or
 	// PrivScanTickets.  Here we assume that anyone with PrivSetupOrders or
@@ -32,26 +31,16 @@ func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	if session = auth.GetSession(tx, w, r, model.PrivScanTickets); session == nil {
 		return
 	}
-	// If future is specified as a query parameter, then we should only
-	// return events scheduled in the future.  This is used by the scanner
-	// app.  (Actually this includes all events starting at the beginning of
-	// the date of the call.)
-	future = r.FormValue("future") != ""
-	if future {
-		events = tx.FetchFutureEvents()
-	} else {
-		events = tx.FetchEvents()
+	// We only return events scheduled in the future.  (Actually this
+	// includes all events starting at the beginning of the date of the
+	// call.)
+	events = tx.FetchFutureEvents()
+	// We also retrieve the ticket class(es) that allow free entry to the
+	// event, if any.
+	for _, e := range events {
+		freeEntries[e.ID] = getFreeEntries(tx, e)
 	}
-	// If freeEntries is specified as a query parameter, then we should
-	// retrieve the ticket class(es) that allow free entry to the event, if
-	// any.
-	wantFreeEntries = r.FormValue("freeEntries") != ""
-	if wantFreeEntries {
-		for _, e := range events {
-			freeEntries[e.ID] = getFreeEntries(tx, e)
-		}
-	}
-	commit(tx)
+	api.Commit(tx)
 	w.Header().Set("Content-Type", "application/json")
 	jw = json.NewWriter(w)
 	jw.Array(func() {

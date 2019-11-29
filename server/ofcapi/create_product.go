@@ -1,4 +1,4 @@
-package api
+package ofcapi
 
 import (
 	"bytes"
@@ -9,12 +9,13 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
-// CreateProduct handles POST /api/product requests.
+// CreateProduct handles POST /ofcapi/product requests.
 func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
 		session   *model.Session
@@ -28,45 +29,45 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if product, err = parseCreateProduct(r.Body); err != nil {
-		BadRequestError(tx, w, err.Error())
+		api.BadRequestError(tx, w, err.Error())
 		return
 	}
 	if product.ID == "" || product.Name == "" || product.ShortName == "" || product.Type == "" || product.TicketCount < 0 {
-		BadRequestError(tx, w, "invalid parameters")
+		api.BadRequestError(tx, w, "invalid parameters")
 		return
 	}
 	if tx.FetchProduct(product.ID) != nil {
-		BadRequestError(tx, w, "duplicate product ID")
+		api.BadRequestError(tx, w, "duplicate product ID")
 		return
 	}
 	if product.TicketCount > 0 {
 		if len(product.Events) == 0 {
-			BadRequestError(tx, w, "ticket products must have associated events")
+			api.BadRequestError(tx, w, "ticket products must have associated events")
 			return
 		}
 	} else {
 		if len(product.Events) != 0 {
-			BadRequestError(tx, w, "only ticket products can have associated events")
+			api.BadRequestError(tx, w, "only ticket products can have associated events")
 			return
 		}
 	}
 	for _, pe := range product.Events {
 		if pe.Event == nil {
-			BadRequestError(tx, w, "invalid event")
+			api.BadRequestError(tx, w, "invalid event")
 			return
 		}
 		if seenEvent[pe.Event.ID] {
-			BadRequestError(tx, w, "duplicate event")
+			api.BadRequestError(tx, w, "duplicate event")
 			return
 		}
 		if tx.FetchEvent(pe.Event.ID) == nil {
-			BadRequestError(tx, w, "nonexistent event")
+			api.BadRequestError(tx, w, "nonexistent event")
 			return
 		}
 		seenEvent[pe.Event.ID] = true
 		if pe.Priority == 0 {
 			if seenPrio0 {
-				BadRequestError(tx, w, "multiple priority 0 events")
+				api.BadRequestError(tx, w, "multiple priority 0 events")
 				return
 			}
 			seenPrio0 = true
@@ -76,24 +77,24 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		switch sku.Source {
 		case model.OrderFromPublic, model.OrderFromMembers, model.OrderFromGala, model.OrderFromOffice, model.OrderInPerson:
 		default:
-			BadRequestError(tx, w, "invalid SKU source")
+			api.BadRequestError(tx, w, "invalid SKU source")
 			return
 		}
 		if sku.Price < 0 || (!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
-			BadRequestError(tx, w, "invalid SKU parameters")
+			api.BadRequestError(tx, w, "invalid SKU parameters")
 			return
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
 			if prev.Source == sku.Source && prev.Flags == sku.Flags && prev.Coupon == sku.Coupon &&
 				overlappingDates(prev, sku) {
-				BadRequestError(tx, w, "overlapping SKUs")
+				api.BadRequestError(tx, w, "overlapping SKUs")
 				return
 			}
 		}
 	}
 	tx.SaveProduct(product)
-	commit(tx)
+	api.Commit(tx)
 	out = emitProduct(product)
 	log.Printf("%s CREATE PRODUCT %s", session.Username, out)
 	w.Header().Set("Content-Type", "application/json")

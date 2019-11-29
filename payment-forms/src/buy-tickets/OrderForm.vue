@@ -54,7 +54,7 @@ export default {
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ name, email, subtype, method }) {
-      const result = await this.$axios.post(`${this.ordersURL}/api/order`, JSON.stringify({
+      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, JSON.stringify({
         source: 'public', name, email, coupon: this.coupon,
         lines: this.lines.filter(ol => ol.quantity && !ol.message).map(ol => ({
           product: ol.product,

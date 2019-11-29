@@ -77,7 +77,7 @@ export default {
       }
       this.order.payments[0].method = paymentMethod.id
       try {
-        const revised = (await this.$axios.post('/api/order', this.order, {
+        const revised = (await this.$axios.post('/posapi/order', this.order, {
           headers: { 'Auth': this.$store.state.auth },
         })).data
         if (revised.error) {

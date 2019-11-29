@@ -54,7 +54,7 @@ export default {
       try {
         result = (await this.$axios({
           method: 'GET',
-          url: `${this.ordersURL}/api/prices`,
+          url: `${this.ordersURL}/payapi/prices`,
           params,
         })).data
       } catch (err) {

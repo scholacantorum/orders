@@ -55,7 +55,7 @@ export default {
           order.payments = [{ ...order.payments[0] }]
           order.payments[0].amount += this.donation * 100
         }
-        const revised = (await this.$axios.post('/api/order', order, {
+        const revised = (await this.$axios.post('/posapi/order', order, {
           headers: { 'Auth': this.$store.state.auth },
         })).data
         if (revised.error) throw revised.error

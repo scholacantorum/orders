@@ -1,11 +1,14 @@
 // Main program for the orders.scholacantorum.org server.
 //
-// This program handles requests to https://orders.scholacantorum.org/api/*, for
-// management of Schola Cantorum product orders and ticket tracking.  It is
-// invoked as a CGI "script" by the Dreamhost web server.
+// This program handles requests to
+// https://orders{,-test}.scholacantorum.org/{api,ticket}/*, for management of
+// Schola Cantorum product orders and ticket tracking.  It is invoked as a CGI
+// "script" by the Dreamhost web server.
 //
-// This program expects to be run
-
+// This program expects to be run in the web root directory, which must contain
+// a mode-700 "data" subdirectory.  The data subdirectory must contain the
+// orders.db database and the config.json configuration file.  The server.log
+// log file will be created there.
 package main
 
 import (
@@ -25,6 +28,10 @@ import (
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/gui"
 	"scholacantorum.org/orders/model"
+	"scholacantorum.org/orders/ofcapi"
+	"scholacantorum.org/orders/oldapi"
+	"scholacantorum.org/orders/payapi"
+	"scholacantorum.org/orders/posapi"
 )
 
 var (
@@ -85,31 +92,18 @@ func router(w http.ResponseWriter, r *http.Request) {
 			case "":
 				switch r.Method {
 				case http.MethodGet:
-					api.ListEvents(txh, w, r)
-				case http.MethodPost:
-					api.CreateEvent(txh, w, r)
+					posapi.ListEvents(txh, w, r)
 				default:
 					methodNotAllowedError(txh, w)
 				}
 			default:
 				switch shiftPath(r) {
-				case "":
-					switch r.Method {
-					case http.MethodGet:
-						notImplementedError(txh, w) // TODO
-					case http.MethodPut:
-						notImplementedError(txh, w) // TODO
-					case http.MethodDelete:
-						notImplementedError(txh, w) // TODO
-					default:
-						methodNotAllowedError(txh, w)
-					}
 				case "orders":
 					switch shiftPath(r) {
 					case "":
 						switch r.Method {
 						case http.MethodGet:
-							api.ListEventOrders(txh, w, r, model.EventID(eventID))
+							posapi.ListEventOrders(txh, w, r, model.EventID(eventID))
 						default:
 							methodNotAllowedError(txh, w)
 						}
@@ -123,7 +117,7 @@ func router(w http.ResponseWriter, r *http.Request) {
 					default:
 						switch r.Method {
 						case http.MethodGet, http.MethodPost:
-							api.UseTicket(txh, w, r, model.EventID(eventID), order)
+							posapi.UseTicket(txh, w, r, model.EventID(eventID), order)
 						default:
 							methodNotAllowedError(txh, w)
 						}
@@ -149,10 +143,9 @@ func router(w http.ResponseWriter, r *http.Request) {
 			case 0:
 				switch r.Method {
 				case http.MethodOptions:
-					w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-					txh.Rollback()
+					api.AllowContentType(txh, w)
 				case http.MethodPost:
-					api.PlaceOrder(txh, w, r)
+					oldapi.CreateOrder(txh, w, r)
 				default:
 					methodNotAllowedError(txh, w)
 				}
@@ -160,10 +153,8 @@ func router(w http.ResponseWriter, r *http.Request) {
 				switch shiftPath(r) {
 				case "":
 					switch r.Method {
-					case http.MethodGet:
-						api.GetOrder(txh, w, r, model.OrderID(orderID))
 					case http.MethodDelete:
-						api.CancelOrder(txh, w, r, model.OrderID(orderID))
+						posapi.CancelOrder(txh, w, r, model.OrderID(orderID))
 					default:
 						methodNotAllowedError(txh, w)
 					}
@@ -172,7 +163,7 @@ func router(w http.ResponseWriter, r *http.Request) {
 					case "":
 						switch r.Method {
 						case http.MethodPost:
-							api.CaptureOrderPayment(txh, w, r, model.OrderID(orderID))
+							posapi.CaptureOrderPayment(txh, w, r, model.OrderID(orderID))
 						default:
 							methodNotAllowedError(txh, w)
 						}
@@ -184,7 +175,7 @@ func router(w http.ResponseWriter, r *http.Request) {
 					case "":
 						switch r.Method {
 						case http.MethodPost:
-							api.SendOrderReceipt(txh, w, r, model.OrderID(orderID))
+							posapi.SendOrderReceipt(txh, w, r, model.OrderID(orderID))
 						default:
 							methodNotAllowedError(txh, w)
 						}
@@ -202,42 +193,7 @@ func router(w http.ResponseWriter, r *http.Request) {
 			case "":
 				switch r.Method {
 				case http.MethodGet:
-					api.GetPrices(txh, w, r)
-				default:
-					methodNotAllowedError(txh, w)
-				}
-			default:
-				api.NotFoundError(txh, w)
-			}
-		case "product":
-			switch productID := shiftPath(r); productID {
-			case "":
-				switch r.Method {
-				case http.MethodGet:
-					notImplementedError(txh, w) // TODO
-				case http.MethodPost:
-					api.CreateProduct(txh, w, r)
-				default:
-					methodNotAllowedError(txh, w)
-				}
-			default:
-				switch r.Method {
-				case http.MethodGet:
-					notImplementedError(txh, w) // TODO
-				case http.MethodPut:
-					notImplementedError(txh, w) // TODO
-				case http.MethodDelete:
-					notImplementedError(txh, w) // TODO
-				default:
-					methodNotAllowedError(txh, w)
-				}
-			}
-		case "report":
-			switch shiftPath(r) {
-			case "":
-				switch r.Method {
-				case http.MethodGet:
-					api.RunReport(txh, w, r)
+					oldapi.GetPrices(txh, w, r)
 				default:
 					methodNotAllowedError(txh, w)
 				}
@@ -251,7 +207,228 @@ func router(w http.ResponseWriter, r *http.Request) {
 				case "":
 					switch r.Method {
 					case http.MethodGet:
-						api.GetStripeConnectTerminal(txh, w, r)
+						posapi.GetStripeConnectTerminal(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		default:
+			api.NotFoundError(txh, w)
+		}
+	case "ofcapi":
+		switch shiftPath(r) {
+		case "event":
+			switch eventID := shiftPath(r); eventID {
+			case "":
+				switch r.Method {
+				case http.MethodPost:
+					ofcapi.CreateEvent(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		case "login":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodPost:
+					api.Login(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		case "product":
+			switch productID := shiftPath(r); productID {
+			case "":
+				switch r.Method {
+				case http.MethodPost:
+					ofcapi.CreateProduct(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		case "report":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodGet:
+					ofcapi.RunReport(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		default:
+			api.NotFoundError(txh, w)
+		}
+	case "payapi":
+		switch shiftPath(r) {
+		case "order":
+			switch orderID := shiftPathID(r); orderID {
+			case 0:
+				switch r.Method {
+				case http.MethodOptions:
+					api.AllowContentType(txh, w)
+				case http.MethodPost:
+					payapi.CreateOrder(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		case "prices":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodGet:
+					payapi.GetPrices(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		default:
+			api.NotFoundError(txh, w)
+		}
+	case "posapi":
+		switch shiftPath(r) {
+		case "event":
+			switch eventID := shiftPath(r); eventID {
+			case "":
+				switch r.Method {
+				case http.MethodGet:
+					posapi.ListEvents(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				switch shiftPath(r) {
+				case "":
+					api.NotFoundError(txh, w)
+				case "orders":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodGet:
+							posapi.ListEventOrders(txh, w, r, model.EventID(eventID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				case "prices":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodGet:
+							posapi.GetEventPrices(txh, w, r, model.EventID(eventID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				case "ticket":
+					switch order := shiftPath(r); order {
+					case "":
+						api.NotFoundError(txh, w)
+					default:
+						switch r.Method {
+						case http.MethodGet, http.MethodPost:
+							posapi.UseTicket(txh, w, r, model.EventID(eventID), order)
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			}
+		case "login":
+			switch shiftPath(r) {
+			case "":
+				switch r.Method {
+				case http.MethodPost:
+					api.Login(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		case "order":
+			switch orderID := shiftPathID(r); orderID {
+			case 0:
+				switch r.Method {
+				case http.MethodOptions:
+					api.AllowContentType(txh, w)
+				case http.MethodPost:
+					posapi.CreateOrder(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			default:
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodDelete:
+						posapi.CancelOrder(txh, w, r, model.OrderID(orderID))
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				case "capturePayment":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodPost:
+							posapi.CaptureOrderPayment(txh, w, r, model.OrderID(orderID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				case "sendReceipt":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodPost:
+							posapi.SendOrderReceipt(txh, w, r, model.OrderID(orderID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			case -1:
+				api.NotFoundError(txh, w)
+			}
+		case "stripe":
+			switch shiftPath(r) {
+			case "connectTerminal":
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodGet:
+						posapi.GetStripeConnectTerminal(txh, w, r)
 					default:
 						methodNotAllowedError(txh, w)
 					}
@@ -283,8 +460,8 @@ func router(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		// This script shouldn't get invoked for anything other than
-		// /api or /ticket because those are the only places it should
-		// be installed.
+		// these, because these are the only places the script is
+		// installed.
 		panic("invalid request URI: " + r.RequestURI)
 	}
 }
@@ -323,11 +500,4 @@ func shiftPathID(r *http.Request) int {
 func methodNotAllowedError(tx db.Tx, w http.ResponseWriter) {
 	tx.Rollback()
 	http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-}
-
-// notImplementedError returns an error for a request to a valid URL with a
-// valid method that hasn't been implemented yet.
-func notImplementedError(tx db.Tx, w http.ResponseWriter) {
-	tx.Rollback()
-	http.Error(w, "500 Internal Server Error: method not implemented", http.StatusInternalServerError)
 }

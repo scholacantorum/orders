@@ -25,7 +25,7 @@ export default {
   data: () => ({ orders: null, search: '', selected: null }),
   async mounted() {
     try {
-      this.orders = (await this.$axios.get(`/api/event/${this.$store.state.event.id}/orders`, {
+      this.orders = (await this.$axios.get(`/posapi/event/${this.$store.state.event.id}/orders`, {
         headers: { 'Auth': this.$store.state.auth },
       })).data
     } catch (err) {
