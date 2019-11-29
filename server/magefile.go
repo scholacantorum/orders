@@ -42,19 +42,16 @@ func ProductionOrders() error {
 }
 
 func orders(path string) error {
-	if err := goBuild("-o", path+"/api", "."); err != nil {
+	if err := goBuild("-o", path+"/ofcapi", "."); err != nil {
 		return err
 	}
-	if err := sh.Run("ln", "-f", path+"/api", path+"/ticket"); err != nil {
+	if err := sh.Run("ln", "-f", path+"/ofcapi", path+"/payapi"); err != nil {
 		return err
 	}
-	if err := sh.Run("ln", "-f", path+"/api", path+"/ofcapi"); err != nil {
+	if err := sh.Run("ln", "-f", path+"/ofcapi", path+"/posapi"); err != nil {
 		return err
 	}
-	if err := sh.Run("ln", "-f", path+"/api", path+"/payapi"); err != nil {
-		return err
-	}
-	if err := sh.Run("ln", "-f", path+"/api", path+"/posapi"); err != nil {
+	if err := sh.Run("ln", "-f", path+"/ofcapi", path+"/ticket"); err != nil {
 		return err
 	}
 	return nil

@@ -159,13 +159,8 @@ class Backend: ConnectionTokenProvider {
         task.resume()
     }
 
-    struct eventProductsResponse: Codable {
-        var coupon: Bool
-        var products: [Product]
-    }
-
     func eventProducts(_ handler: @escaping ([Product]?, String?) -> Void) {
-        let url = URL(string: store.baseURL + "/prices?source=inperson&event=" + store.event.id.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!)
+        let url = URL(string: store.baseURL + "/event/\(store.event.id)/prices")
         var request = URLRequest(url: url!)
         request.setValue(store.auth, forHTTPHeaderField: "Auth")
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
@@ -186,13 +181,13 @@ class Backend: ConnectionTokenProvider {
             }
             var result: eventProductsResponse
             do {
-                result = try JSONDecoder().decode(eventProductsResponse.self, from: data!)
+                result = try JSONDecoder().decode([Product].self, from: data!)
             } catch {
                 print("Error decoding event products: \(error)")
                 handler(nil, "Server error: \(error)")
                 return
             }
-            handler(result.products, nil)
+            handler(result, nil)
         }
         task.resume()
     }

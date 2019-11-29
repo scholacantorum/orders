@@ -106,19 +106,14 @@ func getEventProducts(tx db.Tx, event *model.Event) (productIDs []string) {
 
 // emitGetPrices writes the JSON response.
 func emitGetPrices(jw json.Writer, pdata []*getPricesData) {
-	jw.Object(func() {
-		jw.Prop("coupon", true) // needed by iOS app 2019-10-01
-		jw.Prop("products", func() {
-			jw.Array(func() {
-				for _, pd := range pdata {
-					jw.Object(func() {
-						jw.Prop("id", string(pd.id))
-						jw.Prop("name", pd.name)
-						jw.Prop("price", pd.price)
-						jw.Prop("ticketCount", pd.ticketCount)
-					})
-				}
+	jw.Array(func() {
+		for _, pd := range pdata {
+			jw.Object(func() {
+				jw.Prop("id", string(pd.id))
+				jw.Prop("name", pd.name)
+				jw.Prop("price", pd.price)
+				jw.Prop("ticketCount", pd.ticketCount)
 			})
-		})
+		}
 	})
 }

@@ -12,30 +12,23 @@ import (
 )
 
 var methodRE = regexp.MustCompile(`^pm_[A-Za-z0-9_]+$`)
+var tokenRE = regexp.MustCompile("^tok_[A-Za-z0-9_]*$")
 
 // CreateOrder handles POST /api/pos/order requests.
 func CreateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
-		order *model.Order
-		err   error
+		session *model.Session
+		order   *model.Order
+		err     error
 	)
+	// Verify permissions.
+	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
+		return
+	}
 	// Read the order details from the request.
 	if order, err = api.ParseCreateOrder(r.Body); err != nil {
 		log.Printf("ERROR: can't parse body of POST /api/order request: %s", err)
 		api.BadRequestError(tx, w, err.Error())
-		return
-	}
-	CreateOrderParsed(tx, w, r, order)
-}
-
-var tokenRE = regexp.MustCompile("^tok_[A-Za-z0-9_]*$")
-
-// CreateOrderParsed creates orders for point of sale clients.
-func CreateOrderParsed(tx db.Tx, w http.ResponseWriter, r *http.Request, order *model.Order) {
-	var session *model.Session
-
-	// Get current session data, if any.
-	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
 		return
 	}
 	// Validate the order source and permissions.
