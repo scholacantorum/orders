@@ -179,7 +179,7 @@ class Backend: ConnectionTokenProvider {
                 handler(nil, "Server error: \(response.statusCode)")
                 return
             }
-            var result: eventProductsResponse
+            var result: [Product]
             do {
                 result = try JSONDecoder().decode([Product].self, from: data!)
             } catch {
