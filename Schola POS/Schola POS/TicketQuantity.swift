@@ -23,9 +23,16 @@ class TicketQuantity: UIViewController {
     var showUseRow = false
 
     lazy var sellRow = UIView()
+    lazy var nameBox = UIView()
     lazy var nameLabel: UILabel = {
         var view = UILabel()
         view.font = UIFont.systemFont(ofSize: 24.0)
+        return view
+    }()
+    lazy var subnameLabel: UILabel = {
+        var view = UILabel()
+        view.font = UIFont.systemFont(ofSize: 18.0)
+        view.textColor = UIColor.darkGray
         return view
     }()
     lazy var sellDownButton: UIButton = {
@@ -108,20 +115,27 @@ class TicketQuantity: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        let subs = product.name.split(separator: "\n")
         view.addSubview(sellRow)
-        sellRow.addSubview(nameLabel)
+        sellRow.addSubview(nameBox)
+        nameBox.addSubview(nameLabel)
+        if subs.count > 1 {
+            nameBox.addSubview(subnameLabel)
+        }
         sellRow.addSubview(sellDownButton)
         sellRow.addSubview(sellQtyLabel)
         sellRow.addSubview(sellUpButton)
         sellRow.addSubview(priceLabel)
         noUseBottomConstraint = sellRow.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        NSLayoutConstraint.useAndActivateConstraints([
+        var constraints: [NSLayoutConstraint] = [
             sellRow.leftAnchor.constraint(equalTo: view.leftAnchor),
             sellRow.rightAnchor.constraint(equalTo: view.rightAnchor),
             sellRow.topAnchor.constraint(equalTo: view.topAnchor),
             noUseBottomConstraint,
-            nameLabel.leftAnchor.constraint(equalTo: sellRow.leftAnchor, constant: 9.0),
-            nameLabel.centerYAnchor.constraint(equalTo: sellRow.centerYAnchor),
+            nameBox.leftAnchor.constraint(equalTo: sellRow.leftAnchor, constant: 9.0),
+            nameBox.centerYAnchor.constraint(equalTo: sellRow.centerYAnchor),
+            nameLabel.leftAnchor.constraint(equalTo: nameBox.leftAnchor),
+            nameLabel.topAnchor.constraint(equalTo: sellRow.topAnchor),
             priceLabel.rightAnchor.constraint(equalTo: sellRow.rightAnchor, constant: -9.0),
             priceLabel.widthAnchor.constraint(equalToConstant: 60.0),
             priceLabel.centerYAnchor.constraint(equalTo: sellRow.centerYAnchor),
@@ -138,8 +152,21 @@ class TicketQuantity: UIViewController {
             sellDownButton.topAnchor.constraint(equalTo: sellRow.topAnchor),
             sellDownButton.bottomAnchor.constraint(equalTo: sellRow.bottomAnchor),
             sellDownButton.heightAnchor.constraint(equalToConstant: 45.0),
-        ])
-        nameLabel.text = product.name
+        ]
+        if subs.count > 1 {
+            constraints.append(contentsOf: [
+                subnameLabel.leftAnchor.constraint(equalTo: nameBox.leftAnchor),
+                subnameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor),
+                subnameLabel.bottomAnchor.constraint(equalTo: nameBox.bottomAnchor),
+            ])
+        } else {
+            constraints.append(nameLabel.bottomAnchor.constraint(equalTo: nameBox.bottomAnchor))
+        }
+        NSLayoutConstraint.useAndActivateConstraints(constraints)
+        nameLabel.text = String(subs[0])
+        if subs.count > 1 {
+            subnameLabel.text = String(subs[1])
+        }
         sellQtyLabel.text = "0"
         priceLabel.text = "$\(product.price! / 100)"
         priceLabel.textColor = UIColor.darkGray

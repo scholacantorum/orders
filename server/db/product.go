@@ -105,11 +105,11 @@ FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=? ORDER BY p
 		var p model.Product
 		panicOnError(tx.scanProduct(prows, &p))
 		srows, err = tx.tx.Query(
-			`SELECT coupon, sales_start, sales_end, flags, price FROM sku WHERE product=?`, p.ID)
+			`SELECT source, coupon, sales_start, sales_end, flags, price FROM sku WHERE product=?`, p.ID)
 		panicOnError(err)
 		for srows.Next() {
 			var sku model.SKU
-			panicOnError(srows.Scan(&sku.Coupon, (*Time)(&sku.SalesStart),
+			panicOnError(srows.Scan(&sku.Source, &sku.Coupon, (*Time)(&sku.SalesStart),
 				(*Time)(&sku.SalesEnd), &sku.Flags, &sku.Price))
 			p.SKUs = append(p.SKUs, &sku)
 		}

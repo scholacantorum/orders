@@ -326,12 +326,12 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
     }
 
     @objc func cashButton(_ sender: UIButton) {
-        let order = createOrder(paymentType: "other", paymentSubtype: "cash")
+        let order = createOrder(paymentType: "cash", paymentSubtype: "")
         navigationController!.pushViewController(SalesPaymentCash(order: order), animated: true)
     }
 
     @objc func checkButton(_ sender: UIButton) {
-        let order = createOrder(paymentType: "other", paymentSubtype: "check")
+        let order = createOrder(paymentType: "check", paymentSubtype: "")
         navigationController!.pushViewController(SalesPaymentCheck(order: order), animated: true)
     }
 

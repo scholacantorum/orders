@@ -421,12 +421,6 @@ func validatePayment(order *model.Order) bool {
 	if pmt.ID != 0 || pmt.Stripe != "" || !pmt.Created.IsZero() || pmt.Flags != 0 || pmt.Amount != total {
 		return false
 	}
-	// Some old clients have an old coding for cash and check.  (This can
-	// be removed when those clients are no longer in use.)
-	if pmt.Type == model.PaymentOther && (pmt.Subtype == "cash" || pmt.Subtype == "check") {
-		pmt.Type = model.PaymentType(pmt.Subtype)
-		pmt.Subtype = ""
-	}
 	// If this is a free order and has a payment, its type must be "cash".
 	// We remove it; no point in storing a zero payment.
 	if pmt.Amount == 0 {

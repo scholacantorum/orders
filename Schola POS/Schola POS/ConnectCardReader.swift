@@ -12,15 +12,17 @@ import StripeTerminal
 class ConnectCardReader: UIViewController, ReaderSoftwareUpdateDelegate {
 
     var reader: Reader!
+    var completion: ChooseCardReaderDelegate!
     var update: ReaderSoftwareUpdate!
     var statusLabel: UILabel!
     var descLabel: UILabel!
     var applyButton: UIButton!
     var skipButton: UIButton!
 
-    init(reader: Reader) {
+    init(reader: Reader, completion: ChooseCardReaderDelegate) {
         super.init(nibName: nil, bundle: nil)
         self.reader = reader
+        self.completion = completion
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -68,7 +70,9 @@ class ConnectCardReader: UIViewController, ReaderSoftwareUpdateDelegate {
                 return
             }
             guard let update = update else {
-                self.dismiss(animated: false, completion: nil)
+                self.dismiss(animated: false, completion: {
+                    self.completion.cardReaderReady()
+                })
                 return
             }
             self.update = update
@@ -131,7 +135,9 @@ class ConnectCardReader: UIViewController, ReaderSoftwareUpdateDelegate {
                 self.present(alert, animated: true)
                 return
             }
-            self.dismiss(animated: false, completion: nil)
+            self.dismiss(animated: false, completion: {
+                self.completion.cardReaderReady()
+            })
         }
     }
 
@@ -140,7 +146,9 @@ class ConnectCardReader: UIViewController, ReaderSoftwareUpdateDelegate {
     }
 
     @objc func skipButton(_ sender: UIButton) {
-        self.dismiss(animated: false, completion: nil)
+        self.dismiss(animated: false, completion: {
+            self.completion.cardReaderReady()
+        })
     }
 
 }

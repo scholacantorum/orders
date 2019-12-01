@@ -21,7 +21,11 @@ class ReaderCell: UITableViewCell {
     }
 }
 
-class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSource, UITableViewDelegate {
+protocol ChooseCardReaderDelegate {
+    func cardReaderReady()
+}
+
+class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSource, UITableViewDelegate, ChooseCardReaderDelegate {
 
     var tableView: UITableView!
     var spinner: UIActivityIndicatorView!
@@ -174,7 +178,7 @@ class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSour
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let reader = readers[indexPath.row]
-        present(ConnectCardReader(reader: reader), animated: true, completion: nil)
+        present(ConnectCardReader(reader: reader, completion: self), animated: true, completion: nil)
     }
 
     @objc func skipButton(_ sender: UIButton) {
@@ -194,6 +198,10 @@ class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSour
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         connect()
+    }
+
+    func cardReaderReady() {
+        navigationController!.pushViewController(Main(), animated: true)
     }
 
 }
