@@ -79,12 +79,7 @@ CREATE TABLE order_line (
     -- Scan instance key.  A new key is assigned each time the order token is
     -- scanned (or the order ID is entered into the scanner tool).  Incremental
     -- changes are allowed only by providing the key.
-    scan text NOT NULL DEFAULT '',
-
-    -- The minimum number of tickets used for this line.  This is set to the
-    -- current usage count each time the order token is scanned, so incremental
-    -- changes cannot go below this.  Meaningless for non-ticket products.
-    min_used integer NOT NULL DEFAULT 0
+    scan text NOT NULL DEFAULT ''
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);

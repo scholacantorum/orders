@@ -126,7 +126,6 @@ func useTicketGet(
 		classes = append(classes, &cdata)
 		for _, ol := range clines {
 			ol.Scan = scan
-			ol.MinUsed = 0
 			if ol == order.Lines[0] {
 				cdata.used++
 			}
@@ -135,7 +134,6 @@ func useTicketGet(
 				if !t.Used.IsZero() {
 					cdata.min++
 					cdata.used++
-					ol.MinUsed++
 				}
 			}
 		}
@@ -230,7 +228,7 @@ func useTicketPost(
 				return
 			}
 			max += ol.Quantity * ol.Product.TicketCount
-			min += ol.MinUsed
+			min += ol.TicketsUsed()
 			for _, t := range ol.Tickets {
 				if !t.Used.IsZero() {
 					used++
@@ -357,7 +355,7 @@ func addFreeTickets(order *model.Order, event *model.Event, product *model.Produ
 			}
 		}
 	}
-	line = &model.OrderLine{Product: product, Scan: scan, Quantity: 0, MinUsed: 0, Price: 0}
+	line = &model.OrderLine{Product: product, Scan: scan, Quantity: 0, Price: 0}
 	order.Lines = append(order.Lines, line)
 	ret = line
 found:

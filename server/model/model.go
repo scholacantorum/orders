@@ -74,11 +74,19 @@ type OrderLine struct {
 	Quantity int
 	Price    int
 	Scan     string
-	MinUsed  int
 	Tickets  []*Ticket
 	Used     int     // not persistent; input only
 	UsedAt   EventID // not persistent; input only
 	Error    string  // not persistent; output only
+}
+
+func (ol *OrderLine) TicketsUsed() (used int) {
+	for _, t := range ol.Tickets {
+		if !t.Used.IsZero() {
+			used++
+		}
+	}
+	return used
 }
 
 type PaymentID int
