@@ -75,9 +75,3 @@ func NewToken() string {
 	tval := rand.Intn(1000000000000)
 	return fmt.Sprintf("%04d-%04d-%04d", tval/100000000, tval/10000%10000, tval%10000)
 }
-
-// AllowContentType responds to OPTIONS requests for APIs that take JSON bodies.
-func AllowContentType(tx db.Tx, w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	tx.Rollback()
-}

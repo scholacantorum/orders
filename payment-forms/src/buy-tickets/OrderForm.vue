@@ -54,16 +54,23 @@ export default {
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ name, email, subtype, method }) {
-      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, JSON.stringify({
-        source: 'public', name, email, coupon: this.coupon,
-        lines: this.lines.filter(ol => ol.quantity && !ol.message).map(ol => ({
-          product: ol.product,
-          quantity: ol.quantity,
-          price: ol.price,
-        })),
-        payments: [{ type: 'card', subtype, method, amount: this.total }],
-      }),
-        { headers: { 'Content-Type': 'application/json' } },
+      const body = new FormData()
+      body.append('source', 'public')
+      body.append('name', name)
+      body.append('email', email)
+      body.append('coupon', this.coupon)
+      this.lines.filter(ol => ol.quantity && !ol.message).forEach((ol, idx) => {
+        const prefix = `line${idx + 1}`
+        body.append(`${prefix}.product`, ol.product)
+        body.append(`${prefix}.quantity`, ol.quantity)
+        body.append(`${prefix}.price`, ol.price)
+      })
+      body.append('payment1.type', 'card')
+      body.append('payment1.subtype', subtype)
+      body.append('payment1.method', method)
+      body.append('payment1.amount', this.total)
+      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, body,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       ).catch(err => {
         return err
       })

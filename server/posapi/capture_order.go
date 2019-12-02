@@ -34,7 +34,7 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	// Verify that the order is in the desired state.
 	if order.Valid || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
 		!intentRE.MatchString(order.Payments[0].Method) {
-		log.Printf("ERROR: capture of order in wrong state %s", api.EmitOrder(order, true))
+		log.Printf("ERROR: capture of order in wrong state %s", order.ToJSON(true))
 		api.BadRequestError(tx, w, "order not in capturable state")
 		return
 	}
@@ -48,7 +48,7 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 	tx.SaveOrder(order)
 	_, tentativeEmail = tx.FetchCard(card)
 	api.Commit(tx)
-	log.Printf("- CAPTURE ORDER %s", api.EmitOrder(order, true))
+	log.Printf("- CAPTURE ORDER %s", order.ToJSON(true))
 	if order.Email != "" {
 		api.EmitReceipt(order, false)
 	}
@@ -57,5 +57,5 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 		order.Email = tentativeEmail
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(api.EmitOrder(order, false))
+	w.Write(order.ToJSON(false))
 }

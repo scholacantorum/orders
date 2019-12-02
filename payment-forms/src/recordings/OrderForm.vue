@@ -49,25 +49,28 @@ export default {
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ subtype, method }) {
+      const body = new FormData()
+      body.append('source', 'members')
+      body.append('name', this.user.name)
+      body.append('email', this.user.email)
+      body.append('address', this.user.address)
+      body.append('city', this.user.city)
+      body.append('state', this.user.state)
+      body.append('zip', this.user.zip)
+      body.append('member', this.user.id)
+      this.lines.filter(ol => ol.quantity && !ol.message).forEach((ol, idx) => {
+        const prefix = `line${idx + 1}`
+        body.append(`${prefix}.product`, ol.product)
+        body.append(`${prefix}.quantity`, ol.quantity)
+        body.append(`${prefix}.price`, ol.price)
+      })
+      body.append('payment1.type', 'card')
+      body.append('payment1.subtype', subtype)
+      body.append('payment1.method', method)
+      body.append('payment1.amount', this.total)
       const result = await this.$axios.post(
-        `/payapi/order?auth=${encodeURIComponent(this.auth)}`,
-        JSON.stringify({
-          source: 'members',
-          name: this.user.name,
-          email: this.user.email,
-          address: this.user.address,
-          city: this.user.city,
-          state: this.user.state,
-          zip: this.user.zip,
-          member: this.user.id,
-          lines: this.lines.filter(ol => ol.quantity && !ol.message).map(ol => ({
-            product: ol.product,
-            quantity: ol.quantity,
-            price: ol.price,
-          })),
-          payments: [{ type: 'card', subtype, method, amount: this.total }],
-        }),
-        { headers: { 'Content-Type': 'application/json' } },
+        `/payapi/order?auth=${encodeURIComponent(this.auth)}`, body,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       ).catch(err => {
         return err
       })

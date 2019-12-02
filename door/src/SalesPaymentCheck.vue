@@ -21,6 +21,7 @@ SalesPaymentCheck executes the check payment flow for the order given to it.
 
 <script>
 import Summary from './SalesSummary'
+import orderToFormData from './orderToFormData'
 
 export default {
   components: { Summary },
@@ -55,7 +56,7 @@ export default {
           order.payments = [{ ...order.payments[0] }]
           order.payments[0].amount += this.donation * 100
         }
-        const revised = (await this.$axios.post('/posapi/order', order, {
+        const revised = (await this.$axios.post('/posapi/order', orderToFormData(order), {
           headers: { 'Auth': this.$store.state.auth },
         })).data
         if (revised.error) throw revised.error

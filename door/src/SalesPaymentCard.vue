@@ -16,6 +16,7 @@ form#paycard(@submit.prevent="onChargeCard")
 
 <script>
 import Summary from './SalesSummary'
+import orderToFormData from './orderToFormData'
 
 let stripe // handle to Stripe API, set in mounted()
 
@@ -77,7 +78,7 @@ export default {
       }
       this.order.payments[0].method = paymentMethod.id
       try {
-        const revised = (await this.$axios.post('/posapi/order', this.order, {
+        const revised = (await this.$axios.post('/posapi/order', orderToFormData(this.order), {
           headers: { 'Auth': this.$store.state.auth },
         })).data
         if (revised.error) {

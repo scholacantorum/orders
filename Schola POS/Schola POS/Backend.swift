@@ -72,9 +72,7 @@ class Backend: ConnectionTokenProvider {
         var request = URLRequest(url: url!)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let usernameEncoded = username.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!
-        let passwordEncoded = password.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!
-        request.httpBody = "username=\(usernameEncoded)&password=\(passwordEncoded)".data(using: String.Encoding.utf8)
+        request.httpBody = encodeParameters(["username": username, "password": password])
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("Error with login request: \(error)")
@@ -193,10 +191,26 @@ class Backend: ConnectionTokenProvider {
 
     func placeOrder(order: Order, handler: @escaping (Order?, String?) -> Void) {
         let url = URL(string: store.baseURL + "/order")
+        var obody: [String: String] = [
+            "source": "inperson",
+            "name": order.name ?? "",
+            "email": order.email ?? "",
+            "payment1.type": order.payments[0].type,
+            "payment1.subtype": order.payments[0].subtype ?? "",
+            "payment1.method": order.payments[0].method ?? "",
+            "payment1.amount": "\(order.payments[0].amount)",
+        ]
+        for (idx, ol) in order.lines.enumerated() {
+            obody["line\(idx+1).product"] = ol.product
+            obody["line\(idx+1).quantity"] = "\(ol.quantity)"
+            obody["line\(idx+1).price"] = "\(ol.price)"
+            obody["line\(idx+1).used"] = "\(ol.used ?? 0)"
+            obody["line\(idx+1).usedAt"] = ol.usedAt ?? ""
+        }
         var request = URLRequest(url: url!)
         request.httpMethod = "POST"
         request.setValue(store.auth, forHTTPHeaderField: "Auth")
-        request.httpBody = try! JSONEncoder().encode(order)
+        request.httpBody = encodeParameters(obody)
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("Error placing order: \(error)")
@@ -456,7 +470,7 @@ class Backend: ConnectionTokenProvider {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         var body = "_"
         for cl in usage.classes {
-            body += "&class=\(cl.name.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!)&used=\(cl.used)"
+            body += "&class=\(percentEscapeString(cl.name))&used=\(cl.used)"
         }
         request.httpBody = body.data(using: String.Encoding.utf8)
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
@@ -485,6 +499,23 @@ class Backend: ConnectionTokenProvider {
     }
 
     func noop() {
+    }
+
+    private func percentEscapeString(_ string: String) -> String {
+      var characterSet = CharacterSet.alphanumerics
+      characterSet.insert(charactersIn: "-._* ")
+      return string
+        .addingPercentEncoding(withAllowedCharacters: characterSet)!
+        .replacingOccurrences(of: " ", with: "+")
+        .replacingOccurrences(of: " ", with: "+", options: [], range: nil)
+    }
+
+    private func encodeParameters(_ parameters: [String : String]) -> Data? {
+      let parameterArray = parameters.map { (arg) -> String in
+        let (key, value) = arg
+        return "\(key)=\(self.percentEscapeString(value))"
+      }
+      return parameterArray.joined(separator: "&").data(using: String.Encoding.utf8)
     }
 
 }

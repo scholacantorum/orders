@@ -19,26 +19,24 @@ func CreateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 	var (
 		session *model.Session
 		order   *model.Order
-		err     error
 	)
 	// Verify permissions.
 	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
 		return
 	}
 	// Read the order details from the request.
-	if order, err = api.ParseCreateOrder(r.Body); err != nil {
-		log.Printf("ERROR: can't parse body of POST /api/order request: %s", err)
-		api.BadRequestError(tx, w, err.Error())
+	if order = api.GetOrderFromRequest(w, r); order == nil {
+		tx.Rollback()
 		return
 	}
 	// Validate the order source and permissions.
 	if order.Member != 0 {
-		log.Printf("ERROR: forbidden order %s", api.EmitOrder(order, true))
+		log.Printf("ERROR: forbidden order %s", order.ToJSON(true))
 		api.ForbiddenError(tx, w)
 		return
 	}
 	if order.Source != model.OrderInPerson {
-		log.Printf("ERROR: invalid source %s", api.EmitOrder(order, true))
+		log.Printf("ERROR: invalid source %s", order.ToJSON(true))
 		api.BadRequestError(tx, w, "invalid source")
 		return
 	}
@@ -46,18 +44,18 @@ func CreateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		switch order.Payments[0].Type {
 		case model.PaymentCard:
 			if !tokenRE.MatchString(order.Payments[0].Method) && !methodRE.MatchString(order.Payments[0].Method) {
-				log.Printf("ERROR: invalid payment in order %s", api.EmitOrder(order, true))
+				log.Printf("ERROR: invalid payment in order %s", order.ToJSON(true))
 				api.BadRequestError(tx, w, "invalid payment")
 				return
 			}
 		case model.PaymentCardPresent, model.PaymentCash, model.PaymentCheck:
 			if order.Payments[0].Method != "" {
-				log.Printf("ERROR: invalid payment in order %s", api.EmitOrder(order, true))
+				log.Printf("ERROR: invalid payment in order %s", order.ToJSON(true))
 				api.BadRequestError(tx, w, "invalid payment")
 				return
 			}
 		default:
-			log.Printf("ERROR: invalid payment in order %s", api.EmitOrder(order, true))
+			log.Printf("ERROR: invalid payment in order %s", order.ToJSON(true))
 			api.BadRequestError(tx, w, "invalid payment")
 			return
 		}

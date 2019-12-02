@@ -51,12 +51,23 @@ export default {
     onSubmitted() { this.submitted = true },
     onSubmitting(submitting) { this.submitting = submitting }
     , async onSend({ name, email, address, city, state, zip, subtype, method }) {
-      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, JSON.stringify({
-        source: 'public', name, email, address, city, state, zip,
-        lines: [{ product: 'donation', quantity: 1, price: this.amount * 100 }],
-        payments: [{ type: 'card', subtype, method, amount: this.amount * 100 }],
-      }),
-        { headers: { 'Content-Type': 'application/json' } },
+      const body = new FormData()
+      body.append('source', 'public')
+      body.append('name', name)
+      body.append('email', email)
+      body.append('address', address)
+      body.append('city', city)
+      body.append('state', state)
+      body.append('zip', zip)
+      body.append('line1.product', 'donation')
+      body.append('line1.quantity', 1)
+      body.append('line1.price', this.amount * 100)
+      body.append('payment1.type', 'card')
+      body.append('payment1.subtype', subtype)
+      body.append('payment1.method', method)
+      body.append('payment1.amount', this.amount * 100)
+      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, body,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       ).catch(err => {
         return err
       })

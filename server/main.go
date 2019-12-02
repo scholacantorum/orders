@@ -143,8 +143,6 @@ func router(w http.ResponseWriter, r *http.Request) {
 			switch orderID := shiftPathID(r); orderID {
 			case 0:
 				switch r.Method {
-				case http.MethodOptions:
-					api.AllowContentType(txh, w)
 				case http.MethodPost:
 					payapi.CreateOrder(txh, w, r)
 				default:
@@ -239,8 +237,6 @@ func router(w http.ResponseWriter, r *http.Request) {
 			switch orderID := shiftPathID(r); orderID {
 			case 0:
 				switch r.Method {
-				case http.MethodOptions:
-					api.AllowContentType(txh, w)
 				case http.MethodPost:
 					posapi.CreateOrder(txh, w, r)
 				default:

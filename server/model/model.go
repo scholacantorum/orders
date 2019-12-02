@@ -43,6 +43,7 @@ const (
 	OrderInPerson = "inperson"
 )
 
+//easyjson:json
 type Order struct {
 	ID       OrderID
 	Token    string
@@ -238,4 +239,10 @@ type Ticket struct {
 	ID    TicketID
 	Event *Event
 	Used  time.Time
+}
+
+type Update struct {
+	Timestamp time.Time
+	Username  string
+	Request   string
 }

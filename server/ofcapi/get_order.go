@@ -31,5 +31,5 @@ func GetOrder(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model.Or
 	// Send back the order.
 	api.Commit(tx)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(api.EmitOrder(order, false))
+	w.Write(order.ToJSON(false))
 }

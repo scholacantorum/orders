@@ -6,6 +6,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/magefile/mage v1.8.0
+	github.com/mailru/easyjson v0.7.0
 	github.com/mattn/go-sqlite3 v1.9.0
 	github.com/rothskeller/json v0.0.0-20190604180104-831a68af1667
 	github.com/scholacantorum/go-sqlite3 v1.10.0

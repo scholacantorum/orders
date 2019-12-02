@@ -49,6 +49,6 @@ func CancelOrder(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model
 	}
 	tx.DeleteOrder(order)
 	api.Commit(tx)
-	log.Printf("- CANCEL ORDER %s", api.EmitOrder(order, true))
+	log.Printf("- CANCEL ORDER %s", order.ToJSON(true))
 	w.WriteHeader(http.StatusNoContent)
 }
