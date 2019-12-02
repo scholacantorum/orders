@@ -14,7 +14,8 @@ var orderColumns = `id, token, valid, source, name, email, address, city, state,
 func scanOrder(scanner interface{ Scan(...interface{}) error }, o *model.Order) error {
 	return scanner.Scan(&o.ID, &o.Token, &o.Valid, &o.Source, &o.Name, &o.Email,
 		&o.Address, &o.City, &o.State, &o.Zip, &o.Phone, &o.Customer,
-		&o.Member, (*Time)(&o.Created), &o.CNote, &o.ONote, &o.InAccess)
+		&o.Member, (*Time)(&o.Created), &o.CNote, &o.ONote, &o.InAccess,
+		&o.Coupon)
 }
 
 // FetchOrder returns the order with the specified ID.  It returns nil if no
