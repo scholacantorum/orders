@@ -74,12 +74,7 @@ CREATE TABLE order_line (
 
     -- The price per unit for this line, in cents.  The total amount for this
     -- line will always be price * quantity.
-    price integer NOT NULL,
-
-    -- Scan instance key.  A new key is assigned each time the order token is
-    -- scanned (or the order ID is entered into the scanner tool).  Incremental
-    -- changes are allowed only by providing the key.
-    scan text NOT NULL DEFAULT ''
+    price integer NOT NULL
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);

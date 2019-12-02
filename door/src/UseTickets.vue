@@ -60,7 +60,6 @@ export default {
       try {
         this.using = true
         const body = new URLSearchParams()
-        body.append('scan', this.order.scan)
         this.order.classes.forEach(cl => {
           body.append('class', cl.name)
           body.append('used', cl.used)

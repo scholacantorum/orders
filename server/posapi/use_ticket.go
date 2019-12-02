@@ -102,7 +102,6 @@ func useTicketGet(
 		free    map[string]*model.Product
 		jw      json.Writer
 		classes []*class
-		scan    = api.NewToken()
 	)
 	// Get the order lines for each ticket class.
 	if lines = useTicketClassMap(order, event); lines == nil {
@@ -125,7 +124,6 @@ func useTicketGet(
 		var cdata = class{name: cname}
 		classes = append(classes, &cdata)
 		for _, ol := range clines {
-			ol.Scan = scan
 			if ol == order.Lines[0] {
 				cdata.used++
 			}
@@ -139,7 +137,7 @@ func useTicketGet(
 		}
 		if cdata.used > cdata.max {
 			if fp := free[cname]; fp != nil {
-				if ol := addFreeTickets(order, event, fp, scan, cdata.used-cdata.max); ol != nil {
+				if ol := addFreeTickets(order, event, fp, cdata.used-cdata.max); ol != nil {
 					lines[cname] = append(lines[cname], ol)
 				}
 				cdata.max = 1000
@@ -152,7 +150,6 @@ func useTicketGet(
 		}
 	}
 	// Clean up and emit results.
-	tx.SaveOrder(order)
 	api.Commit(tx)
 	sort.Slice(classes, func(i, j int) bool {
 		return classes[i].name < classes[j].name
@@ -164,7 +161,6 @@ func useTicketGet(
 		if order.Name != "" {
 			jw.Prop("name", order.Name)
 		}
-		jw.Prop("scan", scan)
 		jw.Prop("classes", func() {
 			jw.Array(func() {
 				for _, class := range classes {
@@ -195,7 +191,6 @@ func useTicketPost(
 		linemap map[string][]*model.OrderLine
 		free    map[string]*model.Product
 		jw      json.Writer
-		scan    = r.FormValue("scan")
 	)
 	// Get the order lines for the requested ticket class.
 	if linemap = useTicketClassMap(order, event); linemap == nil && len(order.Lines) != 0 {
@@ -223,18 +218,10 @@ func useTicketPost(
 		}
 		// Check the desired count against the min and max usage for this class.
 		for _, ol := range lines {
-			if ol.Scan != scan {
-				api.BadRequestError(tx, w, "wrong scan session")
-				return
-			}
 			max += ol.Quantity * ol.Product.TicketCount
 			min += ol.TicketsUsed()
-			for _, t := range ol.Tickets {
-				if !t.Used.IsZero() {
-					used++
-				}
-			}
 		}
+		used = min
 		if wanted < min {
 			api.BadRequestError(tx, w, "reducing used count below minimum")
 			return
@@ -247,7 +234,7 @@ func useTicketPost(
 				api.SendError(tx, w, "Ticket already used")
 				return
 			}
-			if ol := addFreeTickets(order, event, fp, scan, wanted-max); ol != nil {
+			if ol := addFreeTickets(order, event, fp, wanted-max); ol != nil {
 				lines = append(lines, ol)
 			}
 			max = 1000
@@ -268,7 +255,6 @@ func useTicketPost(
 	jw = json.NewWriter(w)
 	jw.Object(func() {
 		jw.Prop("id", int(order.ID))
-		jw.Prop("scan", scan)
 	})
 	jw.Close()
 }
@@ -341,7 +327,7 @@ func getFreeClasses(tx db.Tx, event *model.Event) (fc map[string]*model.Product)
 // class, it increases the quantity on that line and returns nil.  Otherwise, it
 // adds a new line to the order and returns it.  The new tickets are not marked
 // used.
-func addFreeTickets(order *model.Order, event *model.Event, product *model.Product, scan string, count int) (ret *model.OrderLine) {
+func addFreeTickets(order *model.Order, event *model.Event, product *model.Product, count int) (ret *model.OrderLine) {
 	var line *model.OrderLine
 
 	for _, ol := range order.Lines {
@@ -355,7 +341,7 @@ func addFreeTickets(order *model.Order, event *model.Event, product *model.Produ
 			}
 		}
 	}
-	line = &model.OrderLine{Product: product, Scan: scan, Quantity: 0, Price: 0}
+	line = &model.OrderLine{Product: product, Quantity: 0, Price: 0}
 	order.Lines = append(order.Lines, line)
 	ret = line
 found:

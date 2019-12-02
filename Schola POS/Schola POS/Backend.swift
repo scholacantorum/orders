@@ -42,7 +42,6 @@ struct TicketUsage: Codable {
     var id: Int
     var name: String?
     var error: String?
-    var scan: String
     var classes: [TicketClassUsage]
 }
 struct TicketClassUsage: Codable {
@@ -455,7 +454,7 @@ class Backend: ConnectionTokenProvider {
         request.httpMethod = "POST"
         request.setValue(store.auth, forHTTPHeaderField: "Auth")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        var body = "scan=" + usage.scan
+        var body = "_"
         for cl in usage.classes {
             body += "&class=\(cl.name.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed)!)&used=\(cl.used)"
         }
