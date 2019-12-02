@@ -152,7 +152,7 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 		}
 		p.Subtype = strings.TrimSpace(r.FormValue(prefix + "subtype"))
 		p.Method = strings.TrimSpace(r.FormValue(prefix + "method"))
-		if p.Amount, err = strconv.Atoi(prefix + "amount"); err != nil {
+		if p.Amount, err = strconv.Atoi(r.FormValue(prefix + "amount")); err != nil {
 			log.Printf("ERROR: invalid payment amount %q", r.FormValue(prefix+"amount"))
 			http.Error(w, `400 Bad Request: invalid "amount"`, http.StatusBadRequest)
 			goto ERROR
