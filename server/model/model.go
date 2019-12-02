@@ -84,14 +84,6 @@ type OrderLine struct {
 
 type PaymentID int
 
-type PaymentFlags byte
-
-const (
-	// PaymentInitial marks the initial payment on an order, for ease of
-	// queries.
-	PaymentInitial PaymentFlags = 1 << iota
-)
-
 type PaymentType string
 
 const (
@@ -120,7 +112,6 @@ type Payment struct {
 	Method  string
 	Stripe  string
 	Created time.Time
-	Flags   PaymentFlags
 	Amount  int
 }
 

@@ -161,9 +161,6 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 			order.Valid = true
 		}
 	}
-	if len(order.Payments) == 1 {
-		order.Payments[0].Flags |= model.PaymentInitial
-	}
 	// Save the order to the database.
 	tx.SaveOrder(order)
 	Commit(tx)
@@ -413,10 +410,10 @@ func validatePayment(order *model.Order) bool {
 	if len(order.Payments) != 1 {
 		return false
 	}
-	// And it should not have an ID, a Stripe ID, a created timestamp, or
-	// any flags, and it should have the correct amount.
+	// And it should not have an ID, a Stripe ID, or a created timestamp,
+	// and it should have the correct amount.
 	var pmt = order.Payments[0]
-	if pmt.ID != 0 || pmt.Stripe != "" || !pmt.Created.IsZero() || pmt.Flags != 0 || pmt.Amount != total {
+	if pmt.ID != 0 || pmt.Stripe != "" || !pmt.Created.IsZero() || pmt.Amount != total {
 		return false
 	}
 	// If this is a free order and has a payment, its type must be "cash".
@@ -585,9 +582,6 @@ func EmitOrder(o *model.Order, log bool) []byte {
 							jw.Prop("stripe", p.Stripe)
 						}
 						jw.Prop("created", p.Created.Format(time.RFC3339))
-						if log {
-							jw.Prop("flags", int(p.Flags))
-						}
 						jw.Prop("amount", p.Amount)
 					})
 				}

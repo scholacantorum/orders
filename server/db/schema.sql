@@ -299,10 +299,6 @@ CREATE TABLE payment (
     -- Timestamp of the payment.
     created text NOT NULL,
 
-    -- Bitmask of flags indicating the status of the payment.  See
-    -- model/payment.go for values.
-    flags integer NOT NULL,
-
     -- Amount of the payment, in cents.  Negative amounts indicate refunds.
     amount integer NOT NULL
 );
