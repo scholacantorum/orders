@@ -357,7 +357,7 @@ func addFreeTickets(order *model.Order, event *model.Event, product *model.Produ
 			}
 		}
 	}
-	line = &model.OrderLine{Product: product, Scan: scan, AutoUse: 0, Quantity: 0, MinUsed: 0, Price: 0}
+	line = &model.OrderLine{Product: product, Scan: scan, Quantity: 0, MinUsed: 0, Price: 0}
 	order.Lines = append(order.Lines, line)
 	ret = line
 found:

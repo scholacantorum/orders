@@ -84,11 +84,7 @@ CREATE TABLE order_line (
     -- The minimum number of tickets used for this line.  This is set to the
     -- current usage count each time the order token is scanned, so incremental
     -- changes cannot go below this.  Meaningless for non-ticket products.
-    min_used integer NOT NULL DEFAULT 0,
-
-    -- The number of tickets to be used automatically each time the order token
-    -- is scanned.  Meaningless for non-ticket products.
-    auto_use integer NOT NULL
+    min_used integer NOT NULL DEFAULT 0
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);
