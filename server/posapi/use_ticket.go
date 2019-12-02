@@ -51,7 +51,7 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		order = &model.Order{
 			Source:  model.OrderInPerson,
 			Created: now,
-			Flags:   model.OrderValid,
+			Valid:   true,
 			Name:    "Free Entry",
 		}
 		r.Form["scan"] = []string{api.NewToken()}

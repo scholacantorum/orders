@@ -24,7 +24,7 @@ func GetOrder(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model.Or
 		api.NotFoundError(tx, w)
 		return
 	}
-	if session.Privileges&model.PrivManageOrders == 0 && order.Flags&model.OrderValid == 0 {
+	if session.Privileges&model.PrivManageOrders == 0 && !order.Valid {
 		api.NotFoundError(tx, w)
 		return
 	}

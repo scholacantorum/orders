@@ -119,7 +119,7 @@ func main() {
 		log.Fatal(err)
 	}
 	// If the order isn't valid, we'll act as if it has no lines.
-	if order.Flags&model.OrderValid == 0 {
+	if !order.Valid {
 		order.Lines = nil
 	}
 	// Make a map of lines by product.

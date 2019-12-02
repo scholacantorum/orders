@@ -8,13 +8,13 @@ import (
 )
 
 // orderColumns is the list of columns in the orderT table.
-var orderColumns = `id, token, source, name, email, address, city, state, zip, phone, customer, member, created, flags, cnote, onote, coupon, repeat`
+var orderColumns = `id, token, valid, source, name, email, address, city, state, zip, phone, customer, member, created, cnote, onote, in_access, coupon, repeat`
 
 // scanOrder scans an orderT table row.
 func scanOrder(scanner interface{ Scan(...interface{}) error }, o *model.Order) error {
-	return scanner.Scan(&o.ID, &o.Token, &o.Source, &o.Name, &o.Email,
+	return scanner.Scan(&o.ID, &o.Token, &o.Valid, &o.Source, &o.Name, &o.Email,
 		&o.Address, &o.City, &o.State, &o.Zip, &o.Phone, &o.Customer,
-		&o.Member, (*Time)(&o.Created), &o.Flags, &o.CNote, &o.ONote,
+		&o.Member, (*Time)(&o.Created), &o.CNote, &o.ONote, &o.InAccess,
 		&o.Coupon, (*Time)(&o.Repeat))
 }
 
@@ -104,11 +104,11 @@ func (tx Tx) SaveOrder(o *model.Order) {
 	)
 	q.WriteString(`INSERT OR REPLACE INTO orderT (`)
 	q.WriteString(orderColumns)
-	q.WriteString(`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-	res, err = tx.tx.Exec(q.String(), ID(o.ID), o.Token, o.Source, o.Name,
-		o.Email, o.Address, o.City, o.State, o.Zip, o.Phone, o.Customer,
-		o.Member, Time(o.Created), o.Flags, o.CNote, o.ONote, o.Coupon,
-		Time(o.Repeat))
+	q.WriteString(`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	res, err = tx.tx.Exec(q.String(), ID(o.ID), o.Token, o.Valid, o.Source,
+		o.Name, o.Email, o.Address, o.City, o.State, o.Zip, o.Phone,
+		o.Customer, o.Member, Time(o.Created), o.CNote, o.ONote,
+		o.InAccess, o.Coupon, Time(o.Repeat))
 	panicOnError(err)
 	if o.ID == 0 {
 		o.ID = model.OrderID(lastInsertID(res))

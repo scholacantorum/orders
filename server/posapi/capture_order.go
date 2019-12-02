@@ -32,7 +32,7 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 		return
 	}
 	// Verify that the order is in the desired state.
-	if order.Flags&model.OrderValid != 0 || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
+	if order.Valid || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
 		!intentRE.MatchString(order.Payments[0].Method) {
 		log.Printf("ERROR: capture of order in wrong state %s", api.EmitOrder(order, true))
 		api.BadRequestError(tx, w, "order not in capturable state")
@@ -44,7 +44,7 @@ func CaptureOrderPayment(tx db.Tx, w http.ResponseWriter, r *http.Request, order
 		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	order.Flags |= model.OrderValid
+	order.Valid = true
 	tx.SaveOrder(order)
 	_, tentativeEmail = tx.FetchCard(card)
 	api.Commit(tx)

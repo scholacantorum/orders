@@ -33,7 +33,7 @@ func SendOrderReceipt(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID 
 		return
 	}
 	// Verify that the order is in the desired state.
-	if order.Flags&model.OrderValid == 0 {
+	if !order.Valid {
 		api.BadRequestError(tx, w, "order not complete")
 		return
 	}

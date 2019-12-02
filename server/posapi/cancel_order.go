@@ -34,7 +34,7 @@ func CancelOrder(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model
 		return
 	}
 	// Verify that the order is in the desired state.
-	if order.Flags&model.OrderValid != 0 || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
+	if order.Valid || len(order.Payments) != 1 || order.Payments[0].Type != model.PaymentCardPresent ||
 		!intentRE.MatchString(order.Payments[0].Stripe) {
 		log.Printf("ERROR: cannot cancel order %d as requested because it is not in the proper state", orderID)
 		api.BadRequestError(tx, w, "order not in cancelable state")

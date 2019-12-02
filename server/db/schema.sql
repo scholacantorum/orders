@@ -14,6 +14,11 @@ CREATE TABLE orderT (
     -- the one used in the generated QR codes.
     token string UNIQUE,
 
+    -- Flag indicating that the order is valid, i.e., it was finalized.  An
+    -- order that doesn't have this flag set either is still in process or was
+    -- canceled before it was finalized.
+    valid boolean NOT NULL DEFAULT 0,
+
     -- Source of the order, one of "public", "members", "gala", "office", or
     -- "inperson".
     source text NOT NULL,
@@ -34,14 +39,15 @@ CREATE TABLE orderT (
     -- Creation time of the order.
     created text NOT NULL,
 
-    -- Bitmask of order type and status flags.  See model/order.go for values.
-    flags integer NOT NULL,
-
     -- Customer notes about the order.
     cnote text NOT NULL DEFAULT '',
 
     -- Office notes about the order.
     onote text NOT NULL DEFAULT '',
+
+    -- Flag indicating that the order and customer details have been posted
+    -- into the office Access database.
+    in_access boolean NOT NULL DEFAULT 0,
 
     -- Coupon code supplied by the customer (empty if none).
     coupon text NOT NULL DEFAULT '',

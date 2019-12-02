@@ -46,7 +46,7 @@ type reportOrder struct {
 	name        string
 	email       string
 	created     time.Time
-	flags       model.OrderFlags
+	valid       bool
 	coupon      string
 	paymentType string
 	counted     bool
@@ -168,7 +168,7 @@ SELECT COUNT(*), CASE WHEN used!='' THEN event ELSE '' END AS used_event FROM ti
 	panicOnError(err)
 	defer ticketUsageStmt.Close()
 	orderStmt, err = tx.tx.Prepare(`
-SELECT o.source, o.name, o.email, o.created, o.flags, o.coupon, p.type, p.subtype
+SELECT o.source, o.name, o.email, o.created, o.valid, o.coupon, p.type, p.subtype
 FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
 	panicOnError(err)
 	defer orderStmt.Close()
@@ -191,7 +191,7 @@ FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
 			var ptype, psubtype sql.NullString
 			order = &reportOrder{id: oid}
 			panicOnError(orderStmt.QueryRow(oid).Scan(&order.source, &order.name, &order.email,
-				(*Time)(&order.created), &order.flags, &order.coupon, &ptype, &psubtype))
+				(*Time)(&order.created), &order.valid, &order.coupon, &ptype, &psubtype))
 			order.coupon = strings.ToUpper(order.coupon)
 			if mapped := paymentTypeMap[ptype.String+","+psubtype.String]; mapped != "" {
 				order.paymentType = mapped
@@ -201,7 +201,7 @@ FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
 				order.paymentType = ptype.String + " " + psubtype.String
 			}
 		}
-		if order.flags&model.OrderValid == 0 {
+		if !order.valid {
 			continue
 		}
 		ol.order = order

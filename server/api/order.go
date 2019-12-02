@@ -154,13 +154,13 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 	// If we don't have to charge a card through Stripe, the order is now
 	// complete.
 	if len(order.Payments) == 0 {
-		order.Flags |= model.OrderValid
+		order.Valid = true
 	} else {
 		switch order.Payments[0].Type {
 		case model.PaymentCard, model.PaymentCardPresent:
 			break
 		default:
-			order.Flags |= model.OrderValid
+			order.Valid = true
 		}
 	}
 	if len(order.Payments) == 1 {
@@ -187,7 +187,7 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 				SendError(tx, w, message)
 				return
 			}
-			order.Flags |= model.OrderValid
+			order.Valid = true
 			tx.SaveOrder(order)
 			tx.SaveCard(card, order.Name, order.Email)
 			receipt = order.Email != ""
@@ -224,7 +224,7 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 	if receipt && order.Email != "" {
 		EmitReceipt(order, false)
 	}
-	if order.Flags&model.OrderValid != 0 {
+	if order.Valid {
 		UpdateGoogleSheet(order)
 	}
 }
@@ -526,7 +526,8 @@ func EmitOrder(o *model.Order, log bool) []byte {
 		}
 		jw.Prop("created", o.Created.Format(time.RFC3339))
 		if log {
-			jw.Prop("flags", int(o.Flags))
+			jw.Prop("valid", o.Valid)
+			jw.Prop("inAccess", o.InAccess)
 		}
 		if o.CNote != "" {
 			jw.Prop("cNote", o.CNote)
