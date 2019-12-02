@@ -86,7 +86,7 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
-			if prev.Source == sku.Source && prev.Flags == sku.Flags && prev.Coupon == sku.Coupon &&
+			if prev.Source == sku.Source && prev.Coupon == sku.Coupon &&
 				overlappingDates(prev, sku) {
 				api.BadRequestError(tx, w, "overlapping SKUs")
 				return

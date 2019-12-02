@@ -32,8 +32,8 @@ func (tx Tx) SaveProduct(p *model.Product) {
 	panicOnExecError(tx.tx.Exec(`DELETE FROM sku WHERE product=?`, p.ID))
 	for _, sku := range p.SKUs {
 		panicOnExecError(tx.tx.Exec(
-			`INSERT INTO sku (product, source, coupon, sales_start, sales_end, flags, price) VALUES (?,?,?,?,?,?,?)`,
-			p.ID, sku.Source, sku.Coupon, Time(sku.SalesStart), Time(sku.SalesEnd), sku.Flags, sku.Price))
+			`INSERT INTO sku (product, source, coupon, sales_start, sales_end, price) VALUES (?,?,?,?,?,?)`,
+			p.ID, sku.Source, sku.Coupon, Time(sku.SalesStart), Time(sku.SalesEnd), sku.Price))
 	}
 }
 
@@ -73,12 +73,12 @@ func (tx Tx) FetchProduct(id model.ProductID) (p *model.Product) {
 	}
 	panicOnError(rows.Err())
 	rows, err = tx.tx.Query(
-		`SELECT source, coupon, sales_start, sales_end, flags, price FROM sku WHERE product=?`, p.ID)
+		`SELECT source, coupon, sales_start, sales_end, price FROM sku WHERE product=?`, p.ID)
 	panicOnError(err)
 	for rows.Next() {
 		var sku model.SKU
 		panicOnError(rows.Scan(&sku.Source, &sku.Coupon, (*Time)(&sku.SalesStart),
-			(*Time)(&sku.SalesEnd), &sku.Flags, &sku.Price))
+			(*Time)(&sku.SalesEnd), &sku.Price))
 		p.SKUs = append(p.SKUs, &sku)
 	}
 	panicOnError(rows.Err())
@@ -105,12 +105,12 @@ FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=? ORDER BY p
 		var p model.Product
 		panicOnError(tx.scanProduct(prows, &p))
 		srows, err = tx.tx.Query(
-			`SELECT source, coupon, sales_start, sales_end, flags, price FROM sku WHERE product=?`, p.ID)
+			`SELECT source, coupon, sales_start, sales_end, price FROM sku WHERE product=?`, p.ID)
 		panicOnError(err)
 		for srows.Next() {
 			var sku model.SKU
 			panicOnError(srows.Scan(&sku.Source, &sku.Coupon, (*Time)(&sku.SalesStart),
-				(*Time)(&sku.SalesEnd), &sku.Flags, &sku.Price))
+				(*Time)(&sku.SalesEnd), &sku.Price))
 			p.SKUs = append(p.SKUs, &sku)
 		}
 		panicOnError(srows.Err())

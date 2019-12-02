@@ -211,7 +211,6 @@ type SKU struct {
 	Coupon     string
 	SalesStart time.Time
 	SalesEnd   time.Time
-	Flags      SKUFlags
 	Price      int
 }
 
@@ -226,8 +225,6 @@ func (s *SKU) InSalesRange(t time.Time) int {
 	}
 	return 0
 }
-
-type SKUFlags byte
 
 type TicketID int
 

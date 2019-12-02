@@ -178,10 +178,6 @@ CREATE TABLE sku (
     sales_start text NOT NULL DEFAULT '',
     sales_end   text NOT NULL DEFAULT '',
 
-    -- Flags further constraining the use of this SKU.  See model/model.go for
-    -- flag values.
-    flags integer NOT NULL DEFAULT 0,
-
     -- Price to purchase the product using this SKU, in cents.  Depending on the
     -- product type, a zero value may mean that the product is free when
     -- purchased with this SKU, or it may mean that the product's price is
