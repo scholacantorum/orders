@@ -50,16 +50,10 @@ CREATE TABLE orderT (
     in_access boolean NOT NULL DEFAULT 0,
 
     -- Coupon code supplied by the customer (empty if none).
-    coupon text NOT NULL DEFAULT '',
-
-    -- Date on which this order should stop recurring.  If empty, the order does
-    -- not recur.  Otherwise, the order will recur on the first of every month
-    -- until this date is reached.
-    repeat text NOT NULL DEFAULT ''
+    coupon text NOT NULL DEFAULT ''
 );
 CREATE INDEX order_name_email_index ON orderT (name, email);
 CREATE INDEX order_email_index      ON orderT (email);
-CREATE INDEX order_repeat_index     ON orderT (repeat) WHERE repeat != 0;
 
 -- The order_line table tracks lines of Schola Cantorum orders.  Every order has
 -- at least one line.

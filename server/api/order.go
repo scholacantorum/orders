@@ -51,8 +51,6 @@ func ParseCreateOrder(r io.Reader) (o *model.Order, err error) {
 			return json.StringHandler(func(s string) { o.ONote = s })
 		case "coupon":
 			return json.StringHandler(func(s string) { o.Coupon = s })
-		case "repeat":
-			return json.TimeHandler(func(t time.Time) { o.Repeat = t })
 		case "lines":
 			return json.ArrayHandler(func() json.Handlers {
 				var ol model.OrderLine
@@ -325,8 +323,8 @@ func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool
 func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) bool {
 
 	// New orders should not have an ID or a created timestamp, and must
-	// have at least one line.  Orders with repeat aren't supported yet.
-	if order.ID != 0 || order.Token != "" || !order.Created.IsZero() || !order.Repeat.IsZero() || len(order.Lines) == 0 {
+	// have at least one line.
+	if order.ID != 0 || order.Token != "" || !order.Created.IsZero() || len(order.Lines) == 0 {
 		return false
 	}
 	order.Created = time.Now()
@@ -537,9 +535,6 @@ func EmitOrder(o *model.Order, log bool) []byte {
 		}
 		if o.Coupon != "" {
 			jw.Prop("coupon", o.Coupon)
-		}
-		if !o.Repeat.IsZero() {
-			jw.Prop("repeat", o.Repeat.Format(time.RFC3339))
 		}
 		jw.Prop("lines", func() {
 			jw.Array(func() {

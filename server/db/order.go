@@ -8,14 +8,13 @@ import (
 )
 
 // orderColumns is the list of columns in the orderT table.
-var orderColumns = `id, token, valid, source, name, email, address, city, state, zip, phone, customer, member, created, cnote, onote, in_access, coupon, repeat`
+var orderColumns = `id, token, valid, source, name, email, address, city, state, zip, phone, customer, member, created, cnote, onote, in_access, coupon`
 
 // scanOrder scans an orderT table row.
 func scanOrder(scanner interface{ Scan(...interface{}) error }, o *model.Order) error {
 	return scanner.Scan(&o.ID, &o.Token, &o.Valid, &o.Source, &o.Name, &o.Email,
 		&o.Address, &o.City, &o.State, &o.Zip, &o.Phone, &o.Customer,
-		&o.Member, (*Time)(&o.Created), &o.CNote, &o.ONote, &o.InAccess,
-		&o.Coupon, (*Time)(&o.Repeat))
+		&o.Member, (*Time)(&o.Created), &o.CNote, &o.ONote, &o.InAccess)
 }
 
 // FetchOrder returns the order with the specified ID.  It returns nil if no
@@ -104,11 +103,11 @@ func (tx Tx) SaveOrder(o *model.Order) {
 	)
 	q.WriteString(`INSERT OR REPLACE INTO orderT (`)
 	q.WriteString(orderColumns)
-	q.WriteString(`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	q.WriteString(`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	res, err = tx.tx.Exec(q.String(), ID(o.ID), o.Token, o.Valid, o.Source,
 		o.Name, o.Email, o.Address, o.City, o.State, o.Zip, o.Phone,
 		o.Customer, o.Member, Time(o.Created), o.CNote, o.ONote,
-		o.InAccess, o.Coupon, Time(o.Repeat))
+		o.InAccess, o.Coupon)
 	panicOnError(err)
 	if o.ID == 0 {
 		o.ID = model.OrderID(lastInsertID(res))

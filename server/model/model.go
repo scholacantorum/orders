@@ -62,7 +62,6 @@ type Order struct {
 	ONote    string
 	InAccess bool
 	Coupon   string
-	Repeat   time.Time
 	Lines    []*OrderLine
 	Payments []*Payment
 }
