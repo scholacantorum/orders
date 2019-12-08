@@ -111,6 +111,19 @@ func router(w http.ResponseWriter, r *http.Request) {
 			default:
 				api.NotFoundError(txh, w)
 			}
+		case "order":
+			switch orderID := shiftPathID(r); orderID {
+			case 0, -1:
+				api.NotFoundError(txh, w)
+			default:
+				switch r.Method {
+				case http.MethodGet:
+					ofcapi.GetOrder(txh, w, r, model.OrderID(orderID))
+					// Used by members site to validate recording orders
+				default:
+					methodNotAllowedError(txh, w)
+				}
+			}
 		case "product":
 			switch productID := shiftPath(r); productID {
 			case "":

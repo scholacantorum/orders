@@ -9,7 +9,9 @@ import (
 	"scholacantorum.org/orders/model"
 )
 
-// GetOrder handles GET /ofcapi/order/${id} requests.
+// GetOrder handles GET /ofcapi/order/${id} requests.  Note that this is called
+// by the members site to validate recording orders, as well as by the office
+// UI.
 func GetOrder(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model.OrderID) {
 	var (
 		session *model.Session
