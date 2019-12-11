@@ -1,6 +1,7 @@
 package ofcapi
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -9,33 +10,32 @@ import (
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
 // RunReport runs a report, handling GET /ofcapi/report requests.
-func RunReport(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+func RunReport(r *api.Request) error {
 	var (
 		def    *model.ReportDefinition
 		result *model.ReportResults
 	)
 	// Verify permissions.
-	if auth.GetSession(tx, w, r, model.PrivViewOrders) == nil {
-		return
+	if r.Privileges&model.PrivViewOrders == 0 {
+		return auth.Forbidden
 	}
 	// Get the report definition.
-	if def = parseReportDef(tx, r); def == nil {
-		api.BadRequestError(tx, w, "invalid report definition")
-		return
+	if def = parseReportDef(r); def == nil {
+		return errors.New("invalid report definition")
 	}
-	result = tx.RunReport(def)
+	result = r.Tx.RunReport(def)
+	r.Tx.Commit()
 	// Send back the results.
-	api.Commit(tx)
-	w.Header().Set("Content-Type", "application/json")
-	emitReport(w, result)
+	r.Header().Set("Content-Type", "application/json")
+	r.Write(result.ToJSON())
+	return nil
 }
 
-func parseReportDef(tx db.Tx, r *http.Request) (def *model.ReportDefinition) {
+func parseReportDef(r *api.Request) (def *model.ReportDefinition) {
 	def = new(model.ReportDefinition)
 	r.ParseForm()
 	for _, os := range r.Form["orderSource"] {
@@ -67,7 +67,7 @@ func parseReportDef(tx db.Tx, r *http.Request) (def *model.ReportDefinition) {
 		}
 	}
 	for _, pid := range r.Form["product"] {
-		if tx.FetchProduct(model.ProductID(pid)) == nil {
+		if r.Tx.FetchProduct(model.ProductID(pid)) == nil {
 			return nil
 		}
 		def.Products = append(def.Products, model.ProductID(pid))
@@ -75,7 +75,7 @@ func parseReportDef(tx db.Tx, r *http.Request) (def *model.ReportDefinition) {
 	def.PaymentTypes = r.Form["paymentType"]
 	def.TicketClasses = r.Form["ticketClass"]
 	for _, eid := range r.Form["usedAtEvent"] {
-		if eid != "" && tx.FetchEvent(model.EventID(eid)) == nil {
+		if eid != "" && r.Tx.FetchEvent(model.EventID(eid)) == nil {
 			return nil
 		}
 		def.UsedAtEvents = append(def.UsedAtEvents, model.EventID(eid))

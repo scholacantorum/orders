@@ -12,25 +12,18 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/cgi"
 	"os"
-	"path"
-	"runtime/debug"
 	"strconv"
 	"strings"
 
 	"scholacantorum.org/orders/api"
-	"scholacantorum.org/orders/config"
+	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
-	"scholacantorum.org/orders/gui"
 	"scholacantorum.org/orders/model"
 	"scholacantorum.org/orders/ofcapi"
-	"scholacantorum.org/orders/payapi"
-	"scholacantorum.org/orders/posapi"
 )
 
 var (
@@ -38,17 +31,310 @@ var (
 )
 
 func main() {
-	var (
-		logfile *os.File
-		err     error
-	)
-	// First, change working directory to orders.scholacantorum.org/data.
-	// This directory should be mode 700 so that it not directly readable by
-	// the web server.
-	if err = os.Chdir("data"); err != nil {
+	// Change working directory to the data subdirectory of the CGI script
+	// location.  This directory should be mode 700 so that it not directly
+	// readable by the web server.
+	if err := os.Chdir("data"); err != nil {
 		fmt.Printf("Status: 500 Internal Server Error\nContent-Type: text/plain\n\n%s\n", err)
 		os.Exit(1)
 	}
+	// Run the request.
+	cgi.Serve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.RunRequest(w, r, txWrapper)
+	}))
+}
+
+// txWrapper opens the database and wraps the request in a transaction.
+func txWrapper(r *api.Request) error {
+	// Open the database and start a transaction.
+	db.Open("orders.db")
+	r.Tx = db.Begin()
+	defer func() {
+		r.Tx.Rollback()
+	}()
+	return authWrapper(r)
+}
+
+// authWrapper looks for an Auth header in the request and, if present,
+// validates the session.
+func authWrapper(r *api.Request) error {
+	if err := auth.ValidateSession(r); err != nil {
+		return err
+	}
+	return router(r)
+}
+
+// router sends the request to the appropriate handler given its method and
+// path.
+func router(r *api.Request) error {
+	var (
+		pathMatch bool
+		comps     = strings.Split(r.Path[1:], "/")
+	)
+	switch comps[0] {
+	case "ofcapi":
+		switch getComponent(comps, 1) {
+		case "event":
+			switch getComponent(comps, 2) {
+			case "":
+				pathMatch = true
+				switch r.Method {
+				case http.MethodPost:
+					return ofcapi.CreateEvent(r)
+				}
+			}
+		case "login":
+			switch getComponent(comps, 2) {
+			case "":
+				pathMatch = true
+				switch r.Method {
+				case http.MethodPost:
+					return api.Login(r)
+				}
+			}
+		case "order":
+			switch oid := getOrderID(comps, 2); oid {
+			case 0, -1:
+				break
+			default:
+				pathMatch = true
+				switch r.Method {
+				case http.MethodGet:
+					return ofcapi.GetOrder(r, oid)
+				}
+			}
+		case "product":
+			switch getComponent(comps, 2) {
+			case "":
+				pathMatch = true
+				switch r.Method {
+				case http.MethodPost:
+					return ofcapi.CreateProduct(r)
+				}
+			}
+		case "report":
+			switch getComponent(comps, 2) {
+			case "":
+				pathMatch = true
+				switch r.Method {
+				case http.MethodGet:
+					return ofcapi.RunReport(r)
+				}
+			}
+		}
+	case "payapi":
+		/*
+			switch shiftPath(r) {
+			case "order":
+				switch orderID := shiftPathID(r); orderID {
+				case 0:
+					switch r.Method {
+					case http.MethodPost:
+						payapi.CreateOrder(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			case "prices":
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodGet:
+						payapi.GetPrices(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		*/
+	case "posapi":
+		/*
+			switch shiftPath(r) {
+			case "event":
+				switch eventID := shiftPath(r); eventID {
+				case "":
+					switch r.Method {
+					case http.MethodGet:
+						posapi.ListEvents(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					switch shiftPath(r) {
+					case "":
+						api.NotFoundError(txh, w)
+					case "orders":
+						switch shiftPath(r) {
+						case "":
+							switch r.Method {
+							case http.MethodGet:
+								posapi.ListEventOrders(txh, w, r, model.EventID(eventID))
+							default:
+								methodNotAllowedError(txh, w)
+							}
+						default:
+							api.NotFoundError(txh, w)
+						}
+					case "prices":
+						switch shiftPath(r) {
+						case "":
+							switch r.Method {
+							case http.MethodGet:
+								posapi.GetEventPrices(txh, w, r, model.EventID(eventID))
+							default:
+								methodNotAllowedError(txh, w)
+							}
+						default:
+							api.NotFoundError(txh, w)
+						}
+					case "ticket":
+						switch order := shiftPath(r); order {
+						case "":
+							api.NotFoundError(txh, w)
+						default:
+							switch r.Method {
+							case http.MethodGet, http.MethodPost:
+								posapi.UseTicket(txh, w, r, model.EventID(eventID), order)
+							default:
+								methodNotAllowedError(txh, w)
+							}
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				}
+			case "login":
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodPost:
+						api.Login(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			case "order":
+				switch orderID := shiftPathID(r); orderID {
+				case 0:
+					switch r.Method {
+					case http.MethodPost:
+						posapi.CreateOrder(txh, w, r)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodDelete:
+							posapi.CancelOrder(txh, w, r, model.OrderID(orderID))
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					case "capturePayment":
+						switch shiftPath(r) {
+						case "":
+							switch r.Method {
+							case http.MethodPost:
+								posapi.CaptureOrderPayment(txh, w, r, model.OrderID(orderID))
+							default:
+								methodNotAllowedError(txh, w)
+							}
+						default:
+							api.NotFoundError(txh, w)
+						}
+					case "sendReceipt":
+						switch shiftPath(r) {
+						case "":
+							switch r.Method {
+							case http.MethodPost:
+								posapi.SendOrderReceipt(txh, w, r, model.OrderID(orderID))
+							default:
+								methodNotAllowedError(txh, w)
+							}
+						default:
+							api.NotFoundError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				case -1:
+					api.NotFoundError(txh, w)
+				}
+			case "stripe":
+				switch shiftPath(r) {
+				case "connectTerminal":
+					switch shiftPath(r) {
+					case "":
+						switch r.Method {
+						case http.MethodGet:
+							posapi.GetStripeConnectTerminal(txh, w, r)
+						default:
+							methodNotAllowedError(txh, w)
+						}
+					default:
+						api.NotFoundError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			default:
+				api.NotFoundError(txh, w)
+			}
+		*/
+	case "ticket":
+		/*
+			switch token := shiftPath(r); token {
+			case "":
+				api.NotFoundError(txh, w)
+			default:
+				switch shiftPath(r) {
+				case "":
+					switch r.Method {
+					case http.MethodGet:
+						gui.ShowTicketInfo(txh, w, r, token)
+					default:
+						methodNotAllowedError(txh, w)
+					}
+				default:
+					api.NotFoundError(txh, w)
+				}
+			}
+		*/
+	}
+	if pathMatch {
+		return api.HTTPError(http.StatusMethodNotAllowed, "405 Method Not Allowed")
+	}
+	return api.NotFound
+}
+
+func getComponent(comps []string, index int) string {
+	if len(comps) >= index {
+		return ""
+	}
+	return comps[index]
+}
+
+func getOrderID(comps []string, index int) model.OrderID {
+	if len(comps) >= index {
+		return 0
+	}
+	if val, err := strconv.Atoi(comps[index]); err == nil && val > 0 {
+		return model.OrderID(val)
+	}
+	return model.OrderID(-1)
+}
+
+/*
+func foo() {
 	// Next, initialize the logger.
 	if logfile, err = os.OpenFile("server.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err != nil {
 		fmt.Printf("Status: 500 Internal Server Error\nContent-Type: text/plain\n\nserver.log: %s\n", err)
@@ -81,7 +367,7 @@ func main() {
 	os.Exit(0)
 }
 
-func router(w http.ResponseWriter, r *http.Request) {
+func routerx(w http.ResponseWriter, r *http.Request) {
 	r.RequestURI = r.URL.String() // net/http/cgi doesn't set it
 	w.Header().Set("Access-Control-Allow-Origin", config.Get("allowOrigin"))
 	switch shiftPath(r) {
@@ -375,3 +661,4 @@ func methodNotAllowedError(tx db.Tx, w http.ResponseWriter) {
 	tx.Rollback()
 	http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 }
+*/

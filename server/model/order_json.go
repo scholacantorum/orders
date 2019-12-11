@@ -46,7 +46,7 @@ func encodeTicket(out *jwriter.Writer, in *Ticket, log bool) {
 		} else {
 			out.RawString(prefix)
 		}
-		out.Raw((in.Used).MarshalJSON())
+		encodeTimestamp(out, in.Used)
 	}
 	out.RawByte('}')
 }
@@ -109,7 +109,7 @@ func encodePayment(out *jwriter.Writer, in *Payment, log bool) {
 		} else {
 			out.RawString(prefix)
 		}
-		out.Raw((in.Created).MarshalJSON())
+		encodeTimestamp(out, in.Created)
 	}
 	{
 		const prefix string = ",\"amount\":"
@@ -192,39 +192,6 @@ func encodeOrderLine(out *jwriter.Writer, in *OrderLine, log bool) {
 			out.RawString(prefix)
 		}
 		out.String(string(in.Error))
-	}
-	out.RawByte('}')
-}
-
-func encodeUpdate(out *jwriter.Writer, in *Update) {
-	out.RawByte('{')
-	first := true
-	_ = first
-	if !in.Timestamp.IsZero() {
-		const prefix string = ",\"timestamp\":"
-		first = false
-		out.RawString(prefix[1:])
-		out.Raw((in.Timestamp).MarshalJSON())
-	}
-	if in.Username != "" {
-		const prefix string = ",\"username\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.String(string(in.Username))
-	}
-	if in.Request != "" {
-		const prefix string = ",\"request\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.String(string(in.Request))
 	}
 	out.RawByte('}')
 }
@@ -367,7 +334,7 @@ func encodeOrder(out *jwriter.Writer, in *Order, log bool) {
 		} else {
 			out.RawString(prefix)
 		}
-		out.Raw((in.Created).MarshalJSON())
+		encodeTimestamp(out, in.Created)
 	}
 	if in.CNote != "" {
 		const prefix string = ",\"cNote\":"

@@ -1,22 +1,20 @@
 package ofcapi
 
 import (
-	"bytes"
-	"io"
+	"errors"
+	"fmt"
 	"log"
-	"net/http"
+	"strconv"
+	"strings"
 	"time"
-
-	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
 // CreateProduct handles POST /ofcapi/product requests.
-func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+func CreateProduct(r *api.Request) error {
 	var (
 		session   *model.Session
 		product   *model.Product
@@ -25,151 +23,144 @@ func CreateProduct(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		seenEvent = map[model.EventID]bool{}
 		seenPrio0 bool
 	)
-	if session = auth.GetSession(tx, w, r, model.PrivSetupOrders); session == nil {
-		return
+	if r.Privileges&model.PrivSetupOrders == 0 {
+		return auth.Forbidden
 	}
-	if product, err = parseCreateProduct(r.Body); err != nil {
-		api.BadRequestError(tx, w, err.Error())
-		return
+	if product, err = parseCreateProduct(r); err != nil {
+		return err
 	}
-	if product.ID == "" || product.Name == "" || product.ShortName == "" || product.Type == "" || product.TicketCount < 0 {
-		api.BadRequestError(tx, w, "invalid parameters")
-		return
-	}
-	if tx.FetchProduct(product.ID) != nil {
-		api.BadRequestError(tx, w, "duplicate product ID")
-		return
+	if r.Tx.FetchProduct(product.ID) != nil {
+		return errors.New("duplicate product ID")
 	}
 	if product.TicketCount > 0 {
 		if len(product.Events) == 0 {
-			api.BadRequestError(tx, w, "ticket products must have associated events")
-			return
+			return errors.New("ticket products must have associated events")
 		}
 	} else {
 		if len(product.Events) != 0 {
-			api.BadRequestError(tx, w, "only ticket products can have associated events")
-			return
+			return errors.New("only ticket products can have associated events")
 		}
 	}
 	for _, pe := range product.Events {
-		if pe.Event == nil {
-			api.BadRequestError(tx, w, "invalid event")
-			return
-		}
 		if seenEvent[pe.Event.ID] {
-			api.BadRequestError(tx, w, "duplicate event")
-			return
+			return errors.New("duplicate event")
 		}
-		if tx.FetchEvent(pe.Event.ID) == nil {
-			api.BadRequestError(tx, w, "nonexistent event")
-			return
+		if r.Tx.FetchEvent(pe.Event.ID) == nil {
+			return errors.New("nonexistent event")
 		}
 		seenEvent[pe.Event.ID] = true
 		if pe.Priority == 0 {
 			if seenPrio0 {
-				api.BadRequestError(tx, w, "multiple priority 0 events")
-				return
+				return errors.New("multiple priority 0 events")
 			}
 			seenPrio0 = true
 		}
 	}
 	for i, sku := range product.SKUs {
-		switch sku.Source {
-		case model.OrderFromPublic, model.OrderFromMembers, model.OrderFromGala, model.OrderFromOffice, model.OrderInPerson:
-		default:
-			api.BadRequestError(tx, w, "invalid SKU source")
-			return
-		}
-		if sku.Price < 0 || (!sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart)) {
-			api.BadRequestError(tx, w, "invalid SKU parameters")
-			return
+		if !sku.SalesStart.IsZero() && !sku.SalesEnd.IsZero() && !sku.SalesEnd.After(sku.SalesStart) {
+			return errors.New("invalid SKU sales range")
 		}
 		for j := 0; j < i; j++ {
 			prev := product.SKUs[j]
-			if prev.Source == sku.Source && prev.Coupon == sku.Coupon &&
-				overlappingDates(prev, sku) {
-				api.BadRequestError(tx, w, "overlapping SKUs")
-				return
+			if prev.Source == sku.Source && prev.Coupon == sku.Coupon && overlappingDates(prev, sku) {
+				return errors.New("overlapping SKUs")
 			}
 		}
 	}
-	tx.SaveProduct(product)
-	api.Commit(tx)
-	out = emitProduct(product)
+	r.Tx.SaveProduct(product)
+	r.Tx.Commit()
+	out = product.ToJSON()
 	log.Printf("%s CREATE PRODUCT %s", session.Username, out)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(out)
+	r.Header().Set("Content-Type", "application/json")
+	r.Write(out)
+	return nil
 }
 
 // parseCreateProduct reads the product details from the request body.
-func parseCreateProduct(r io.Reader) (p *model.Product, err error) {
-	var jr = json.NewReader(r)
-
+func parseCreateProduct(r *api.Request) (p *model.Product, err error) {
 	p = new(model.Product)
-	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
-		switch key {
-		case "id":
-			return json.StringHandler(func(s string) { p.ID = model.ProductID(s) })
-		case "series":
-			return json.StringHandler(func(s string) { p.Series = s })
-		case "name":
-			return json.StringHandler(func(s string) { p.Name = s })
-		case "shortname":
-			return json.StringHandler(func(s string) { p.ShortName = s })
-		case "type":
-			return json.StringHandler(func(s string) { p.Type = model.ProductType(s) })
-		case "receipt":
-			return json.StringHandler(func(s string) { p.Receipt = s })
-		case "ticketCount":
-			return json.IntHandler(func(i int) { p.TicketCount = i })
-		case "ticketClass":
-			return json.StringHandler(func(s string) { p.TicketClass = s })
-		case "skus":
-			return json.ArrayHandler(func() json.Handlers {
-				var sku model.SKU
-				p.SKUs = append(p.SKUs, &sku)
-				return parseCreateProductSKU(&sku)
-			})
-		case "events":
-			return json.ArrayHandler(func() json.Handlers {
-				p.Events = append(p.Events, model.ProductEvent{})
-				return parseCreateProductEvent(&p.Events[len(p.Events)-1])
-			})
-		default:
-			return json.RejectHandler()
+	if p.ID = model.ProductID(strings.TrimSpace(r.FormValue("id"))); p.ID == "" {
+		return nil, errors.New("missing id")
+	}
+	p.Series = strings.TrimSpace(r.FormValue("series"))
+	if p.Name = strings.TrimSpace(r.FormValue("name")); p.Name == "" {
+		return nil, errors.New("missing name")
+	}
+	if p.ShortName = strings.TrimSpace(r.FormValue("shortname")); p.ShortName == "" {
+		return nil, errors.New("missing shortname")
+	}
+	switch p.Type = model.ProductType(strings.TrimSpace(r.FormValue("type"))); p.Type {
+	case model.ProdAuctionItem, model.ProdDonation, model.ProdOther, model.ProdRecording, model.ProdSheetMusic,
+		model.ProdTicket, model.ProdWardrobe:
+		break
+	case "":
+		return nil, errors.New("missing type")
+	default:
+		return nil, errors.New("invalid type")
+	}
+	p.Receipt = strings.TrimSpace(r.FormValue("receipt"))
+	if tcs := r.FormValue("ticketCount"); tcs != "" {
+		if tc, err := strconv.Atoi(r.FormValue("ticketCount")); err == nil && tc >= 0 {
+			p.TicketCount = tc
+		} else {
+			return nil, errors.New("invalid ticketCount")
 		}
-	}))
-	return p, err
-}
-func parseCreateProductSKU(sku *model.SKU) json.Handlers {
-	return json.ObjectHandler(func(key string) json.Handlers {
-		switch key {
-		case "source":
-			return json.StringHandler(func(s string) { sku.Source = model.OrderSource(s) })
-		case "coupon":
-			return json.StringHandler(func(s string) { sku.Coupon = s })
-		case "salesStart":
-			return json.TimeHandler(func(t time.Time) { sku.SalesStart = t })
-		case "salesEnd":
-			return json.TimeHandler(func(t time.Time) { sku.SalesEnd = t })
-		case "price":
-			return json.IntHandler(func(i int) { sku.Price = i })
-		default:
-			return json.RejectHandler()
+	}
+	p.TicketClass = strings.TrimSpace(r.FormValue("ticketClass"))
+	for i := 0; true; i++ {
+		var (
+			sku    model.SKU
+			prefix = fmt.Sprintf("sku%d.", i)
+		)
+		if sku.Source = model.OrderSource(r.FormValue(prefix + "source")); sku.Source == "" {
+			break
 		}
-	})
-}
-func parseCreateProductEvent(pe *model.ProductEvent) json.Handlers {
-	return json.ObjectHandler(func(key string) json.Handlers {
-		switch key {
-		case "event":
-			return json.StringHandler(func(s string) { pe.Event = &model.Event{ID: model.EventID(s)} })
-		case "priority":
-			return json.IntHandler(func(i int) { pe.Priority = i })
+		switch sku.Source {
+		case model.OrderFromPublic, model.OrderFromMembers, model.OrderFromGala, model.OrderFromOffice, model.OrderInPerson:
+			break
 		default:
-			return json.RejectHandler()
+			return nil, errors.New("invalid SKU source")
 		}
-	})
+		sku.Coupon = strings.ToUpper(strings.TrimSpace(r.FormValue(prefix + "coupon")))
+		if sss := r.FormValue(prefix + "salesStart"); sss != "" {
+			if ss, err := time.Parse(time.RFC3339, sss); err == nil {
+				sku.SalesStart = ss.In(time.Local)
+			} else {
+				return nil, errors.New("invalid SKU salesStart")
+			}
+		}
+		if ses := r.FormValue(prefix + "salesEnd"); ses != "" {
+			if se, err := time.Parse(time.RFC3339, ses); err == nil {
+				sku.SalesEnd = se.In(time.Local)
+			} else {
+				return nil, errors.New("invalid SKU salesEnd")
+			}
+		}
+		if pr, err := strconv.Atoi(r.FormValue(prefix + "price")); err == nil && pr >= 0 {
+			sku.Price = pr
+		} else {
+			return nil, errors.New("invalid SKU price")
+		}
+		p.SKUs = append(p.SKUs, &sku)
+	}
+	for i := 0; true; i++ {
+		var (
+			pe     model.ProductEvent
+			prefix = fmt.Sprintf("event%d.", i)
+		)
+		if eid := model.EventID(strings.TrimSpace(r.FormValue(prefix + "id"))); eid != "" {
+			pe.Event = &model.Event{ID: eid}
+		} else {
+			break
+		}
+		if pr, err := strconv.Atoi(r.FormValue(prefix + "priority")); err == nil {
+			pe.Priority = pr
+		} else {
+			return nil, errors.New("invalid event priority")
+		}
+		p.Events = append(p.Events, pe)
+	}
+	return p, nil
 }
 
 // overlappingDates returns true if the SalesStart..SalesEnd ranges of the two
@@ -194,59 +185,4 @@ func overlappingDates(sku1, sku2 *model.SKU) bool {
 		return sku1.SalesEnd.After(sku2.SalesStart)
 	}
 	return sku2.SalesEnd.After(sku1.SalesStart)
-}
-
-// emitProduct generates the JSON representation of a product.
-func emitProduct(p *model.Product) []byte {
-	var (
-		buf bytes.Buffer
-		jw  = json.NewWriter(&buf)
-	)
-	jw.Object(func() {
-		jw.Prop("id", string(p.ID))
-		jw.Prop("series", p.Series)
-		jw.Prop("name", p.Name)
-		jw.Prop("shortname", p.ShortName)
-		jw.Prop("type", string(p.Type))
-		jw.Prop("receipt", p.Receipt)
-		if p.TicketCount != 0 {
-			jw.Prop("ticketCount", p.TicketCount)
-		}
-		if p.TicketClass != "" {
-			jw.Prop("ticketClass", p.TicketClass)
-		}
-		jw.Prop("skus", func() {
-			jw.Array(func() {
-				for _, sku := range p.SKUs {
-					jw.Object(func() {
-						jw.Prop("source", sku.Source)
-						if sku.Coupon != "" {
-							jw.Prop("coupon", sku.Coupon)
-						}
-						if !sku.SalesStart.IsZero() {
-							jw.Prop("salesStart", sku.SalesStart.Format(time.RFC3339))
-						}
-						if !sku.SalesEnd.IsZero() {
-							jw.Prop("salesEnd", sku.SalesEnd.Format(time.RFC3339))
-						}
-						jw.Prop("price", sku.Price)
-					})
-				}
-			})
-		})
-		if len(p.Events) != 0 {
-			jw.Prop("events", func() {
-				jw.Array(func() {
-					for _, pe := range p.Events {
-						jw.Object(func() {
-							jw.Prop("event", string(pe.Event.ID))
-							jw.Prop("priority", pe.Priority)
-						})
-					}
-				})
-			})
-		}
-	})
-	jw.Close()
-	return buf.Bytes()
 }

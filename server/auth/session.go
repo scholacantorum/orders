@@ -7,9 +7,29 @@ import (
 
 	"github.com/rothskeller/json"
 
+	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
+
+// Forbidden is the error returned when the calling session lacks the privileges
+// needed for the call it issued.
+var Forbidden = api.HTTPError(http.StatusForbidden, "403 Forbidden")
+
+// ValidateSession decodes the session token in the request, if any, and sets
+// the Session and Privileges fields of the request appropriately.  It returns
+// an error only if the request contains a session token that is invalid.
+func ValidateSession(r *api.Request) error {
+	if r.Request.Header.Get("Auth") == "" {
+		return nil
+	}
+	r.Tx.ExpireSessions()
+	if r.Session = r.Tx.FetchSession(r.Request.Header.Get("Auth")); r.Session == nil {
+		return api.HTTPError(http.StatusUnauthorized, "401 Unauthorized")
+	}
+	r.Privileges = r.Session.Privileges
+	return nil
+}
 
 // GetSession verifies that the HTTP request identifies a valid session, and
 // that session has all of the privileges specified in the priv bitmask.  (The

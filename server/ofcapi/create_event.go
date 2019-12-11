@@ -1,98 +1,72 @@
 package ofcapi
 
 import (
-	"bytes"
-	"io"
+	"errors"
 	"log"
-	"net/http"
+	"strconv"
 	"time"
-
-	"github.com/rothskeller/json"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
 // CreateEvent handles POST /ofcapi/event requests.
-func CreateEvent(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+func CreateEvent(r *api.Request) error {
 	var (
 		session *model.Session
 		event   *model.Event
 		out     []byte
 		err     error
 	)
-	if session = auth.GetSession(tx, w, r, model.PrivSetupOrders); session == nil {
-		return
+	if r.Privileges&model.PrivSetupOrders == 0 {
+		return auth.Forbidden
 	}
-	if event, err = parseCreateEvent(r.Body); err != nil {
-		api.BadRequestError(tx, w, err.Error())
-		return
+	if event, err = parseCreateEvent(r); err != nil {
+		return err
 	}
-	if event.ID == "" || event.MembersID < 0 || event.Name == "" || event.Start.IsZero() || event.Capacity < 0 {
-		api.BadRequestError(tx, w, "invalid parameters")
-		return
+	if r.Tx.FetchEvent(event.ID) != nil {
+		return errors.New("duplicate event ID")
 	}
-	if tx.FetchEvent(event.ID) != nil {
-		api.BadRequestError(tx, w, "duplicate event ID")
-		return
+	if event.MembersID != 0 && r.Tx.FetchEventByMembersID(event.MembersID) != nil {
+		return errors.New("membersID already in use")
 	}
-	if event.MembersID != 0 && tx.FetchEventByMembersID(event.MembersID) != nil {
-		api.BadRequestError(tx, w, "membersID already in use")
-		return
-	}
-	tx.SaveEvent(event)
-	api.Commit(tx)
-	out = emitCreatedEvent(event)
+	r.Tx.SaveEvent(event)
+	r.Tx.Commit()
+	out = event.ToJSON()
 	log.Printf("%s CREATE EVENT %s", session.Username, out)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(out)
+	r.Header().Set("Content-Type", "application/json")
+	r.Write(out)
+	return nil
 }
 
-func parseCreateEvent(r io.Reader) (e *model.Event, err error) {
-	var (
-		jr = json.NewReader(r)
-	)
+func parseCreateEvent(r *api.Request) (e *model.Event, err error) {
 	e = new(model.Event)
-	err = jr.Read(json.ObjectHandler(func(key string) json.Handlers {
-		switch key {
-		case "id":
-			return json.StringHandler(func(s string) { e.ID = model.EventID(s) })
-		case "membersID":
-			return json.IntHandler(func(i int) { e.MembersID = i })
-		case "name":
-			return json.StringHandler(func(s string) { e.Name = s })
-		case "series":
-			return json.StringHandler(func(s string) { e.Series = s })
-		case "start":
-			return json.TimeHandler(func(t time.Time) { e.Start = t })
-		case "capacity":
-			return json.IntHandler(func(i int) { e.Capacity = i })
-		default:
-			return json.RejectHandler()
+	if e.ID = model.EventID(r.FormValue("id")); e.ID == "" {
+		return nil, errors.New("missing ID")
+	}
+	if mid, err := strconv.Atoi(r.FormValue("membersID")); err == nil && mid > 0 {
+		e.MembersID = mid
+	} else {
+		return nil, errors.New("missing or invalid membersID")
+	}
+	if e.Name = r.FormValue("name"); e.Name == "" {
+		return nil, errors.New("missing name")
+	}
+	if e.Series = r.FormValue("series"); e.Series == "" {
+		return nil, errors.New("missing series")
+	}
+	if start, err := time.Parse(time.RFC3339, r.FormValue("start")); err == nil {
+		e.Start = start.In(time.Local)
+	} else {
+		return nil, errors.New("missing or invalid start")
+	}
+	if caps := r.FormValue("capacity"); caps != "" {
+		if cap, err := strconv.Atoi(r.FormValue("capacity")); err == nil && cap >= 0 {
+			e.Capacity = cap
+		} else {
+			return nil, errors.New("invalid capacity")
 		}
-	}))
-	return e, err
-}
-
-func emitCreatedEvent(e *model.Event) []byte {
-	var (
-		buf bytes.Buffer
-		jw  = json.NewWriter(&buf)
-	)
-	jw.Object(func() {
-		jw.Prop("id", string(e.ID))
-		if e.MembersID != 0 {
-			jw.Prop("membersID", e.MembersID)
-		}
-		jw.Prop("name", e.Name)
-		jw.Prop("series", e.Series)
-		jw.Prop("start", e.Start.Format(time.RFC3339))
-		if e.Capacity != 0 {
-			jw.Prop("capacity", e.Capacity)
-		}
-	})
-	jw.Close()
-	return buf.Bytes()
+	}
+	return e, nil
 }

@@ -242,6 +242,7 @@ class Backend: ConnectionTokenProvider {
                 print("Error decoding placed order: \(error)")
                 handler(nil, "Server error: \(error)")
                 return
+
             }
             if let error = result.error {
                 handler(nil, error)

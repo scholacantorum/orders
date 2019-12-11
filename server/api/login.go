@@ -1,121 +1,111 @@
 package api
 
 import (
+	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/rothskeller/json"
-
 	"scholacantorum.org/orders/config"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
+type ssoLogin struct {
+	ID                int
+	Username          string
+	PrivSetupOrders   bool
+	PrivViewOrders    bool
+	PrivManageOrders  bool
+	PrivInPersonSales bool
+	PrivScanTickets   bool
+}
+type loginResponse struct {
+	Token             string
+	Username          string
+	StripePublicKey   string
+	PrivSetupOrders   bool
+	PrivViewOrders    bool
+	PrivManageOrders  bool
+	PrivInPersonSales bool
+	PrivScanTickets   bool
+}
+
 // Login handles POST /api/login requests.
-func Login(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+func Login(r *Request) error {
 	var (
-		password string
-		session  model.Session
-		resp     *http.Response
-		jw       json.Writer
-		err      error
+		password      string
+		buf           []byte
+		ssoLogin      ssoLogin
+		session       model.Session
+		resp          *http.Response
+		loginResponse loginResponse
+		err           error
 	)
 	if session.Username = strings.TrimSpace(r.FormValue("username")); session.Username == "" {
-		BadRequestError(tx, w, "missing username")
-		return
+		return errors.New("missing username")
 	}
 	if password = r.FormValue("password"); password == "" {
-		BadRequestError(tx, w, "missing password")
-		return
+		return errors.New("missing password")
 	}
 	resp, err = http.PostForm("https://scholacantorummembers.org/api/login/sso", url.Values{
 		"username": []string{session.Username},
 		"password": []string{password},
 	})
 	if err != nil {
-		commit(tx)
 		log.Printf("ERROR: can't contact members site for SSO: %s", err)
-		http.Error(w, "500 SSO server error", http.StatusInternalServerError)
-		return
+		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusOK:
 		break
 	case http.StatusUnauthorized:
-		commit(tx)
-		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
-		return
+		return HTTPError(http.StatusUnauthorized, "401 Unauthorized")
 	default:
-		commit(tx)
 		log.Printf("ERROR: from members site SSO: %s", resp.Status)
-		http.Error(w, "500 SSO server error", http.StatusInternalServerError)
-		return
+		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
-	err = json.NewReader(resp.Body).Read(json.ObjectHandler(func(key string) json.Handlers {
-		switch key {
-		case "id":
-			return json.IntHandler(func(i int) { session.Member = i })
-		case "username":
-			return json.IgnoreHandler()
-		case "privSetupOrders":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivSetupOrders
-				}
-			})
-		case "privViewOrders":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivViewOrders
-				}
-			})
-		case "privManageOrders":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivManageOrders
-				}
-			})
-		case "privInPersonSales":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivInPersonSales
-				}
-			})
-		case "privScanTickets":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivScanTickets
-				}
-			})
-		default:
-			return json.RejectHandler()
-		}
-	}))
-	if err != nil {
-		commit(tx)
+	if buf, err = ioutil.ReadAll(r.Body); err != nil {
+		log.Printf("ERROR: bad response from members site SSO: %s", err)
+		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
+	}
+	if err = ssoLogin.UnmarshalJSON(buf); err != nil {
 		log.Printf("ERROR: bad JSON from members site SSO: %s", err)
-		http.Error(w, "500 SSO server error", http.StatusInternalServerError)
-		return
+		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
+	}
+	session.Member = ssoLogin.ID
+	if ssoLogin.PrivSetupOrders {
+		session.Privileges |= model.PrivSetupOrders
+	}
+	if ssoLogin.PrivViewOrders {
+		session.Privileges |= model.PrivViewOrders
+	}
+	if ssoLogin.PrivManageOrders {
+		session.Privileges |= model.PrivManageOrders
+	}
+	if ssoLogin.PrivInPersonSales {
+		session.Privileges |= model.PrivInPersonSales
+	}
+	if ssoLogin.PrivScanTickets {
+		session.Privileges |= model.PrivScanTickets
 	}
 	session.Privileges |= model.PrivLogin
 	session.Expires = time.Now().Add(3 * time.Hour)
 	session.Token = NewToken()
-	tx.SaveSession(&session)
-	commit(tx)
-	jw = json.NewWriter(w)
-	jw.Object(func() {
-		jw.Prop("token", session.Token)
-		jw.Prop("username", session.Username)
-		jw.Prop("stripePublicKey", config.Get("stripePublicKey"))
-		jw.Prop("privSetupOrders", session.Privileges&model.PrivSetupOrders != 0)
-		jw.Prop("privViewOrders", session.Privileges&model.PrivViewOrders != 0)
-		jw.Prop("privManageOrders", session.Privileges&model.PrivManageOrders != 0)
-		jw.Prop("privInPersonSales", session.Privileges&model.PrivInPersonSales != 0)
-		jw.Prop("privScanTickets", session.Privileges&model.PrivScanTickets != 0)
-	})
-	jw.Close()
+	r.Tx.SaveSession(&session)
+	r.Tx.Commit()
+	loginResponse.Token = session.Token
+	loginResponse.Username = session.Username
+	loginResponse.StripePublicKey = config.Get("stripePublicKey")
+	loginResponse.PrivSetupOrders = ssoLogin.PrivSetupOrders
+	loginResponse.PrivViewOrders = ssoLogin.PrivViewOrders
+	loginResponse.PrivManageOrders = ssoLogin.PrivManageOrders
+	loginResponse.PrivInPersonSales = ssoLogin.PrivInPersonSales
+	loginResponse.PrivScanTickets = ssoLogin.PrivScanTickets
+	buf, _ = loginResponse.MarshalJSON()
+	r.Write(buf)
+	return nil
 }

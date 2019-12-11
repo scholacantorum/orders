@@ -1,37 +1,31 @@
 package ofcapi
 
 import (
-	"net/http"
-
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
 // GetOrder handles GET /ofcapi/order/${id} requests.  Note that this is called
 // by the members site to validate recording orders, as well as by the office
 // UI.
-func GetOrder(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model.OrderID) {
-	var (
-		session *model.Session
-		order   *model.Order
-	)
+func GetOrder(r *api.Request, orderID model.OrderID) error {
+	var order *model.Order
+
 	// Verify permissions.
-	if session = auth.GetSession(tx, w, r, model.PrivViewOrders); session == nil {
-		return
+	if r.Privileges&model.PrivViewOrders == 0 {
+		return auth.Forbidden
 	}
 	// Get the requested order.
-	if order = tx.FetchOrder(orderID); order == nil {
-		api.NotFoundError(tx, w)
-		return
+	if order = r.Tx.FetchOrder(orderID); order == nil {
+		return api.NotFound
 	}
-	if session.Privileges&model.PrivManageOrders == 0 && !order.Valid {
-		api.NotFoundError(tx, w)
-		return
+	if r.Privileges&model.PrivManageOrders == 0 && !order.Valid {
+		return api.NotFound
 	}
 	// Send back the order.
-	api.Commit(tx)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(order.ToJSON(false))
+	r.Tx.Commit()
+	r.Header().Set("Content-Type", "application/json")
+	r.Write(order.ToJSON(false))
+	return nil
 }

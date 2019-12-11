@@ -11,6 +11,9 @@ import (
 	"scholacantorum.org/orders/db"
 )
 
+// NotFound is the error returned when a page is not found.
+var NotFound = HTTPError(http.StatusNotFound, "404 Not Found")
+
 // NotFoundError returns a 404 Not Found.
 func NotFoundError(tx db.Tx, w http.ResponseWriter) {
 	tx.Rollback()
@@ -56,14 +59,10 @@ func sendError(tx db.Tx, w http.ResponseWriter, message string) {
 
 // Commit commits the transaction.
 func Commit(tx db.Tx) {
-	if err := tx.Commit(); err != nil {
-		panic(err)
-	}
+	tx.Commit()
 }
 func commit(tx db.Tx) {
-	if err := tx.Commit(); err != nil {
-		panic(err)
-	}
+	tx.Commit()
 }
 
 func init() {

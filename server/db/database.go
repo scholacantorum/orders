@@ -117,7 +117,7 @@ type Tx struct {
 	tx *sql.Tx
 }
 
-// Begin starts a transaction, returning our Tx wrapper instead of a raw sql.Tx.
+// Begin  starts a transaction, returning our Tx wrapper instead of a raw sql.Tx.
 func Begin() (tx Tx) {
 	var err error
 
@@ -128,7 +128,9 @@ func Begin() (tx Tx) {
 }
 
 // Commit commits a transaction.
-func (tx Tx) Commit() error { return tx.tx.Commit() }
+func (tx Tx) Commit() {
+	panicOnError(tx.tx.Commit())
+}
 
 // Rollback rolls back a transaction.
 func (tx Tx) Rollback() error {
