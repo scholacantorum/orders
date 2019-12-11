@@ -68,7 +68,7 @@ func Login(r *Request) error {
 		log.Printf("ERROR: from members site SSO: %s", resp.Status)
 		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
-	if buf, err = ioutil.ReadAll(r.Body); err != nil {
+	if buf, err = ioutil.ReadAll(resp.Body); err != nil {
 		log.Printf("ERROR: bad response from members site SSO: %s", err)
 		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
