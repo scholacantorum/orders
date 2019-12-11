@@ -113,10 +113,10 @@ func (tx Tx) SaveOrder(o *model.Order) {
 	if o.ID == 0 {
 		o.ID = model.OrderID(lastInsertID(res))
 	}
-	for _, p := range o.Payments {
+	for i, p := range o.Payments {
 		res, err = tx.tx.Exec(
-			`INSERT OR REPLACE INTO payment (id, orderid, type, subtype, method, stripe, created, amount) VALUES (?,?,?,?,?,?,?,?)`,
-			ID(p.ID), o.ID, p.Type, p.Subtype, p.Method, p.Stripe, Time(p.Created), p.Amount)
+			`INSERT OR REPLACE INTO payment (id, orderid, type, subtype, method, stripe, created, initial, amount) VALUES (?,?,?,?,?,?,?,?,?)`,
+			ID(p.ID), o.ID, p.Type, p.Subtype, p.Method, p.Stripe, Time(p.Created), i == 0, p.Amount)
 		panicOnError(err)
 		if p.ID == 0 {
 			p.ID = model.PaymentID(lastInsertID(res))

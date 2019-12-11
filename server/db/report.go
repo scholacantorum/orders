@@ -169,7 +169,7 @@ SELECT COUNT(*), CASE WHEN used!='' THEN event ELSE '' END AS used_event FROM ti
 	defer ticketUsageStmt.Close()
 	orderStmt, err = tx.tx.Prepare(`
 SELECT o.source, o.name, o.email, o.created, o.valid, o.coupon, p.type, p.subtype
-FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.flags&1 WHERE o.id=?`)
+FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.initial WHERE o.id=?`)
 	panicOnError(err)
 	defer orderStmt.Close()
 

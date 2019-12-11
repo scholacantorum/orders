@@ -281,6 +281,9 @@ CREATE TABLE payment (
     -- Timestamp of the payment.
     created text NOT NULL,
 
+    -- Flag indicating that this payment is the initial payment of the order.
+    initial boolean NOT NULL,
+
     -- Amount of the payment, in cents.  Negative amounts indicate refunds.
     amount integer NOT NULL
 );
