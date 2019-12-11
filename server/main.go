@@ -317,14 +317,14 @@ func router(r *api.Request) error {
 }
 
 func getComponent(comps []string, index int) string {
-	if len(comps) >= index {
+	if index >= len(comps) {
 		return ""
 	}
 	return comps[index]
 }
 
 func getOrderID(comps []string, index int) model.OrderID {
-	if len(comps) >= index {
+	if index >= len(comps) {
 		return 0
 	}
 	if val, err := strconv.Atoi(comps[index]); err == nil && val > 0 {

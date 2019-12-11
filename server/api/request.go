@@ -64,7 +64,7 @@ func RunRequest(w http.ResponseWriter, r *http.Request, handler RequestHandler) 
 			if code == http.StatusNoContent {
 				request.WriteHeader(http.StatusNoContent)
 			} else {
-				http.Error(request.Response, err.Error(), code)
+				http.Error(&request.Response, err.Error(), code)
 			}
 		}
 		if f, ok := request.Response.ResponseWriter.(http.Flusher); ok {
@@ -91,7 +91,8 @@ func RunRequest(w http.ResponseWriter, r *http.Request, handler RequestHandler) 
 		}
 		fmt.Fprintf(&logbuf, ", %dms\n", end.Sub(request.Start)/time.Millisecond)
 		if panicked != nil {
-			fmt.Fprintf(&logbuf, string(debug.Stack()))
+			fmt.Fprintln(&logbuf, panicked)
+			fmt.Fprintln(&logbuf, string(debug.Stack()))
 		}
 		if logfile, err = os.OpenFile(logfilename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err != nil {
 			panic(err)
@@ -130,8 +131,8 @@ type Request struct {
 // and http.ResponseWriter, in favor of the latter.  This allows Request to be
 // used in the context of an http.ResponseWriter, such as in calls to
 // http.Error.
-func (r Request) Header() http.Header           { return r.Response.Header() }
-func (r Request) Write(buf []byte) (int, error) { return r.Response.Write(buf) }
+func (r *Request) Header() http.Header           { return r.Response.Header() }
+func (r *Request) Write(buf []byte) (int, error) { return r.Response.Write(buf) }
 
 // Response is an implementation of http.ResponseWriter that records the status
 // code sent in the response.
@@ -140,7 +141,7 @@ type Response struct {
 	StatusCode int
 }
 
-func (r Response) Write(buf []byte) (int, error) {
+func (r *Response) Write(buf []byte) (int, error) {
 	if r.StatusCode == 0 {
 		r.StatusCode = http.StatusOK
 	}
@@ -148,7 +149,7 @@ func (r Response) Write(buf []byte) (int, error) {
 }
 
 // WriteHeader implements http.ResponseWriter.
-func (r Response) WriteHeader(statusCode int) {
+func (r *Response) WriteHeader(statusCode int) {
 	r.StatusCode = statusCode
 	r.ResponseWriter.WriteHeader(statusCode)
 }
