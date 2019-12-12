@@ -151,7 +151,7 @@ func (tx Tx) FetchEventOrders(event *model.Event) (list []EventOrder) {
 	rows, err = tx.tx.Query(`
 SELECT DISTINCT o.id, o.name FROM ordert o, order_line ol, product_event pe, ticket t
 WHERE pe.event=?1 AND pe.product=ol.product AND o.id=ol.orderid AND o.name != ''
-AND o.flags&1 AND t.order_line=ol.id AND (t.used='' OR t.event=?1)`, event.ID)
+AND o.valid AND t.order_line=ol.id AND (t.used='' OR t.event=?1)`, event.ID)
 	panicOnError(err)
 	for rows.Next() {
 		var eo EventOrder

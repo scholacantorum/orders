@@ -129,7 +129,7 @@ CREATE TABLE product (
 -- represents the method and pricing scheme by which they ordered it.
 --
 -- Although not expressed in SQL, the code enforces a uniqueness constraint on
--- this table:  for any given combination of product, source, coupon, and flags,
+-- this table:  for any given combination of product, source, and coupon,
 -- there cannot be overlapping sales_start..sales_end ranges.  When choosing
 -- which SKU to use for a given order, the following algorithm is used:
 --   - If the order source is not "office", SKUs with a different source are not
