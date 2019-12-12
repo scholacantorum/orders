@@ -24,6 +24,7 @@ import (
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 	"scholacantorum.org/orders/ofcapi"
+	"scholacantorum.org/orders/payapi"
 )
 
 var (
@@ -123,36 +124,26 @@ func router(r *api.Request) error {
 			}
 		}
 	case "payapi":
-		/*
-			switch shiftPath(r) {
-			case "order":
-				switch orderID := shiftPathID(r); orderID {
-				case 0:
-					switch r.Method {
-					case http.MethodPost:
-						payapi.CreateOrder(txh, w, r)
-					default:
-						methodNotAllowedError(txh, w)
-					}
-				default:
-					api.NotFoundError(txh, w)
+		switch getComponent(comps, 1) {
+		case "order":
+			switch getOrderID(comps, 2) {
+			case 0:
+				pathMatch = true
+				switch r.Method {
+				case http.MethodPost:
+					return payapi.CreateOrder(r)
 				}
-			case "prices":
-				switch shiftPath(r) {
-				case "":
-					switch r.Method {
-					case http.MethodGet:
-						payapi.GetPrices(txh, w, r)
-					default:
-						methodNotAllowedError(txh, w)
-					}
-				default:
-					api.NotFoundError(txh, w)
-				}
-			default:
-				api.NotFoundError(txh, w)
 			}
-		*/
+		case "prices":
+			switch getComponent(comps, 2) {
+			case "":
+				pathMatch = true
+				switch r.Method {
+				case http.MethodGet:
+					return payapi.GetPrices(r)
+				}
+			}
+		}
 	case "posapi":
 		/*
 			switch shiftPath(r) {

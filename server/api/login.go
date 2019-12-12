@@ -1,18 +1,21 @@
 package api
 
+//go:generate easyjson -lower_camel_case login.go
+
 import (
 	"errors"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/mailru/easyjson"
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/model"
 )
 
+//easyjson:json
 type ssoLogin struct {
 	ID                int
 	Username          string
@@ -22,6 +25,8 @@ type ssoLogin struct {
 	PrivInPersonSales bool
 	PrivScanTickets   bool
 }
+
+//easyjson:json
 type loginResponse struct {
 	Token             string
 	Username          string
@@ -37,7 +42,6 @@ type loginResponse struct {
 func Login(r *Request) error {
 	var (
 		password      string
-		buf           []byte
 		ssoLogin      ssoLogin
 		session       model.Session
 		resp          *http.Response
@@ -68,11 +72,7 @@ func Login(r *Request) error {
 		log.Printf("ERROR: from members site SSO: %s", resp.Status)
 		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
-	if buf, err = ioutil.ReadAll(resp.Body); err != nil {
-		log.Printf("ERROR: bad response from members site SSO: %s", err)
-		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
-	}
-	if err = ssoLogin.UnmarshalJSON(buf); err != nil {
+	if err = easyjson.UnmarshalFromReader(resp.Body, &ssoLogin); err != nil {
 		log.Printf("ERROR: bad JSON from members site SSO: %s", err)
 		return HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
@@ -105,7 +105,6 @@ func Login(r *Request) error {
 	loginResponse.PrivManageOrders = ssoLogin.PrivManageOrders
 	loginResponse.PrivInPersonSales = ssoLogin.PrivInPersonSales
 	loginResponse.PrivScanTickets = ssoLogin.PrivScanTickets
-	buf, _ = loginResponse.MarshalJSON()
-	r.Write(buf)
+	easyjson.MarshalToHTTPResponseWriter(loginResponse, r)
 	return nil
 }

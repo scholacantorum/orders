@@ -4,19 +4,18 @@ import (
 	"strings"
 	"time"
 
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
 // ProductHasCapacity returns false if the product is a ticket for an event that
 // is sold out.  It returns true for non-ticket products.
-func ProductHasCapacity(tx db.Tx, product *model.Product) bool {
+func ProductHasCapacity(r *Request, product *model.Product) bool {
 	for _, pe := range product.Events {
 		if pe.Priority == 0 {
 			if pe.Event.Capacity == 0 {
 				return true
 			}
-			return tx.FetchTicketCount(pe.Event) < pe.Event.Capacity
+			return r.Tx.FetchTicketCount(pe.Event) < pe.Event.Capacity
 		}
 	}
 	return true

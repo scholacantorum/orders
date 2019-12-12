@@ -1,9 +1,9 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -22,13 +22,10 @@ var zipRE = regexp.MustCompile(`^\d{5}(?:-\d{4})?$`)
 var customerRE = regexp.MustCompile(`^cus_[A-Za-z0-9]+$`)
 
 // GetOrderFromRequest reads the order details from the request body and returns
-// them.  If it returns nil, the order details were invalid; an appropriate
-// error response has been issued, and the error has been logged.
-func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order) {
-	var (
-		err   error
-		pseen = map[model.ProductID]bool{}
-	)
+// them.  If the order details are invalid, it returns nil and an appropriate
+// error.
+func GetOrderFromRequest(r *Request) (o *model.Order, err error) {
+	var pseen = map[model.ProductID]bool{}
 
 	o = new(model.Order)
 	o.Source = model.OrderSource(r.FormValue("source"))
@@ -38,59 +35,42 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 	case model.OrderFromPublic, model.OrderFromMembers, model.OrderFromGala, model.OrderFromOffice, model.OrderInPerson:
 		// no-op
 	default:
-		log.Printf("ERROR: invalid source %q", o.Source)
-		http.Error(w, `400 Bad Request: invalid "source"`, http.StatusBadRequest)
-		goto ERROR
+		return nil, errors.New("invalid source")
 	}
 	o.Name = strings.TrimSpace(r.FormValue("name"))
 	o.Email = strings.TrimSpace(r.FormValue("email"))
 	if o.Email != "" && !emailRE.MatchString(o.Email) {
-		log.Printf("ERROR: invalid email %q", o.Email)
-		http.Error(w, `400 Bad Request: invalid "email"`, http.StatusBadRequest)
-		goto ERROR
+		return nil, errors.New("invalid email")
 	}
 	o.Address = strings.TrimSpace(r.FormValue("address"))
 	o.City = strings.TrimSpace(r.FormValue("city"))
 	o.State = strings.ToUpper(strings.TrimSpace(r.FormValue("state")))
 	if o.State != "" && !stateRE.MatchString(o.State) {
-		log.Printf("ERROR: invalid state %q", o.State)
-		http.Error(w, `400 Bad Request: invalid "state"`, http.StatusBadRequest)
-		goto ERROR
+		return nil, errors.New("invalid state")
 	}
 	o.Zip = strings.TrimSpace(r.FormValue("zip"))
 	if o.Zip != "" && !zipRE.MatchString(o.Zip) {
-		log.Printf("ERROR: invalid zip %q", o.Zip)
-		http.Error(w, `400 Bad Request: invalid "zip"`, http.StatusBadRequest)
-		goto ERROR
+		return nil, errors.New("invalid zip")
 	}
 	if (o.Address != "" || o.City != "" || o.State != "" || o.Zip != "") &&
 		(o.Address == "" || o.City == "" || o.State == "" || o.Zip == "") {
-		log.Printf("ERROR: have address %v city %v state %v zip %v",
-			o.Address != "", o.City != "", o.State != "", o.Zip != "")
-		http.Error(w, `400 Bad Request: specify all or none of "address"+"city"+"state"+"zip"`, http.StatusBadRequest)
-		goto ERROR
+		return nil, errors.New("specify all or none of address, city, state, and zip")
 	}
 	o.Phone = strings.TrimSpace(r.FormValue("phone"))
 	o.Customer = strings.TrimSpace(r.FormValue("customer"))
 	if o.Customer != "" && !customerRE.MatchString(o.Customer) {
-		log.Printf("ERROR: invalid customer %q", o.Customer)
-		http.Error(w, `400 Bad Request: invalid "customer"`, http.StatusBadRequest)
-		goto ERROR
+		return nil, errors.New("invalid customer")
 	}
 	if mstr := r.FormValue("member"); mstr != "" {
 		if o.Member, err = strconv.Atoi(mstr); err != nil || o.Member < 1 {
-			log.Printf("ERROR: invalid member %q", mstr)
-			http.Error(w, `400 Bad Request: invalid "member"`, http.StatusBadRequest)
-			goto ERROR
+			return nil, errors.New("invalid member ID")
 		}
 	}
 	o.CNote = strings.TrimSpace(r.FormValue("cNote"))
 	o.ONote = strings.TrimSpace(r.FormValue("oNote"))
 	if iastr := r.FormValue("inAccess"); iastr != "" {
 		if o.InAccess, err = strconv.ParseBool(iastr); err != nil {
-			log.Printf("ERROR: invalid inAccess %q", iastr)
-			http.Error(w, `400 Bad Request: invalid "inAccess"`, http.StatusBadRequest)
-			goto ERROR
+			return nil, errors.New("invalid inAccess")
 		}
 	}
 	o.Coupon = strings.ToUpper(strings.TrimSpace(r.FormValue("coupon")))
@@ -102,34 +82,24 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 		if pname := r.FormValue(prefix + "product"); pname != "" {
 			ol.Product = &model.Product{ID: model.ProductID(pname)}
 			if pseen[ol.Product.ID] {
-				log.Printf("ERROR: multiple lines with product %q", pname)
-				http.Error(w, `400 Bad Request: multiple lines with same "product"`, http.StatusBadRequest)
-				goto ERROR
+				return nil, errors.New("multiple lines with same product")
 			}
 			pseen[ol.Product.ID] = true
 		} else {
 			break
 		}
-		if ol.Quantity, err = strconv.Atoi(r.FormValue(prefix + "quantity")); err != nil || ol.Quantity < 1 {
-			log.Printf("ERROR: invalid quantity %q", r.FormValue(prefix+"quantity"))
-			http.Error(w, `400 Bad Request: invalid "quantity"`, http.StatusBadRequest)
-			goto ERROR
+		if ol.Quantity, err = strconv.Atoi(r.FormValue(prefix + "quantity")); err != nil || ol.Quantity < 0 {
+			return nil, errors.New("invalid line quantity")
 		}
-		if ol.Price, err = strconv.Atoi(r.FormValue(prefix + "price")); err != nil || ol.Quantity < 0 {
-			log.Printf("ERROR: invalid price %q", r.FormValue(prefix+"price"))
-			http.Error(w, `400 Bad Request: invalid "price"`, http.StatusBadRequest)
-			goto ERROR
+		if ol.Price, err = strconv.Atoi(r.FormValue(prefix + "price")); err != nil || ol.Price < 0 {
+			return nil, errors.New("invalid line price")
 		}
 		if uval := r.FormValue(prefix + "used"); uval != "" {
 			if ol.Used, err = strconv.Atoi(uval); err != nil || ol.Used < 0 {
-				log.Printf("ERROR: invalid used amount %q", uval)
-				http.Error(w, `400 Bad Request: invalid "used"`, http.StatusBadRequest)
-				goto ERROR
+				return nil, errors.New("invalid line used amount")
 			}
 			if ol.UsedAt = model.EventID(r.FormValue(prefix + "usedAt")); ol.Used > 0 && ol.UsedAt == "" {
-				log.Printf("ERROR: missing usedAt")
-				http.Error(w, `400 Bad Request: "usedAt" is required when "used" is nonzero`, http.StatusBadRequest)
-				goto ERROR
+				return nil, errors.New("usedAt is required when used is nonzero")
 			}
 		}
 		o.Lines = append(o.Lines, &ol)
@@ -146,71 +116,50 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 		case model.PaymentCard, model.PaymentCardPresent, model.PaymentCash, model.PaymentCheck, model.PaymentOther:
 			// no-op
 		default:
-			log.Printf("ERROR: invalid payment type %q", p.Type)
-			http.Error(w, `400 Bad Request: invalid "type"`, http.StatusBadRequest)
-			goto ERROR
+			return nil, errors.New("invalid payment type")
 		}
 		p.Subtype = strings.TrimSpace(r.FormValue(prefix + "subtype"))
 		p.Method = strings.TrimSpace(r.FormValue(prefix + "method"))
 		if p.Amount, err = strconv.Atoi(r.FormValue(prefix + "amount")); err != nil {
-			log.Printf("ERROR: invalid payment amount %q", r.FormValue(prefix+"amount"))
-			http.Error(w, `400 Bad Request: invalid "amount"`, http.StatusBadRequest)
-			goto ERROR
+			return nil, errors.New("invalid payment amount")
 		}
 		o.Payments = append(o.Payments, &p)
 	}
-	return o
-
-ERROR:
-	log.Printf("    in %s %s %+v", r.Method, r.RequestURI, r.Form)
-	return nil
+	return o, nil
 }
 
 // CreateOrderCommon is the common part of creating an order, shared by the
 // various APIs.  Each of them makes authorization and validity checks specific
 // to it, and then calls this function to perform the common checks and create
 // the order.
-func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, order *model.Order) {
+func CreateOrderCommon(r *Request, order *model.Order) (err error) {
 	var (
-		privs   model.Privilege
 		success bool
 		card    string
 		message string
 		receipt bool
-		logverb = "PLACE"
 	)
-	if session != nil {
-		privs = session.Privileges
-	}
 	// Resolve the products and SKUs and validate the prices.
-	if !resolveSKUs(tx, order) {
-		log.Printf("ERROR: invalid products or prices in order %s", order.ToJSON(true))
-		BadRequestError(tx, w, "invalid products or prices")
-		return
+	if err = resolveSKUs(r, order); err != nil {
+		return err
 	}
 	// Validate the customer data.
-	if !validateCustomer(tx, order, session) {
-		log.Printf("ERROR: invalid customer data in order %s", order.ToJSON(true))
-		BadRequestError(tx, w, "invalid customer data")
-		return
+	if err = validateCustomer(r, order); err != nil {
+		return err
 	}
 	// Make sure the rest of the order details are OK.
-	if !validateOrderDetails(tx, order, privs) {
-		log.Printf("ERROR: invalid parameters in order %s", order.ToJSON(true))
-		BadRequestError(tx, w, "invalid parameters")
-		return
+	if err = validateOrderDetails(r, order); err != nil {
+		return err
 	}
 	// Calculate the order total and verify the payment.
-	if !validatePayment(order) {
-		log.Printf("ERROR: invalid payment in order %s", order.ToJSON(true))
-		BadRequestError(tx, w, "invalid payment")
-		return
+	if err = validatePayment(order); err != nil {
+		return err
 	}
 	// Assign a token to the order (after the new transaction is opened, to
 	// ensure uniqueness).
-	order.Token = newOrderToken(tx)
+	order.Token = newOrderToken(r)
 	// Generate tickets if needed.
-	generateTickets(tx, order)
+	generateTickets(order)
 	// If we don't have to charge a card through Stripe, the order is now
 	// complete.
 	if len(order.Payments) == 0 {
@@ -224,8 +173,8 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 		}
 	}
 	// Save the order to the database.
-	tx.SaveOrder(order)
-	Commit(tx)
+	r.Tx.SaveOrder(order)
+	r.Tx.Commit()
 	// If we do have to charge a card through Stripe, do it now.
 	if len(order.Payments) == 1 {
 		switch order.Payments[0].Type {
@@ -233,57 +182,52 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 			receipt = order.Email != ""
 		case model.PaymentCard:
 			success, card, message = stripe.ChargeCard(order, order.Payments[0])
-			tx = db.Begin()
+			r.Tx = db.Begin()
 			if !success {
-				tx.DeleteOrder(order)
-				Commit(tx)
+				r.Tx.DeleteOrder(order)
+				r.Tx.Commit()
 				if message == "" {
 					message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
 				}
 				log.Printf("ERROR: payment rejected (%q) in order %s", message, order.ToJSON(true))
-				SendError(tx, w, message)
+				SendError(r, message)
 				return
 			}
 			order.Valid = true
-			tx.SaveOrder(order)
-			tx.SaveCard(card, order.Name, order.Email)
+			r.Tx.SaveOrder(order)
+			r.Tx.SaveCard(card, order.Name, order.Email)
 			receipt = order.Email != ""
-			order.Name, order.Email = tx.FetchCard(card)
-			Commit(tx)
+			order.Name, order.Email = r.Tx.FetchCard(card)
+			r.Tx.Commit()
 		case model.PaymentCardPresent:
 			// For card present transactions, we have to create the
 			// order and notify Stripe before processing the card.
 			// Do that now, and return the (uncompleted) order with
 			// the payment intent in it.
 			success = stripe.CreatePaymentIntent(order)
-			tx = db.Begin()
+			r.Tx = db.Begin()
 			if !success {
-				tx.DeleteOrder(order)
-				Commit(tx)
-				SendError(tx, w, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
+				r.Tx.DeleteOrder(order)
+				r.Tx.Commit()
+				SendError(r, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
 				log.Printf("ERROR: can't create payment intent for order %s", order.ToJSON(true))
 				return
 			}
-			tx.SaveOrder(order)
-			Commit(tx)
-			logverb = "CREATE"
+			r.Tx.SaveOrder(order)
+			r.Tx.Commit()
 			receipt = false
 		}
 	}
 	// Log and return the completed order.
-	if session != nil {
-		log.Printf("%s %s ORDER %s", session.Username, logverb, order.ToJSON(true))
-	} else {
-		log.Printf("- %s ORDER %s", logverb, order.ToJSON(true))
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(order.ToJSON(false))
+	r.Header().Set("Content-Type", "application/json")
+	r.Write(order.ToJSON(false))
 	if receipt && order.Email != "" {
 		EmitReceipt(order, false)
 	}
 	if order.Valid {
 		UpdateGoogleSheet(order)
 	}
+	return nil
 }
 
 // resolveSKUs walks through each line of the order, finding the listed product
@@ -292,18 +236,18 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 // successfully and false otherwise. Note that if a coupon is specified in the
 // order but not used by any SKU, it is removed; this keeps the order reporting
 // system clean of invalid coupon codes.
-func resolveSKUs(tx db.Tx, order *model.Order) bool {
+func resolveSKUs(r *Request, order *model.Order) error {
 	var couponMatch bool
 
 	for _, line := range order.Lines {
 		var sku *model.SKU
 
-		if line.Product = tx.FetchProduct(line.Product.ID); line.Product == nil {
-			return false
+		if line.Product = r.Tx.FetchProduct(line.Product.ID); line.Product == nil {
+			return errors.New("nonexistent line product")
 		}
 		if line.Product.Type == model.ProdAuctionItem || line.Product.Type == model.ProdDonation {
 			if line.Price < 1 {
-				return false
+				return errors.New("invalid line price")
 			}
 			continue
 		}
@@ -320,53 +264,50 @@ func resolveSKUs(tx db.Tx, order *model.Order) bool {
 			continue
 		}
 		if line.Price != sku.Price {
-			return false
+			return errors.New("incorrect line price")
 		}
 	}
 	if !couponMatch {
 		order.Coupon = ""
 	}
-	return true
+	return nil
 }
 
 // validateCustomer returns whether the customer data in the order are valid.
-func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool {
+func validateCustomer(r *Request, order *model.Order) error {
 
 	// A Stripe customer ID is allowed only for gala sales.  TODO
 	if order.Customer != "" {
-		return false
+		return errors.New("invalid customer")
 	}
 
 	// A member ID is required for sheet music or concert recording sales.
 	for _, line := range order.Lines {
 		if line.Product.Type == model.ProdRecording || line.Product.Type == model.ProdSheetMusic {
 			if order.Member == 0 {
-				return false
+				return errors.New("missing member ID")
 			}
 		}
 	}
-	return true
+	return nil
 }
 
 // validateOrderDetails returns whether the order details are valid.  Note that
 // this does not check authorization.  It also doesn't check anything specific
 // to the product type or the order type.
-func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) bool {
+func validateOrderDetails(r *Request, order *model.Order) error {
 
 	order.Created = time.Now()
 
 	// Office notes are allowed only by office staff.
-	if order.ONote != "" && privs&model.PrivManageOrders == 0 {
-		return false
+	if order.ONote != "" && r.Privileges&model.PrivManageOrders == 0 {
+		return errors.New("invalid oNote")
 	}
 
 	// Remove any lines with zero quantity.  Make sure there's at least one
 	// line left.
 	var j = 0
 	for i := range order.Lines {
-		if order.Lines[i].Quantity < 0 {
-			return false
-		}
 		if order.Lines[i].Quantity != 0 {
 			order.Lines[j] = order.Lines[i]
 			j++
@@ -374,7 +315,7 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 	}
 	order.Lines = order.Lines[:j]
 	if len(order.Lines) == 0 {
-		return false
+		return errors.New("no lines with nonzero quantity")
 	}
 
 	// Check the validity of each order line.
@@ -384,20 +325,20 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 		switch line.Product.Type {
 		case model.ProdAuctionItem:
 			// Auction items aren't supported yet.
-			return false // TODO
+			return errors.New("invalid line product") // TODO
 		case model.ProdDonation, model.ProdRecording, model.ProdSheetMusic:
 			// Donations, concert recordings, and sheet music must
 			// have a quantity of 1.
 			if line.Quantity != 1 || line.Used != 0 || line.UsedAt != "" {
-				return false
+				return errors.New("invalid line quantity, used, or usedAt")
 			}
 		case model.ProdWardrobe:
-			if line.Quantity < 1 || line.Used != 0 || line.UsedAt != "" {
-				return false
+			if line.Used != 0 || line.UsedAt != "" {
+				return errors.New("invalid line used or usedAt")
 			}
 		case model.ProdTicket:
 			if line.Used < 0 || line.Used > line.Quantity*line.Product.TicketCount {
-				return false
+				return errors.New("invalid line used amount")
 			}
 			if line.Used != 0 {
 				var found bool
@@ -408,17 +349,17 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 					}
 				}
 				if !found {
-					return false
+					return errors.New("invalid line usedAt")
 				}
 			}
 		}
 	}
-	return true
+	return nil
 }
 
 // validatePayment returns whether the order payment is valid for the order type
 // and has the correct amount.
-func validatePayment(order *model.Order) bool {
+func validatePayment(order *model.Order) error {
 	var total int
 
 	// Calculate the order total.
@@ -427,32 +368,32 @@ func validatePayment(order *model.Order) bool {
 	}
 	// If this is a free order, it's OK if there is no payment.
 	if total == 0 && len(order.Payments) == 0 {
-		return true
+		return nil
 	}
 	// Otherwise, there should be exactly one payment.
 	if len(order.Payments) != 1 {
-		return false
+		return errors.New("expected one payment")
 	}
 	// And it should have the correct amount.
 	var pmt = order.Payments[0]
 	if pmt.Amount != total {
-		return false
+		return errors.New("incorrect payment amount")
 	}
 	// If this is a free order and has a payment, its type must be "cash".
 	// We remove it; no point in storing a zero payment.
 	if pmt.Amount == 0 {
 		if pmt.Type != model.PaymentCash {
-			return false
+			return errors.New("free order must have payment type cash")
 		}
 		order.Payments = order.Payments[:0]
-		return true
+		return nil
 	}
 	pmt.Created = order.Created
-	return true
+	return nil
 }
 
 // generateTickets creates tickets as needed for the new order.
-func generateTickets(tx db.Tx, order *model.Order) {
+func generateTickets(order *model.Order) {
 	var (
 		event *model.Event
 		found bool
@@ -500,8 +441,8 @@ func generateTickets(tx db.Tx, order *model.Order) {
 
 // newOrderToken generates a token for a new order, retrying until it has one
 // that's unique.
-func newOrderToken(tx db.Tx) (token string) {
-	for token == "" || tx.FetchOrderByToken(token) != nil {
+func newOrderToken(r *Request) (token string) {
+	for token == "" || r.Tx.FetchOrderByToken(token) != nil {
 		token = NewToken()
 	}
 	return token

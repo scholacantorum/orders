@@ -1,14 +1,15 @@
 package auth
 
+//go:generate easyjson -lower_camel_case session.go
+
 import (
 	"log"
 	"net/http"
 	"net/url"
 
-	"github.com/rothskeller/json"
+	"github.com/mailru/easyjson"
 
 	"scholacantorum.org/orders/api"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
@@ -31,121 +32,76 @@ func ValidateSession(r *api.Request) error {
 	return nil
 }
 
-// GetSession verifies that the HTTP request identifies a valid session, and
-// that session has all of the privileges specified in the priv bitmask.  (The
-// mask may be zero to check for a valid session without requiring specific
-// privileges.)  If so, GetSession returns the session details.  If not,
-// GetSession emits an appropriate error, rolls back the transaction, and
-// returns nil.
-func GetSession(tx db.Tx, w http.ResponseWriter, r *http.Request, priv model.Privilege) (session *model.Session) {
-	tx.ExpireSessions()
-	if session = tx.FetchSession(r.Header.Get("Auth")); session == nil {
-		tx.Rollback()
-		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
-		return nil
-	}
-	if session.Privileges&priv != priv {
-		tx.Rollback()
-		http.Error(w, "403 Forbidden", http.StatusForbidden)
-		return nil
-	}
-	return session
+//easyjson:json
+type ssoLogin struct {
+	ID                int
+	Username          string
+	Name              string
+	Email             string
+	Address           string
+	City              string
+	State             string
+	Zip               string
+	PrivSetupOrders   bool
+	PrivViewOrders    bool
+	PrivManageOrders  bool
+	PrivInPersonSales bool
+	PrivScanTickets   bool
 }
 
 // GetSessionMembersAuth verifies that the provided auth token is a valid token
 // for someone logged into the members site, and returns a pseudo-session with
 // the corresponding data.
-func GetSessionMembersAuth(tx db.Tx, w http.ResponseWriter, r *http.Request, auth string) (session *model.Session) {
+func GetSessionMembersAuth(r *api.Request, auth string) (err error) {
 	var (
-		resp *http.Response
-		err  error
+		resp     *http.Response
+		ssoLogin ssoLogin
 	)
 	resp, err = http.Get("http://scholacantorummembers.org/api/login/sso?auth=" + url.QueryEscape(auth))
 	if err != nil {
-		tx.Rollback()
 		log.Printf("ERROR: can't contact members site for SSO: %s", err)
-		http.Error(w, "500 SSO server error", http.StatusInternalServerError)
-		return nil
+		return api.HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusOK:
 		break
 	case http.StatusUnauthorized:
-		tx.Rollback()
-		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
-		return nil
+		return api.HTTPError(http.StatusUnauthorized, "401 Unauthorized")
 	default:
-		tx.Rollback()
 		log.Printf("ERROR: from members site SSO: %s", resp.Status)
-		http.Error(w, "500 SSO server error", http.StatusInternalServerError)
-		return nil
+		return api.HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
-	session = new(model.Session)
-	err = json.NewReader(resp.Body).Read(json.ObjectHandler(func(key string) json.Handlers {
-		switch key {
-		case "id":
-			return json.IntHandler(func(i int) { session.Member = i })
-		case "username":
-			return json.StringHandler(func(s string) { session.Username = s })
-		case "name":
-			return json.StringHandler(func(s string) { session.Name = s })
-		case "email":
-			return json.StringHandler(func(s string) { session.Email = s })
-		case "address":
-			return json.StringHandler(func(s string) { session.Address = s })
-		case "city":
-			return json.StringHandler(func(s string) { session.City = s })
-		case "state":
-			return json.StringHandler(func(s string) { session.State = s })
-		case "zip":
-			return json.StringHandler(func(s string) { session.Zip = s })
-		case "privSetupOrders":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivSetupOrders
-				}
-			})
-		case "privViewOrders":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivViewOrders
-				}
-			})
-		case "privManageOrders":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivManageOrders
-				}
-			})
-		case "privInPersonSales":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivInPersonSales
-				}
-			})
-		case "privScanTickets":
-			return json.BoolHandler(func(b bool) {
-				if b {
-					session.Privileges |= model.PrivScanTickets
-				}
-			})
-		default:
-			return json.RejectHandler()
-		}
-	}))
-	if err != nil {
-		tx.Rollback()
+	if err = easyjson.UnmarshalFromReader(resp.Body, &ssoLogin); err != nil {
 		log.Printf("ERROR: bad JSON from members site SSO: %s", err)
-		http.Error(w, "500 SSO server error", http.StatusInternalServerError)
-		return nil
+		return api.HTTPError(http.StatusInternalServerError, "500 SSO server error")
 	}
-	session.Privileges |= model.PrivLogin
-	return session
-}
-
-// HasSession returns whether the HTTP request identifies a session.  (The
-// session is not necessarily valid.)
-func HasSession(r *http.Request) bool {
-	return r.Header.Get("Auth") != ""
+	r.Session = &model.Session{
+		Member:     ssoLogin.ID,
+		Username:   ssoLogin.Username,
+		Name:       ssoLogin.Name,
+		Email:      ssoLogin.Email,
+		Address:    ssoLogin.Address,
+		City:       ssoLogin.City,
+		State:      ssoLogin.State,
+		Zip:        ssoLogin.Zip,
+		Privileges: model.PrivLogin,
+	}
+	if ssoLogin.PrivSetupOrders {
+		r.Session.Privileges |= model.PrivSetupOrders
+	}
+	if ssoLogin.PrivViewOrders {
+		r.Session.Privileges |= model.PrivViewOrders
+	}
+	if ssoLogin.PrivManageOrders {
+		r.Session.Privileges |= model.PrivManageOrders
+	}
+	if ssoLogin.PrivInPersonSales {
+		r.Session.Privileges |= model.PrivInPersonSales
+	}
+	if ssoLogin.PrivScanTickets {
+		r.Session.Privileges |= model.PrivScanTickets
+	}
+	r.Privileges = r.Session.Privileges
+	return nil
 }

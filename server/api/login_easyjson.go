@@ -64,70 +64,39 @@ func easyjson9af65625EncodeScholacantorumOrgOrdersApi(out *jwriter.Writer, in ss
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.ID != 0 {
+	{
 		const prefix string = ",\"id\":"
-		first = false
 		out.RawString(prefix[1:])
 		out.Int(int(in.ID))
 	}
-	if in.Username != "" {
+	{
 		const prefix string = ",\"username\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.Username))
 	}
-	if in.PrivSetupOrders {
+	{
 		const prefix string = ",\"privSetupOrders\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivSetupOrders))
 	}
-	if in.PrivViewOrders {
+	{
 		const prefix string = ",\"privViewOrders\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivViewOrders))
 	}
-	if in.PrivManageOrders {
+	{
 		const prefix string = ",\"privManageOrders\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivManageOrders))
 	}
-	if in.PrivInPersonSales {
+	{
 		const prefix string = ",\"privInPersonSales\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivInPersonSales))
 	}
-	if in.PrivScanTickets {
+	{
 		const prefix string = ",\"privScanTickets\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivScanTickets))
 	}
 	out.RawByte('}')
@@ -205,80 +174,44 @@ func easyjson9af65625EncodeScholacantorumOrgOrdersApi1(out *jwriter.Writer, in l
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.Token != "" {
+	{
 		const prefix string = ",\"token\":"
-		first = false
 		out.RawString(prefix[1:])
 		out.String(string(in.Token))
 	}
-	if in.Username != "" {
+	{
 		const prefix string = ",\"username\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.Username))
 	}
-	if in.StripePublicKey != "" {
+	{
 		const prefix string = ",\"stripePublicKey\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.StripePublicKey))
 	}
-	if in.PrivSetupOrders {
+	{
 		const prefix string = ",\"privSetupOrders\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivSetupOrders))
 	}
-	if in.PrivViewOrders {
+	{
 		const prefix string = ",\"privViewOrders\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivViewOrders))
 	}
-	if in.PrivManageOrders {
+	{
 		const prefix string = ",\"privManageOrders\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivManageOrders))
 	}
-	if in.PrivInPersonSales {
+	{
 		const prefix string = ",\"privInPersonSales\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivInPersonSales))
 	}
-	if in.PrivScanTickets {
+	{
 		const prefix string = ",\"privScanTickets\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(in.PrivScanTickets))
 	}
 	out.RawByte('}')
