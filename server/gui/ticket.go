@@ -2,29 +2,27 @@ package gui
 
 import (
 	"html/template"
-	"net/http"
 
 	"scholacantorum.org/orders/api"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
 // ShowTicketInfo handles GET /ticket/$token requests, by showing information
 // about the named order.
-func ShowTicketInfo(tx db.Tx, w http.ResponseWriter, r *http.Request, token string) {
+func ShowTicketInfo(r *api.Request, token string) error {
 	var (
 		order *model.Order
 		err   error
 	)
-	if order = tx.FetchOrderByToken(token); order == nil {
-		api.NotFoundError(tx, w)
-		return
+	if order = r.Tx.FetchOrderByToken(token); order == nil {
+		return api.NotFound
 	}
-	tx.Commit()
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	if err = ticketInfoTemplate.Execute(w, order); err != nil {
+	r.Tx.Commit()
+	r.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	if err = ticketInfoTemplate.Execute(r, order); err != nil {
 		panic(err)
 	}
+	return nil
 }
 
 var ticketInfoTemplate = template.Must(template.New("").Funcs(map[string]interface{}{

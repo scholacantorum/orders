@@ -3,33 +3,31 @@ package posapi
 import (
 	"net/http"
 
-	"github.com/rothskeller/json"
+	"github.com/mailru/easyjson/jwriter"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 	"scholacantorum.org/orders/stripe"
 )
 
 // GetStripeConnectTerminal gets a connection token from Stripe allowing a
 // terminal to connect to our Stripe account.
-func GetStripeConnectTerminal(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+func GetStripeConnectTerminal(r *api.Request) error {
 	var (
-		session *model.Session
-		jw      json.Writer
-		token   string
+		token string
+		jw    jwriter.Writer
 	)
+	r.Tx.Commit()
 	// Getting a connection token requires PrivInPersonSales.
-	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
-		return
+	if r.Privileges&model.PrivInPersonSales == 0 {
+		return auth.Forbidden
 	}
-	api.Commit(tx)
 	if token = stripe.GetConnectionToken(); token == "" {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
+		return api.HTTPError(http.StatusInternalServerError, "500 Internal Server Error")
 	}
-	jw = json.NewWriter(w)
+	r.Header().Set("Content-Type", "application/json")
 	jw.String(token)
-	jw.Close()
+	jw.DumpTo(r)
+	return nil
 }

@@ -1,6 +1,8 @@
 package ofcapi
 
 import (
+	"github.com/mailru/easyjson"
+
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/model"
@@ -25,7 +27,6 @@ func GetOrder(r *api.Request, orderID model.OrderID) error {
 	}
 	// Send back the order.
 	r.Tx.Commit()
-	r.Header().Set("Content-Type", "application/json")
-	r.Write(order.ToJSON(false))
+	easyjson.MarshalToHTTPResponseWriter(order, r)
 	return nil
 }

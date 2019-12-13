@@ -102,6 +102,7 @@ func (tx Tx) RunReport(def *model.ReportDefinition) *model.ReportResults {
 		ticketUsageStmt *sql.Stmt
 		orderStmt       *sql.Stmt
 		order           *reportOrder
+		minOrderID      model.OrderID
 		err             error
 
 		// If we don't have any criteria, we return only statistics and
@@ -173,9 +174,23 @@ FROM ordert o LEFT JOIN payment p ON p.orderid=o.id AND p.initial WHERE o.id=?`)
 	panicOnError(err)
 	defer orderStmt.Close()
 
-	// Now, read every order line in the database.  Sort by order ID so that
-	// all of the lines for an order are read together.
-	rows, err = tx.tx.Query(`SELECT id, orderid, product, quantity, price FROM order_line ORDER BY orderid, id`)
+	// To save time on the scan, we'll find the lowest order ID that comes
+	// after the report start time, and only scan order lines for IDs above
+	// that.
+	if !def.CreatedAfter.IsZero() {
+		err = tx.tx.QueryRow(`SELECT id FROM ordert WHERE start>=? ORDER BY id LIMIT 1`, Time(def.CreatedAfter)).
+			Scan(&minOrderID)
+		if err != nil && err != sql.ErrNoRows {
+			panic(err)
+		}
+	}
+
+	// Now, read every order line in the database, starting with the
+	// lowest order ID we found above (or with zero, if we didn't find one).
+	// Sort by order ID so that all of the lines for an order are read
+	// together.
+	rows, err = tx.tx.Query(
+		`SELECT id, orderid, product, quantity, price FROM order_line WHERE orderid>=? ORDER BY orderid, id`, minOrderID)
 	panicOnError(err)
 	for rows.Next() {
 		var (

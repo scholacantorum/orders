@@ -1,14 +1,9 @@
 package posapi
 
 import (
-	"net/http"
-	"time"
-
-	"github.com/rothskeller/json"
-
+	"github.com/mailru/easyjson/jwriter"
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
@@ -18,46 +13,48 @@ type freeEntryData struct {
 }
 
 // ListEvents handles GET /api/event requests.
-func ListEvents(tx db.Tx, w http.ResponseWriter, r *http.Request) {
+func ListEvents(r *api.Request) error {
 	var (
-		session     *model.Session
 		events      []*model.Event
-		jw          json.Writer
+		jw          jwriter.Writer
 		freeEntries = map[model.EventID][]string{}
 	)
 	// Getting events needs PrivSetupOrders, PrivInPersonSales, or
 	// PrivScanTickets.  Here we assume that anyone with PrivSetupOrders or
 	// PrivInPersonSales will also have PrivScanTickets.
-	if session = auth.GetSession(tx, w, r, model.PrivScanTickets); session == nil {
-		return
+	if r.Privileges&(model.PrivSetupOrders|model.PrivInPersonSales|model.PrivScanTickets) == 0 {
+		return auth.Forbidden
 	}
 	// We only return events scheduled in the future.  (Actually this
 	// includes all events starting at the beginning of the date of the
 	// call.)
-	events = tx.FetchFutureEvents()
+	events = r.Tx.FetchFutureEvents()
 	// We also retrieve the ticket class(es) that allow free entry to the
 	// event, if any.
 	for _, e := range events {
-		freeEntries[e.ID] = getFreeEntries(tx, e)
+		freeEntries[e.ID] = getFreeEntries(r, e)
 	}
-	api.Commit(tx)
-	w.Header().Set("Content-Type", "application/json")
-	jw = json.NewWriter(w)
-	jw.Array(func() {
-		for _, e := range events {
-			emitListedEvent(jw, e, freeEntries[e.ID])
+	r.Tx.Commit()
+	r.Header().Set("Content-Type", "application/json")
+	jw.RawByte('[')
+	for i, e := range events {
+		if i != 0 {
+			jw.RawByte(',')
 		}
-	})
-	jw.Close()
+		emitListedEvent(&jw, e, freeEntries[e.ID])
+	}
+	jw.RawByte(']')
+	jw.DumpTo(r)
+	return nil
 }
 
 // getFreeEntries looks for tickets to the event that can be ordered at zero
 // cost, which will generally be the ticket classes that gets free entry (e.g.
 // students).  If it finds any, it returns a list of the ticket class names;
 // otherwise, it returns nil.
-func getFreeEntries(tx db.Tx, event *model.Event) (list []string) {
+func getFreeEntries(r *api.Request, event *model.Event) (list []string) {
 	var seen = map[string]bool{}
-	for _, p := range getFreeClasses(tx, event) {
+	for _, p := range getFreeClasses(r, event) {
 		if !seen[p.TicketClass] {
 			list = append(list, p.TicketClass)
 		}
@@ -66,19 +63,20 @@ func getFreeEntries(tx db.Tx, event *model.Event) (list []string) {
 }
 
 // emitListedEvent emits the JSON for one event in a list.
-func emitListedEvent(jw json.Writer, e *model.Event, freeEntries []string) {
-	jw.Object(func() {
-		jw.Prop("id", string(e.ID))
-		jw.Prop("name", e.Name)
-		jw.Prop("start", e.Start.Format(time.RFC3339))
-		if freeEntries != nil {
-			jw.Prop("freeEntries", func() {
-				jw.Array(func() {
-					for _, fe := range freeEntries {
-						jw.String(fe)
-					}
-				})
-			})
+func emitListedEvent(jw *jwriter.Writer, e *model.Event, freeEntries []string) {
+	jw.RawString(`{"id":`)
+	jw.String(string(e.ID))
+	jw.RawString(`,"name":`)
+	jw.String(e.Name)
+	jw.RawString(`,"start"`)
+	jw.Raw(e.Start.MarshalJSON())
+	if freeEntries != nil {
+		jw.RawString(`,"freeEntries":[`)
+		for i, fe := range freeEntries {
+			if i != 0 {
+				jw.RawByte(',')
+			}
+			jw.String(fe)
 		}
-	})
+	}
 }

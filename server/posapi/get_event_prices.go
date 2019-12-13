@@ -1,14 +1,10 @@
 package posapi
 
 import (
-	"log"
-	"net/http"
-
-	"github.com/rothskeller/json"
+	"github.com/mailru/easyjson/jwriter"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
@@ -21,24 +17,21 @@ type getPricesData struct {
 
 // GetEventPrices returns the prices and availability of the products giving
 // admission to an event.
-func GetEventPrices(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID) {
+func GetEventPrices(r *api.Request, eventID model.EventID) error {
 	var (
 		event      *model.Event
 		productIDs []string
 		pdata      []*getPricesData
-		jw         json.Writer
+		jw         jwriter.Writer
 	)
-	// Get current session privileges.
-	if auth.GetSession(tx, w, r, model.PrivInPersonSales) == nil {
-		return
+	if r.Privileges&model.PrivInPersonSales == 0 {
+		return auth.Forbidden
 	}
 	// Get the list of products offering ticket sales for that event.
-	if event = tx.FetchEvent(eventID); event == nil {
-		log.Printf("ERROR: no such event %q", eventID)
-		api.NotFoundError(tx, w)
-		return
+	if event = r.Tx.FetchEvent(eventID); event == nil {
+		return api.NotFound
 	}
-	productIDs = getEventProducts(tx, event)
+	productIDs = getEventProducts(r, event)
 	// Look up the prices for each product.
 	for _, pid := range productIDs {
 		var (
@@ -47,8 +40,8 @@ func GetEventPrices(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID mo
 			pd      getPricesData
 		)
 		// Get the product.  Make sure it has capacity.
-		product = tx.FetchProduct(model.ProductID(pid))
-		if !api.ProductHasCapacity(tx, product) {
+		product = r.Tx.FetchProduct(model.ProductID(pid))
+		if !api.ProductHasCapacity(r, product) {
 			continue
 		}
 		pd.id = product.ID
@@ -69,25 +62,25 @@ func GetEventPrices(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID mo
 		pd.ticketCount = product.TicketCount
 		pdata = append(pdata, &pd)
 	}
-	api.Commit(tx)
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	jw = json.NewWriter(w)
+	r.Tx.Commit()
+	r.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if len(pdata) == 0 {
 		// No products available for sale, or even with messages to
 		// display, so we return a null.
-		jw.Null()
+		jw.RawString("null")
 	} else {
 		// Return the product data.
-		emitGetPrices(jw, pdata)
+		emitGetPrices(&jw, pdata)
 	}
-	jw.Close()
+	jw.DumpTo(r)
+	return nil
 }
 
 // getEventProducts returns the product names for the products selling tickets
 // to the specified event.  Only products that are targeted at the event, or not
 // targeted at any specific event, are included.
-func getEventProducts(tx db.Tx, event *model.Event) (productIDs []string) {
-	for _, p := range tx.FetchProductsByEvent(event) {
+func getEventProducts(r *api.Request, event *model.Event) (productIDs []string) {
+	for _, p := range r.Tx.FetchProductsByEvent(event) {
 		var targeted, match bool
 		for _, pe := range p.Events {
 			if pe.Priority == 0 {
@@ -105,15 +98,21 @@ func getEventProducts(tx db.Tx, event *model.Event) (productIDs []string) {
 }
 
 // emitGetPrices writes the JSON response.
-func emitGetPrices(jw json.Writer, pdata []*getPricesData) {
-	jw.Array(func() {
-		for _, pd := range pdata {
-			jw.Object(func() {
-				jw.Prop("id", string(pd.id))
-				jw.Prop("name", pd.name)
-				jw.Prop("price", pd.price)
-				jw.Prop("ticketCount", pd.ticketCount)
-			})
+func emitGetPrices(jw *jwriter.Writer, pdata []*getPricesData) {
+	jw.RawByte('[')
+	for i, pd := range pdata {
+		if i != 0 {
+			jw.RawByte(',')
 		}
-	})
+		jw.RawString(`{"id":`)
+		jw.String(string(pd.id))
+		jw.RawString(`,"name":`)
+		jw.String(pd.name)
+		jw.RawString(`,"price":`)
+		jw.Int(pd.price)
+		jw.RawString(`,"ticketCount":`)
+		jw.Int(pd.ticketCount)
+		jw.RawByte('}')
+	}
+	jw.RawByte(']')
 }

@@ -10,10 +10,17 @@ type AuditRecord struct {
 	Timestamp time.Time
 	Username  string
 	Request   string
+	Card      *Card
 	Event     *Event
 	Order     *Order
 	Product   *Product
 	Session   *Session
+}
+
+type Card struct {
+	Card  string
+	Name  string
+	Email string
 }
 
 type EventID string

@@ -1,12 +1,10 @@
 package posapi
 
 import (
-	"log"
-	"net/http"
+	"errors"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 	"scholacantorum.org/orders/stripe"
 )
@@ -14,43 +12,38 @@ import (
 // SendOrderReceipt processes POST /api/order/${id}/sendReceipt requests, by
 // (re-)sending the email receipt for the order.  It takes an optional email=
 // query parameter to update the email address on the order.
-func SendOrderReceipt(tx db.Tx, w http.ResponseWriter, r *http.Request, orderID model.OrderID) {
+func SendOrderReceipt(r *api.Request, orderID model.OrderID) error {
 	var (
-		session *model.Session
-		order   *model.Order
-		email   string
-		card    string
-		sname   string
-		semail  string
+		order  *model.Order
+		email  string
+		card   string
+		sname  string
+		semail string
 	)
-	// Get current session data, if any.
-	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
-		return
+	if r.Privileges&model.PrivInPersonSales == 0 {
+		return auth.Forbidden
 	}
 	// Get the order whose payment we're supposed to capture.
-	if order = tx.FetchOrder(orderID); order == nil {
-		api.NotFoundError(tx, w)
-		return
+	if order = r.Tx.FetchOrder(orderID); order == nil {
+		return api.NotFound
 	}
 	// Verify that the order is in the desired state.
 	if !order.Valid {
-		api.BadRequestError(tx, w, "order not complete")
-		return
+		return errors.New("order not complete")
 	}
 	// Update the email address on the order if requested.
 	if email = r.FormValue("email"); email != "" && email != order.Email {
 		order.Email = email
 		if card = stripe.GetCardFingerprint(order.Payments[0].Stripe); card != "" {
-			sname, semail = tx.FetchCard(card)
+			sname, semail = r.Tx.FetchCard(card)
 			if order.Name == "" && email == semail {
 				order.Name = sname
 			}
-			tx.SaveCard(card, order.Name, order.Email)
+			r.Tx.SaveCard(&model.Card{Card: card, Name: order.Name, Email: order.Email})
 		}
-		tx.SaveOrder(order)
+		r.Tx.SaveOrder(order)
 	}
-	api.Commit(tx)
-	log.Printf("- RESEND RECEIPT for order %d to %s", orderID, order.Email)
-	w.WriteHeader(http.StatusNoContent)
+	r.Tx.Commit()
 	api.EmitReceipt(order, false)
+	return nil
 }

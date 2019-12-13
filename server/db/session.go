@@ -25,11 +25,13 @@ func (tx Tx) SaveSession(s *model.Session) {
 	q.WriteString(sessionColumns)
 	q.WriteString(`) VALUES (?,?,?,?,?)`)
 	panicOnExecError(tx.tx.Exec(q.String(), s.Token, s.Username, Time(s.Expires), s.Member, s.Privileges))
+	tx.audit(model.AuditRecord{Session: s})
 }
 
 // ExpireSessions deletes all sessions that have expired.
 func (tx Tx) ExpireSessions() {
 	panicOnExecError(tx.tx.Exec(`DELETE FROM session WHERE expires<?`, Time(time.Now())))
+	// intentionally not auditing
 }
 
 // FetchSession returns the session with the specified Token.  It returns nil if

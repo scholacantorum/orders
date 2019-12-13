@@ -198,6 +198,7 @@ CREATE TABLE event (
     -- Seating capacity of the event.  Zero means unlimited.
     capacity integer NOT NULL DEFAULT 0
 );
+CREATE INDEX event_start_index ON event (start);
 
 -- The product_event table specifies which products grant admission to which
 -- events.  A non-ticket product will have no entries in this table.  An

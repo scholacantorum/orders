@@ -2,31 +2,35 @@ package db
 
 import (
 	"database/sql"
+
+	"scholacantorum.org/orders/model"
 )
 
 // SaveCard saves a card to the database.
-func (tx Tx) SaveCard(card, name, email string) {
+func (tx Tx) SaveCard(card *model.Card) {
 	var (
 		oname  string
 		oemail string
 		err    error
 	)
-	switch err = tx.tx.QueryRow(`SELECT name, email FROM card_email WHERE card=?`, card).Scan(&oname, &oemail); err {
+	switch err = tx.tx.QueryRow(`SELECT name, email FROM card_email WHERE card=?`, card.Card).Scan(&oname, &oemail); err {
 	case nil, sql.ErrNoRows:
 		break
 	default:
 		panic(err)
 	}
-	if name == "" && oname != "" {
-		name = oname
+	if card.Name == "" && oname != "" {
+		card.Name = oname
 	}
-	if email == "" && oemail != "" {
-		email = oemail
+	if card.Email == "" && oemail != "" {
+		card.Email = oemail
 	}
-	if name == "" && email == "" {
+	if card.Name == "" && card.Email == "" {
 		return
 	}
-	panicOnNoRows(tx.tx.Exec(`INSERT OR REPLACE INTO card_email (card, name, email) VALUES (?,?,?)`, card, name, email))
+	panicOnNoRows(tx.tx.Exec(`INSERT OR REPLACE INTO card_email (card, name, email) VALUES (?,?,?)`,
+		card.Card, card.Name, card.Email))
+	tx.audit(model.AuditRecord{Card: card})
 }
 
 // FetchCard returns the name and email associated with the card, or empty

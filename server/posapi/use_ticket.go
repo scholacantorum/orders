@@ -1,17 +1,17 @@
 package posapi
 
 import (
-	"log"
+	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
 
-	"github.com/rothskeller/json"
+	"github.com/mailru/easyjson/jwriter"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
-	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
 
@@ -26,21 +26,19 @@ import (
 // usage count of one or more ticket classes.  The counts may go up or down from
 // their current values, but they can't go lower than the usage count at the
 // time of the previous GET call.
-func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID, token string) {
+func UseTicket(r *api.Request, eventID model.EventID, token string) error {
 	var (
-		session *model.Session
-		order   *model.Order
-		event   *model.Event
-		now     = time.Now()
+		order *model.Order
+		event *model.Event
+		now   = time.Now()
 	)
 	// Must have PrivScanTickets to use this API.
-	if session = auth.GetSession(tx, w, r, model.PrivScanTickets); session == nil {
-		return
+	if r.Privileges&model.PrivScanTickets == 0 {
+		return auth.Forbidden
 	}
 	// Make sure the requisite event exists.
-	if event = tx.FetchEvent(eventID); event == nil {
-		api.NotFoundError(tx, w)
-		return
+	if event = r.Tx.FetchEvent(eventID); event == nil {
+		return api.NotFound
 	}
 	// Get the requested order.  It could be either an order number or an
 	// order token.  If we're in POST mode, it could also be the word
@@ -56,30 +54,29 @@ func UseTicket(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.E
 		}
 		r.Form["scan"] = []string{api.NewToken()}
 	} else if oid, err := strconv.Atoi(token); err == nil {
-		order = tx.FetchOrder(model.OrderID(oid))
+		order = r.Tx.FetchOrder(model.OrderID(oid))
 	} else {
-		order = tx.FetchOrderByToken(token)
+		order = r.Tx.FetchOrderByToken(token)
 	}
 	if order == nil {
-		api.NotFoundError(tx, w)
-		return
+		return api.NotFound
 	}
 	// The rest of the processing differs between natural and explicit
 	// modes.
 	switch r.Method {
 	case http.MethodGet:
-		useTicketGet(tx, session, w, event, order, now)
+		return useTicketGet(r, event, order, now)
 	case http.MethodPost:
-		useTicketPost(tx, session, w, r, event, order, now)
+		return useTicketPost(r, event, order, now)
+	default:
+		panic("not reachable")
 	}
 }
 
 // useTicketGet handles UseTicket GET requests, i.e., the ones made when a
 // ticket is first scanned.  It supplies the UI with information about classes
 // and ticket counts.
-func useTicketGet(
-	tx db.Tx, session *model.Session, w http.ResponseWriter, event *model.Event, order *model.Order, now time.Time,
-) {
+func useTicketGet(r *api.Request, event *model.Event, order *model.Order, now time.Time) error {
 	// Information collected and returned about each ticket class.
 	type class struct {
 		// class name
@@ -100,20 +97,20 @@ func useTicketGet(
 	var (
 		lines   map[string][]*model.OrderLine
 		free    map[string]*model.Product
-		jw      json.Writer
+		jw      jwriter.Writer
 		classes []*class
 	)
 	// Get the order lines for each ticket class.
 	if lines = useTicketClassMap(order, event); lines == nil {
-		useTicketError(tx, w, order, "Not a ticket order")
-		return
+		useTicketError(r, order, "Not a ticket order")
+		return nil
 	} else if len(lines) == 0 {
-		useTicketError(tx, w, order, "Wrong event")
-		return
+		useTicketError(r, order, "Wrong event")
+		return nil
 	}
 	// Get the free classes and make sure the lines map contains each of
 	// them.
-	free = getFreeClasses(tx, event)
+	free = getFreeClasses(r, event)
 	for fc := range free {
 		if _, ok := lines[fc]; !ok {
 			lines[fc] = nil
@@ -150,56 +147,54 @@ func useTicketGet(
 		}
 	}
 	// Clean up and emit results.
-	api.Commit(tx)
+	r.Tx.Commit()
 	sort.Slice(classes, func(i, j int) bool {
 		return classes[i].name < classes[j].name
 	})
-	w.Header().Set("Content-Type", "application/json")
-	jw = json.NewWriter(w)
-	jw.Object(func() {
-		jw.Prop("id", int(order.ID))
-		if order.Name != "" {
-			jw.Prop("name", order.Name)
+	r.Header().Set("Content-Type", "application/json")
+	jw.RawString(`{"id":`)
+	jw.Int(int(order.ID))
+	if order.Name != "" {
+		jw.RawString(`,"name":`)
+		jw.String(order.Name)
+	}
+	jw.RawString(`,"classes":[`)
+	for i, class := range classes {
+		if i != 0 {
+			jw.RawByte(',')
 		}
-		jw.Prop("classes", func() {
-			jw.Array(func() {
-				for _, class := range classes {
-					jw.Object(func() {
-						jw.Prop("name", class.name)
-						jw.Prop("min", class.min)
-						jw.Prop("max", class.max)
-						jw.Prop("used", class.used)
-						if class.overflow {
-							jw.Prop("overflow", true)
-						}
-					})
-				}
-			})
-		})
-	})
-	jw.Close()
+		jw.RawString(`{"name":`)
+		jw.String(class.name)
+		jw.RawString(`,"min":`)
+		jw.Int(class.min)
+		jw.RawString(`,"max":`)
+		jw.Int(class.max)
+		jw.RawString(`,"used":`)
+		jw.Int(class.used)
+		if class.overflow {
+			jw.RawString(`,"overflow":true`)
+		}
+		jw.RawByte('}')
+	}
+	jw.RawString(`]}`)
+	jw.DumpTo(r)
+	return nil
 }
 
 // useTicketPost handles UseTicket POST requests, i.e., those invoked by the UI
 // when the user changes the number of tickets used for a particular class of a
 // particular order.
-func useTicketPost(
-	tx db.Tx, session *model.Session, w http.ResponseWriter, r *http.Request,
-	event *model.Event, order *model.Order, now time.Time,
-) {
+func useTicketPost(r *api.Request, event *model.Event, order *model.Order, now time.Time) error {
 	var (
 		linemap map[string][]*model.OrderLine
 		free    map[string]*model.Product
-		jw      json.Writer
 	)
 	// Get the order lines for the requested ticket class.
 	if linemap = useTicketClassMap(order, event); linemap == nil && len(order.Lines) != 0 {
-		api.BadRequestError(tx, w, "not a ticket order")
-		return
+		return errors.New("not a ticket order")
 	}
 	if len(r.Form["class"]) != len(r.Form["used"]) {
-		api.BadRequestError(tx, w, "different numbers of class and used parameters")
-		return
+		return errors.New("different numbers of class and used parameters")
 	}
 	for cidx, cname := range r.Form["class"] {
 		var (
@@ -213,8 +208,7 @@ func useTicketPost(
 		)
 		lines = linemap[cname]
 		if wanted, err = strconv.Atoi(r.Form["used"][cidx]); err != nil || wanted < 0 {
-			api.BadRequestError(tx, w, "invalid used count")
-			return
+			return errors.New("invalid used count")
 		}
 		// Check the desired count against the min and max usage for this class.
 		for _, ol := range lines {
@@ -223,16 +217,15 @@ func useTicketPost(
 		}
 		used = min
 		if wanted < min {
-			api.BadRequestError(tx, w, "reducing used count below minimum")
-			return
+			return errors.New("reducing used count below minimum")
 		}
 		if wanted > max {
 			if free == nil {
-				free = getFreeClasses(tx, event)
+				free = getFreeClasses(r, event)
 			}
 			if fp = free[cname]; fp == nil {
-				api.SendError(tx, w, "Ticket already used")
-				return
+				api.SendError(r, "Ticket already used")
+				return nil
 			}
 			if ol := addFreeTickets(order, event, fp, wanted-max); ol != nil {
 				lines = append(lines, ol)
@@ -246,32 +239,28 @@ func useTicketPost(
 		if wanted < used {
 			unconsumeTickets(lines, event, used-wanted)
 		}
-		log.Printf("%s USE TICKETS order:%d event:%s class:%q used:%d want:%d allow:%d-%d",
-			session.Username, order.ID, event.ID, cname, used, wanted, min, max)
 	}
 	// Clean up and return success.
-	tx.SaveOrder(order)
-	api.Commit(tx)
-	jw = json.NewWriter(w)
-	jw.Object(func() {
-		jw.Prop("id", int(order.ID))
-	})
-	jw.Close()
+	r.Tx.SaveOrder(order)
+	r.Tx.Commit()
+	fmt.Fprint(r, `{"id":%d}`, order.ID)
+	return nil
 }
 
 // useTicketError sends an error for a UseTicket request with an invalid order.
-func useTicketError(tx db.Tx, w http.ResponseWriter, order *model.Order, message string) {
-	api.Commit(tx)
-	w.Header().Set("Content-Type", "application/json")
-	jw := json.NewWriter(w)
-	jw.Object(func() {
-		jw.Prop("id", int(order.ID))
-		if order.Name != "" {
-			jw.Prop("name", order.Name)
-		}
-		jw.Prop("error", message)
-	})
-	jw.Close()
+func useTicketError(r *api.Request, order *model.Order, message string) {
+	r.Header().Set("Content-Type", "application/json")
+	var jw jwriter.Writer
+	jw.RawString(`{"id":`)
+	jw.Int(int(order.ID))
+	if order.Name != "" {
+		jw.RawString(`,"name":`)
+		jw.String(order.Name)
+	}
+	jw.RawString(`,"error":`)
+	jw.String(message)
+	jw.RawByte('}')
+	jw.DumpTo(r)
 }
 
 // useTicketClassMap returns a map from ticket class name to the list of order
@@ -309,9 +298,9 @@ func useTicketClassMap(order *model.Order, event *model.Event) (cm map[string][]
 
 // getFreeClasses returns a map from class name to product for each ticket class
 // that is available free to the specified event.
-func getFreeClasses(tx db.Tx, event *model.Event) (fc map[string]*model.Product) {
+func getFreeClasses(r *api.Request, event *model.Event) (fc map[string]*model.Product) {
 	fc = make(map[string]*model.Product)
-	for _, p := range tx.FetchProductsByEvent(event) {
+	for _, p := range r.Tx.FetchProductsByEvent(event) {
 		for _, sku := range p.SKUs {
 			if sku.Source == model.OrderInPerson && sku.Coupon == "" && sku.InSalesRange(time.Now()) == 0 &&
 				sku.Price == 0 {

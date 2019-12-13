@@ -2,9 +2,10 @@ package ofcapi
 
 import (
 	"errors"
-	"log"
 	"strconv"
 	"time"
+
+	"github.com/mailru/easyjson"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
@@ -14,10 +15,8 @@ import (
 // CreateEvent handles POST /ofcapi/event requests.
 func CreateEvent(r *api.Request) error {
 	var (
-		session *model.Session
-		event   *model.Event
-		out     []byte
-		err     error
+		event *model.Event
+		err   error
 	)
 	if r.Privileges&model.PrivSetupOrders == 0 {
 		return auth.Forbidden
@@ -33,10 +32,7 @@ func CreateEvent(r *api.Request) error {
 	}
 	r.Tx.SaveEvent(event)
 	r.Tx.Commit()
-	out = event.ToJSON()
-	log.Printf("%s CREATE EVENT %s", session.Username, out)
-	r.Header().Set("Content-Type", "application/json")
-	r.Write(out)
+	easyjson.MarshalToHTTPResponseWriter(event, r)
 	return nil
 }
 

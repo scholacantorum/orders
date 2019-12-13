@@ -1,7 +1,5 @@
 package api
 
-//go:generate easyjson -lower_camel_case login.go
-
 import (
 	"errors"
 	"log"
@@ -11,11 +9,14 @@ import (
 	"time"
 
 	"github.com/mailru/easyjson"
+	"github.com/mailru/easyjson/jlexer"
+	"github.com/mailru/easyjson/jwriter"
+
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/model"
 )
 
-//easyjson:json
+// ssoLogin is what we get back from the members site when we request SSO.
 type ssoLogin struct {
 	ID                int
 	Username          string
@@ -26,7 +27,7 @@ type ssoLogin struct {
 	PrivScanTickets   bool
 }
 
-//easyjson:json
+// loginResponse is the form of the JSON response to the login request.
 type loginResponse struct {
 	Token             string
 	Username          string
@@ -107,4 +108,53 @@ func Login(r *Request) error {
 	loginResponse.PrivScanTickets = ssoLogin.PrivScanTickets
 	easyjson.MarshalToHTTPResponseWriter(loginResponse, r)
 	return nil
+}
+
+func (v *ssoLogin) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	l.Delim('{')
+	for !l.IsDelim('}') {
+		key := l.UnsafeString()
+		l.WantColon()
+		switch key {
+		case "id":
+			v.ID = l.Int()
+		case "username":
+			v.Username = l.String()
+		case "privSetupOrders":
+			v.PrivSetupOrders = l.Bool()
+		case "privViewOrders":
+			v.PrivViewOrders = l.Bool()
+		case "privManageOrders":
+			v.PrivManageOrders = l.Bool()
+		case "privInPersonSales":
+			v.PrivInPersonSales = l.Bool()
+		case "privScanTickets":
+			v.PrivScanTickets = l.Bool()
+		default:
+			l.SkipRecursive()
+		}
+		l.WantComma()
+	}
+	l.Delim('}')
+	l.Consumed()
+}
+
+func (v loginResponse) MarshalEasyJSON(w *jwriter.Writer) {
+	w.RawString(`{\"token\":`)
+	w.String(v.Token)
+	w.RawString(`,\"username\":`)
+	w.String(v.Username)
+	w.RawString(`,\"stripePublicKey\":`)
+	w.String(v.StripePublicKey)
+	w.RawString(`,\"privSetupOrders\":`)
+	w.Bool(v.PrivSetupOrders)
+	w.RawString(`,\"privViewOrders\":`)
+	w.Bool(v.PrivViewOrders)
+	w.RawString(`,\"privManageOrders\":`)
+	w.Bool(v.PrivManageOrders)
+	w.RawString(`,\"privInPersonSales\":`)
+	w.Bool(v.PrivInPersonSales)
+	w.RawString(`,\"privScanTickets\":`)
+	w.Bool(v.PrivScanTickets)
+	w.RawByte('}')
 }

@@ -1,12 +1,10 @@
 package posapi
 
 import (
-	"net/http"
 	"sort"
 	"strings"
 
-	"github.com/rothskeller/json"
-
+	"github.com/mailru/easyjson/jwriter"
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
 	"scholacantorum.org/orders/db"
@@ -16,24 +14,21 @@ import (
 // ListEventOrders returns a list of orders that include tickets valid at the
 // specified event.  It is used to support the Will Call feature of the
 // at-the-door sales app.
-func ListEventOrders(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID model.EventID) {
+func ListEventOrders(r *api.Request, eventID model.EventID) error {
 	var (
-		session *model.Session
-		event   *model.Event
-		list    []db.EventOrder
-		jw      json.Writer
+		event *model.Event
+		list  []db.EventOrder
+		jw    jwriter.Writer
 	)
-	// Get current session data, if any.
-	if session = auth.GetSession(tx, w, r, model.PrivInPersonSales); session == nil {
-		return
+	if r.Privileges&model.PrivInPersonSales == 0 {
+		return auth.Forbidden
 	}
 	// Get the event whose orders we're supposed to list.
-	if event = tx.FetchEvent(eventID); event == nil {
-		api.NotFoundError(tx, w)
-		return
+	if event = r.Tx.FetchEvent(eventID); event == nil {
+		return api.NotFound
 	}
-	list = tx.FetchEventOrders(event)
-	api.Commit(tx)
+	list = r.Tx.FetchEventOrders(event)
+	r.Tx.Commit()
 	for i := range list {
 		list[i].Name = lastNameFirst(list[i].Name)
 	}
@@ -46,17 +41,21 @@ func ListEventOrders(tx db.Tx, w http.ResponseWriter, r *http.Request, eventID m
 		}
 		return list[i].ID < list[j].ID
 	})
-	w.Header().Set("Content-Type", "application/json")
-	jw = json.NewWriter(w)
-	jw.Array(func() {
-		for _, eo := range list {
-			jw.Object(func() {
-				jw.Prop("id", int(eo.ID))
-				jw.Prop("name", eo.Name)
-			})
+	r.Header().Set("Content-Type", "application/json")
+	jw.RawByte('[')
+	for i, eo := range list {
+		if i != 0 {
+			jw.RawByte(',')
 		}
-	})
-	jw.Close()
+		jw.RawString(`{"id":`)
+		jw.Int(int(eo.ID))
+		jw.RawString(`,"name":`)
+		jw.String(eo.Name)
+		jw.RawByte('}')
+	}
+	jw.RawByte(']')
+	jw.DumpTo(r)
+	return nil
 }
 
 func lastNameFirst(name string) string {

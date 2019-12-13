@@ -34,11 +34,13 @@ func (tx Tx) SaveEvent(e *model.Event) {
 	q.WriteString(eventColumns)
 	q.WriteString(`) VALUES (?,?,?,?,?,?)`)
 	panicOnExecError(tx.tx.Exec(q.String(), IDStr(e.ID), ID(e.MembersID), e.Name, e.Series, Time(e.Start), e.Capacity))
+	tx.audit(model.AuditRecord{Event: e})
 }
 
 // DeleteEvent deletes an event.
 func (tx Tx) DeleteEvent(e *model.Event) {
 	panicOnNoRows(tx.tx.Exec(`DELETE FROM event WHERE id=?`, e.ID))
+	tx.audit(model.AuditRecord{Event: &model.Event{ID: e.ID}})
 }
 
 // FetchEvent returns the event with the specified ID.  It returns nil if no

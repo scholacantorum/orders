@@ -35,11 +35,13 @@ func (tx Tx) SaveProduct(p *model.Product) {
 			`INSERT INTO sku (product, source, coupon, sales_start, sales_end, price) VALUES (?,?,?,?,?,?)`,
 			p.ID, sku.Source, sku.Coupon, Time(sku.SalesStart), Time(sku.SalesEnd), sku.Price))
 	}
+	tx.audit(model.AuditRecord{Product: p})
 }
 
 // DeleteProduct deletes a product.
 func (tx Tx) DeleteProduct(p *model.Product) {
 	panicOnNoRows(tx.tx.Exec(`DELETE FROM product WHERE id=?`, p.ID))
+	tx.audit(model.AuditRecord{Product: &model.Product{ID: p.ID}})
 }
 
 // FetchProduct returns the product with the specified ID.  It returns nil if no

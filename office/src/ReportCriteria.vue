@@ -33,6 +33,7 @@ ReportCriteria
 </template>
 
 <script>
+import moment from 'moment'
 import TreeSelect from './TreeSelect'
 
 const productTypeLabels = {
@@ -58,7 +59,7 @@ export default {
     stats: Object,
   },
   data: () => ({
-    createdAfter: '',
+    createdAfter: moment().subtract(1, 'year').format('YYYY-MM-DD'),
     createdBefore: '',
     customer: '',
     selectedOrderCoupons: [],
@@ -144,7 +145,7 @@ export default {
     onChangeUsedAtEvents(list) { this.selectedUsedAtEvents = list },
     onReset() {
       this.customer = ''
-      this.createdAfter = ''
+      this.createdAfter = moment().subtract(1, 'year').format('YYYY-MM-DD')
       this.createdBefore = ''
       this.selectedOrderCoupons = []
       this.selectedOrderSources = []

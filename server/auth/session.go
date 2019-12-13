@@ -1,13 +1,12 @@
 package auth
 
-//go:generate easyjson -lower_camel_case session.go
-
 import (
 	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/mailru/easyjson"
+	"github.com/mailru/easyjson/jlexer"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/model"
@@ -29,10 +28,11 @@ func ValidateSession(r *api.Request) error {
 		return api.HTTPError(http.StatusUnauthorized, "401 Unauthorized")
 	}
 	r.Privileges = r.Session.Privileges
+	r.Tx.SetUsername(r.Session.Username)
 	return nil
 }
 
-//easyjson:json
+// ssoLogin is what we get back from the members site when we request SSO.
 type ssoLogin struct {
 	ID                int
 	Username          string
@@ -103,5 +103,47 @@ func GetSessionMembersAuth(r *api.Request, auth string) (err error) {
 		r.Session.Privileges |= model.PrivScanTickets
 	}
 	r.Privileges = r.Session.Privileges
+	r.Tx.SetUsername(r.Session.Username)
 	return nil
+}
+
+func (out *ssoLogin) UnmarshalEasyJSON(in *jlexer.Lexer) {
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		switch key {
+		case "id":
+			out.ID = in.Int()
+		case "username":
+			out.Username = in.String()
+		case "name":
+			out.Name = in.String()
+		case "email":
+			out.Email = in.String()
+		case "address":
+			out.Address = in.String()
+		case "city":
+			out.City = in.String()
+		case "state":
+			out.State = in.String()
+		case "zip":
+			out.Zip = in.String()
+		case "privSetupOrders":
+			out.PrivSetupOrders = in.Bool()
+		case "privViewOrders":
+			out.PrivViewOrders = in.Bool()
+		case "privManageOrders":
+			out.PrivManageOrders = in.Bool()
+		case "privInPersonSales":
+			out.PrivInPersonSales = in.Bool()
+		case "privScanTickets":
+			out.PrivScanTickets = in.Bool()
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	in.Consumed()
 }

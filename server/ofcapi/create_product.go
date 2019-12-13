@@ -3,10 +3,11 @@ package ofcapi
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mailru/easyjson"
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
@@ -16,9 +17,7 @@ import (
 // CreateProduct handles POST /ofcapi/product requests.
 func CreateProduct(r *api.Request) error {
 	var (
-		session   *model.Session
 		product   *model.Product
-		out       []byte
 		err       error
 		seenEvent = map[model.EventID]bool{}
 		seenPrio0 bool
@@ -69,10 +68,7 @@ func CreateProduct(r *api.Request) error {
 	}
 	r.Tx.SaveProduct(product)
 	r.Tx.Commit()
-	out = product.ToJSON()
-	log.Printf("%s CREATE PRODUCT %s", session.Username, out)
-	r.Header().Set("Content-Type", "application/json")
-	r.Write(out)
+	easyjson.MarshalToHTTPResponseWriter(product, r)
 	return nil
 }
 

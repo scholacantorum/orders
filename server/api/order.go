@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mailru/easyjson"
+
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
@@ -183,19 +185,23 @@ func CreateOrderCommon(r *Request, order *model.Order) (err error) {
 		case model.PaymentCard:
 			success, card, message = stripe.ChargeCard(order, order.Payments[0])
 			r.Tx = db.Begin()
+			r.Tx.SetRequest(r.Method + " " + r.Path)
+			if r.Session != nil {
+				r.Tx.SetUsername(r.Session.Username)
+			}
 			if !success {
 				r.Tx.DeleteOrder(order)
 				r.Tx.Commit()
 				if message == "" {
 					message = "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700."
 				}
-				log.Printf("ERROR: payment rejected (%q) in order %s", message, order.ToJSON(true))
+				log.Printf("ERROR: payment rejected (%q) in order %d", message, order.ID)
 				SendError(r, message)
 				return
 			}
 			order.Valid = true
 			r.Tx.SaveOrder(order)
-			r.Tx.SaveCard(card, order.Name, order.Email)
+			r.Tx.SaveCard(&model.Card{Card: card, Name: order.Name, Email: order.Email})
 			receipt = order.Email != ""
 			order.Name, order.Email = r.Tx.FetchCard(card)
 			r.Tx.Commit()
@@ -206,11 +212,15 @@ func CreateOrderCommon(r *Request, order *model.Order) (err error) {
 			// the payment intent in it.
 			success = stripe.CreatePaymentIntent(order)
 			r.Tx = db.Begin()
+			r.Tx.SetRequest(r.Method + " " + r.Path)
+			if r.Session != nil {
+				r.Tx.SetUsername(r.Session.Username)
+			}
 			if !success {
 				r.Tx.DeleteOrder(order)
 				r.Tx.Commit()
 				SendError(r, "We're sorry, but our payment processor isn't working right now.  Please try again later, or contact our office at (650) 254-1700.")
-				log.Printf("ERROR: can't create payment intent for order %s", order.ToJSON(true))
+				log.Printf("ERROR: can't create payment intent for order %d", order.ID)
 				return
 			}
 			r.Tx.SaveOrder(order)
@@ -219,8 +229,7 @@ func CreateOrderCommon(r *Request, order *model.Order) (err error) {
 		}
 	}
 	// Log and return the completed order.
-	r.Header().Set("Content-Type", "application/json")
-	r.Write(order.ToJSON(false))
+	easyjson.MarshalToHTTPResponseWriter(order, r)
 	if receipt && order.Email != "" {
 		EmitReceipt(order, false)
 	}

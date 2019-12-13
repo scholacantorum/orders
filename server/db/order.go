@@ -146,6 +146,7 @@ func (tx Tx) SaveOrder(o *model.Order) {
 			}
 		}
 	}
+	tx.audit(model.AuditRecord{Order: o})
 }
 
 // DeleteOrder deletes an order from the database.  Generally this is done only
@@ -153,4 +154,5 @@ func (tx Tx) SaveOrder(o *model.Order) {
 func (tx Tx) DeleteOrder(o *model.Order) {
 	panicOnExecError(tx.tx.Exec(`DELETE FROM payment WHERE orderid=?`, o.ID))
 	panicOnNoRows(tx.tx.Exec(`DELETE FROM orderT WHERE id=?`, o.ID))
+	tx.audit(model.AuditRecord{Order: &model.Order{ID: o.ID}})
 }

@@ -114,7 +114,9 @@ func (id *IDStr) Scan(value interface{}) error {
 // Tx is a wrapper around sql.Tx that implements all of the database package
 // functions for access to our tables.
 type Tx struct {
-	tx *sql.Tx
+	tx       *sql.Tx
+	username string
+	request  string
 }
 
 // Begin  starts a transaction, returning our Tx wrapper instead of a raw sql.Tx.
@@ -139,6 +141,12 @@ func (tx Tx) Rollback() error {
 	}
 	return nil
 }
+
+// SetUsername sets the username used in audit logging of database changes.
+func (tx *Tx) SetUsername(username string) { tx.username = username }
+
+// SetRequest sets the request used in audit logging of database changes.
+func (tx *Tx) SetRequest(request string) { tx.request = request }
 
 func panicOnError(err error) {
 	if err != nil {
