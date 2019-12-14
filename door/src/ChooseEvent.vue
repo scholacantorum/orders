@@ -29,7 +29,7 @@ export default {
         this.choosing = true
         const products = (await this.$axios.get(`/posapi/event/${event.id}/prices`, {
           headers: { 'Auth': this.$store.state.auth },
-        })).data.products.filter(p => !p.message)
+        })).data.filter(p => !p.message)
         this.choosing = false
         if (!products.length) {
           window.alert('No tickets are on sale for that event.')
