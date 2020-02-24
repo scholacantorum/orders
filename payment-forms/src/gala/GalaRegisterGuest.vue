@@ -59,5 +59,5 @@ export default {
 
 <style lang="stylus">
 .gala-guest-label
-  width 5rem
+  min-width 5rem
 </style>
