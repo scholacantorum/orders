@@ -25,10 +25,7 @@ var customerRE = regexp.MustCompile(`^cus_[A-Za-z0-9]+$`)
 // them.  If it returns nil, the order details were invalid; an appropriate
 // error response has been issued, and the error has been logged.
 func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order) {
-	var (
-		err   error
-		pseen = map[model.ProductID]bool{}
-	)
+	var err error
 
 	o = new(model.Order)
 	o.Source = model.OrderSource(r.FormValue("source"))
@@ -101,12 +98,6 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 		)
 		if pname := r.FormValue(prefix + "product"); pname != "" {
 			ol.Product = &model.Product{ID: model.ProductID(pname)}
-			if pseen[ol.Product.ID] {
-				log.Printf("ERROR: multiple lines with product %q", pname)
-				http.Error(w, `400 Bad Request: multiple lines with same "product"`, http.StatusBadRequest)
-				goto ERROR
-			}
-			pseen[ol.Product.ID] = true
 		} else {
 			break
 		}
@@ -120,6 +111,9 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 			http.Error(w, `400 Bad Request: invalid "price"`, http.StatusBadRequest)
 			goto ERROR
 		}
+		ol.GuestName = r.FormValue(prefix + "guestName")
+		ol.GuestEmail = r.FormValue(prefix + "guestEmail")
+		ol.Option = r.FormValue(prefix + "option")
 		if uval := r.FormValue(prefix + "used"); uval != "" {
 			if ol.Used, err = strconv.Atoi(uval); err != nil || ol.Used < 0 {
 				log.Printf("ERROR: invalid used amount %q", uval)
@@ -385,9 +379,9 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 		case model.ProdAuctionItem:
 			// Auction items aren't supported yet.
 			return false // TODO
-		case model.ProdDonation, model.ProdRecording, model.ProdSheetMusic:
-			// Donations, concert recordings, and sheet music must
-			// have a quantity of 1.
+		case model.ProdDonation, model.ProdRecording, model.ProdSheetMusic, model.ProdRegistration:
+			// Donations, concert recordings, sheet music, and event
+			// registrations must have a quantity of 1.
 			if line.Quantity != 1 || line.Used != 0 || line.UsedAt != "" {
 				return false
 			}

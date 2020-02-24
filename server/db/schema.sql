@@ -74,7 +74,18 @@ CREATE TABLE order_line (
 
     -- The price per unit for this line, in cents.  The total amount for this
     -- line will always be price * quantity.
-    price integer NOT NULL
+    price integer NOT NULL,
+
+    -- The guest name for this line.  Used only for products of type
+    -- registration.
+    guest_name text NOT NULL DEFAULT '',
+
+    -- The guest email for this line.  Used only for products of type
+    -- registration.
+    guest_email text NOT NULL DEFAULT '',
+
+    -- The guest-selected option for this line, if the product has options.
+    option text NOT NULL DEFAULT ''
 );
 CREATE INDEX order_line_order_index   ON order_line (orderid);
 CREATE INDEX order_line_product_index ON order_line (product);
@@ -119,7 +130,11 @@ CREATE TABLE product (
     -- Ticket class (i.e., the sort of person who is allowed to use this
     -- ticket: "Senior", "Student", etc.).  Empty string for non-ticket products
     -- or unrestricted-use tickets.
-    ticket_class text NOT NULL DEFAULT ''
+    ticket_class text NOT NULL DEFAULT '',
+
+    -- Comma-separated list of options that the purchaser can choose from when
+    -- purchasing this product.
+    options text NOT NULL DEFAULT ''
 );
 
 -- The sku table lists all of the SKUs that have been, are, or will be for sale.

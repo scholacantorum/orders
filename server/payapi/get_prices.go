@@ -19,6 +19,7 @@ type getPricesData struct {
 	name    string
 	message string
 	price   int
+	options []string
 }
 
 // GetPrices returns the prices and availability of one or more products.  It is
@@ -66,6 +67,7 @@ func GetPrices(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		}
 		pd.id = product.ID
 		pd.name = product.ShortName
+		pd.options = product.Options
 		// Find the best SKU for this product.
 		for _, s := range product.SKUs {
 			if !api.MatchingSKU(s, coupon, source, true) {
@@ -153,6 +155,15 @@ func emitGetPrices(jw json.Writer, session *model.Session, couponMatch bool, pda
 							jw.Prop("message", pd.message)
 						} else {
 							jw.Prop("price", pd.price)
+						}
+						if len(pd.options) != 0 {
+							jw.Prop("options", func() {
+								jw.Array(func() {
+									for _, o := range pd.options {
+										jw.String(o)
+									}
+								})
+							})
 						}
 					})
 				}

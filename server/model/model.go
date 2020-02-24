@@ -70,14 +70,17 @@ type Order struct {
 type OrderLineID int
 
 type OrderLine struct {
-	ID       OrderLineID
-	Product  *Product
-	Quantity int
-	Price    int
-	Tickets  []*Ticket
-	Used     int     // not persistent; input only
-	UsedAt   EventID // not persistent; input only
-	Error    string  // not persistent; output only
+	ID         OrderLineID
+	Product    *Product
+	Quantity   int
+	Price      int
+	GuestName  string
+	GuestEmail string
+	Option     string
+	Tickets    []*Ticket
+	Used       int     // not persistent; input only
+	UsedAt     EventID // not persistent; input only
+	Error      string  // not persistent; output only
 }
 
 func (ol *OrderLine) TicketsUsed() (used int) {
@@ -179,6 +182,9 @@ const (
 	// ProdOther is an "other" product type, not allowed for new products
 	// but used for products in archive orders.
 	ProdOther = "other"
+
+	// ProdRegistration is a registration for an event (generally the gala).
+	ProdRegistration = "registration"
 )
 
 type Product struct {
@@ -190,6 +196,7 @@ type Product struct {
 	Receipt     string
 	TicketCount int
 	TicketClass string
+	Options     []string
 	SKUs        []*SKU
 	Events      []ProductEvent
 }

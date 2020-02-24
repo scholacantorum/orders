@@ -164,6 +164,36 @@ func encodeOrderLine(out *jwriter.Writer, in *OrderLine, log bool) {
 		}
 		out.Int(int(in.Price))
 	}
+	if in.GuestName != "" {
+		const prefix string = ",\"guestName\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(in.GuestName)
+	}
+	if in.GuestEmail != "" {
+		const prefix string = ",\"guestEmail\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(in.GuestEmail)
+	}
+	if in.Option != "" {
+		const prefix string = ",\"option\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(in.Option)
+	}
 	if len(in.Tickets) != 0 {
 		const prefix string = ",\"tickets\":"
 		if first {

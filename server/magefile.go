@@ -87,7 +87,7 @@ func publicPaymentForms(path, data, config string) error {
 		err       error
 		resources = map[string]map[string][]string{}
 	)
-	for _, base := range []string{"chunk-vendors", "buy-tickets", "donate"} {
+	for _, base := range []string{"chunk-vendors", "buy-tickets", "donate", "gala"} {
 		matches, _ = filepath.Glob(path + "/" + base + ".*")
 		for _, match := range matches {
 			if err = sh.Rm(match); err != nil {
