@@ -107,7 +107,7 @@ func (tx Tx) FetchProductsByEvent(event *model.Event) (products []*model.Product
 		err      error
 	)
 	prows, err = tx.tx.Query(`
-SELECT p.id, p.series, p.name, p.shortname, p.type, p.receipt, p.ticket_count, p.ticket_class
+SELECT p.id, p.series, p.name, p.shortname, p.type, p.receipt, p.ticket_count, p.ticket_class, p.options
 FROM product p, product_event pe WHERE pe.product=p.id AND pe.event=? ORDER BY pe.priority`, event.ID)
 	panicOnError(err)
 	for prows.Next() {
