@@ -196,7 +196,7 @@ CREATE TABLE event (
     id text PRIMARY KEY,
 
     -- Identifier of the event in the event table of the
-    -- scholacantorummembers.org database.
+    -- members.scholacantorum.org database.
     members_id integer UNIQUE,
 
     -- Name of the event (as it should be shown to a customer on a receipt).  Do
@@ -305,28 +305,28 @@ CREATE TABLE payment (
 CREATE INDEX payment_order_index ON payment (orderid);
 
 -- The session table lists all active user sessions.  User authentication and
--- authorization are delegated to scholacantorummembers.org.
+-- authorization are delegated to members.scholacantorum.org.
 CREATE TABLE session (
 
     -- Unique identifier of a login session (a random alphanumeric string).
     -- This identifier is included in all HTTPS requests to the server.
     token text PRIMARY KEY,
 
-    -- The username of the session user.  It maps to the user.username column in
-    -- the scholacantorummembers.org database.
+    -- The username of the session user.  It maps to the username in the
+    -- members.scholacantorum.org database.
     username text NOT NULL,
 
     -- The expiration date and time of the session.  After this time, the user
     -- must log in again.
     expires text NOT NULL,
 
-    -- The user ID of the session user, in the user table of the
-    -- scholacantorummembers.org table.
+    -- The user ID of the session user, in the user data of the
+    -- members.scholacantorum.org database.
     member integer NOT NULL,
 
     -- The privileges granted to this user and therefore to this session (a
-    -- bitmask).  These are derived from the user.roles column in the
-    -- scholacantorummembers.org database.
+    -- bitmask).  These are derived from the user roles in the
+    -- members.scholacantorum.org database.
     privileges integer NOT NULL
 );
 

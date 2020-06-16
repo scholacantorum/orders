@@ -27,7 +27,7 @@ const (
 	OrderFromPublic OrderSource = "public"
 
 	// OrderFromMembers indicates that this order was placed through
-	// Schola's members web site, scholacantorummembers.org.
+	// Schola's members web site, members.scholacantorum.org.
 	OrderFromMembers = "members"
 
 	// OrderFromGala indicates that this order was placed through Schola's

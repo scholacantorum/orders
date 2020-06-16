@@ -31,7 +31,7 @@ func Login(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 		BadRequestError(tx, w, "missing password")
 		return
 	}
-	resp, err = http.PostForm("https://scholacantorummembers.org/api/login/sso", url.Values{
+	resp, err = http.PostForm("https://members.scholacantorum.org/api/login/sso", url.Values{
 		"username": []string{session.Username},
 		"password": []string{password},
 	})

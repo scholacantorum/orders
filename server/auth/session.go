@@ -40,7 +40,7 @@ func GetSessionMembersAuth(tx db.Tx, w http.ResponseWriter, r *http.Request, aut
 		resp *http.Response
 		err  error
 	)
-	resp, err = http.Get("http://scholacantorummembers.org/api/login/sso?auth=" + url.QueryEscape(auth))
+	resp, err = http.Get("http://members.scholacantorum.org/api/login/sso?auth=" + url.QueryEscape(auth))
 	if err != nil {
 		tx.Rollback()
 		log.Printf("ERROR: can't contact members site for SSO: %s", err)
