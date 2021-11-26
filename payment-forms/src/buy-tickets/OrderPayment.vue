@@ -1,23 +1,24 @@
 <!--
 OrderPayment gets the payment method.  Its properties are:
   - couponMatch - indicates whether the coupon code in the form is valid
-  - send - function that will send the order to the server.  It is called with
-    a hash containing:
+  - send - function that will send the order to the server.  This function must
+    return a Promise that resolves to null if the order was placed successfully,
+    or an error message otherwise.  It is called with a hash containing:
       - name - the customer name
       - email - the customer email
       - subtype - the payment subtype information
       - method - the Stripe payment method ID
-    This function must return a Promise that resolves to null if the order was
-    placed successfully, or an error message otherwise.
   - stripeKey - the key for accessing the Stripe API
   - total - the amount to be paid, in cents, or null if the form is not ready
-It emits:
+
+OrderPayment emits:
   - cancel - when the order is cancelled by the user.
   - submitted - when the user attempts to submit the form.  This enables more
     blatant validation errors.
   - submitting - sent with payload true when the code is attempting to submit
     the payment, and sent with payload false when the attempt ends
-It exposes:
+
+OrderPayment exposes:
   - submit() - to be called when the containing form is submitted.  The default
     action of the form submit should be prevented by the caller.
 
@@ -30,7 +31,9 @@ If PaymentRequest API is supported, we give the user the option of using it or
 directly entering their payment info.  Both UIs are rendered so that switching
 between them is quick, but only the selected one is visible.  The user's choice
 is stored in the "usePR" flag, controlled by a switch in the UI.  It defaults to
-true (i.e, use the PaymentRequest API).
+true (i.e, use the PaymentRequest API).  However, it is forced to false (i.e.,
+use manual entry) if total becomes zero, sinec the PaymentRequest API can't
+handle a zero-value transaction.
 
 If the PaymentRequest API is used, we will get a 'click' event from the payment
 request button when it is clicked.  If the form passes validation, we update the
@@ -41,49 +44,81 @@ payment method ID from that event, and tell our parent component to place the
 order using those; we then notify the payment request button whether the order
 was successfully placed.
 
-If the PaymentRequest API is not used, we will get a 'submit' event from the
-form when the user clicks the 'Pay Now' button.  If the form passes validation,
-we will request a payment method from the card entry field, and if that is
-successful, we will tell our parent component to place the order using it and
-using the customer name and email from our form fields.
+If the PaymentRequest API is not used, but the order total is nonzero, we will
+get a 'submit' event from the form when the user clicks the 'Pay Now' button.
+If the form passes validation, we will request a payment method from the card
+entry field, and if that is successful, we will tell our parent component to
+place the order using it and using the customer name and email from our form
+fields.
+
+If the order total is zero, we will get a 'submit' event from the form when the
+user clicks the 'Register' button.  If the form passes validation, we will tell
+our parent component to place the order using the customer name and email from
+our form fields, with no payment information.
 -->
 
 <template lang="pug">
-#buy-tickets-form-payment(v-show="canPR !== null")
-  #buy-tickets-form-use-pr-div(v-if="canPR")
-    label#buy-tickets-form-use-pr-label(for="buy-tickets-form-use-pr")
+#buy-tickets-form-payment(v-show='canPR !== null')
+  #buy-tickets-form-use-pr-div(v-if='canPR')
+    label#buy-tickets-form-use-pr-label(for='buy-tickets-form-use-pr')
       | Use payment info saved {{ deviceOrBrowser }}?
-    b-form-checkbox#buy-tickets-form-use-pr(v-model="usePR" switch)
-  div(v-show="!usePR")
+    b-form-checkbox#buy-tickets-form-use-pr(v-model='usePR', switch, :disabled='total === 0')
+  div(v-show='!usePR')
     b-form-group.mb-1(
-      label="Your name" label-sr-only
-      :state="nameState" invalid-feedback="Please enter your name."
-    )
-      b-form-input(v-model.trim="name" placeholder="Your name" autocomplete="name" :disabled="submitting")
-    b-form-group.mb-1(
-      label="Email address" label-sr-only
-      :state="emailState"
-      :invalid-feedback="email ? 'This is not a valid email address.' : 'Please enter your email address.'"
+      label='Your name',
+      label-sr-only,
+      :state='nameState',
+      invalid-feedback='Please enter your name.'
     )
       b-form-input(
-        v-model.trim="email" type="email" placeholder="Email address" autocomplete="email" :disabled="submitting"
-        @focus="emailFocused=true" @blur="emailFocused=false"
+        v-model.trim='name',
+        placeholder='Your name',
+        autocomplete='name',
+        :disabled='submitting'
       )
     b-form-group.mb-1(
-      label="Card number" label-sr-only
-      :state="cardError ? false : null" :invalid-feedback="cardError"
+      label='Email address',
+      label-sr-only,
+      :state='emailState',
+      :invalid-feedback='email ? "This is not a valid email address." : "Please enter your email address."'
     )
-      #buy-tickets-form-card.form-control(ref="card")
+      b-form-input(
+        v-model.trim='email',
+        type='email',
+        placeholder='Email address',
+        autocomplete='email',
+        :disabled='submitting',
+        @focus='emailFocused = true',
+        @blur='emailFocused = false'
+      )
+    b-form-group.mb-1(
+      label='Card number',
+      label-sr-only,
+      :state='cardError ? false : null',
+      :invalid-feedback='cardError'
+    )
+      #buy-tickets-form-card.form-control(ref='card')
   #buy-tickets-form-footer
-    #buy-tickets-form-message(v-if="message" v-text="message")
+    #buy-tickets-form-message(v-if='message', v-text='message')
     #buy-tickets-form-buttons
-      b-btn(type="button" variant="secondary" :disabled="submitting" @click="onCancel") Cancel
-      #buy-tickets-form-prbutton(v-show="usePR" ref="prbutton")
-      b-btn#buy-tickets-form-pay-now(v-if="!usePR && submitting" type="submit" variant="primary" disabled)
+      b-btn(type='button', variant='secondary', :disabled='submitting', @click='onCancel') Cancel
+      #buy-tickets-form-prbutton(v-show='usePR', ref='prbutton')
+      b-btn#buy-tickets-form-pay-now(
+        v-if='!usePR && submitting',
+        type='submit',
+        variant='primary',
+        disabled
+      )
         b-spinner.mr-1(small)
-        | Paying...
-      b-btn#buy-tickets-form-pay-now(v-if="!usePR && !submitting" type="submit" variant="primary")
-        | Pay {{ total ? `$${total/100}` : 'Now' }}
+        span(v-if='total !== 0') Paying...
+        span(v-else) Saving...
+      b-btn#buy-tickets-form-pay-now(
+        v-if='!usePR && !submitting',
+        type='submit',
+        variant='primary'
+      )
+        span(v-if='total') Pay ${{ total / 100 }}
+        span(v-else) Register
 </template>
 
 <script>
@@ -114,11 +149,14 @@ export default {
   }),
   async mounted() {
     // eslint-disable-next-line
-    if (!stripe) stripe = Stripe(this.stripeKey);
+    if (!stripe) stripe = Stripe(this.stripeKey)
 
     // Create the Stripe card element and set it up.
-    this.elements = stripe.elements();
-    this.card = this.elements.create('card', { style: { base: { fontSize: '16px', lineHeight: 1.5 } } });
+    this.elements = stripe.elements()
+    this.card = this.elements.create('card', {
+      style: { base: { fontSize: '16px', lineHeight: 1.5 } },
+      disabled: !this.total,
+    })
     this.card.on('change', this.onCardChange)
     this.card.on('focus', () => { this.cardFocus = true })
     this.card.on('blur', () => { this.cardFocus = false })
@@ -152,7 +190,7 @@ export default {
       // Returns an error message describing the problem with the card input,
       // or null if no error message should be displayed.
       if (this.cardChange && this.cardChange.error) return this.cardChange.error.message
-      if (!this.submitted) return null
+      if (!this.submitted || !this.total) return null
       if (!this.cardChange || this.cardChange.empty) return 'Please enter your card number.'
       if (!this.cardFocus && !this.cardChange.complete) return 'This card number is incomplete.'
       // Incomplete entries in one of the card fields are reflected in
@@ -187,6 +225,14 @@ export default {
   watch: {
     submitted() { if (this.submitted) this.$emit('submitted') },
     submitting() { this.$emit('submitting', this.submitting) },
+    total() {
+      if (this.total === 0) {
+        this.card.update({ disabled: true })
+        this.usePR = false
+      } else {
+        this.card.update({ disabled: !this.total })
+      }
+    },
     usePR() {
       // When someone changes from payment request to manual entry, it's likely
       // because their payment request failed.  If so, the name, email, and card
@@ -234,7 +280,17 @@ export default {
       // Otherwise, validate the form.
       this.submitted = true
       this.message = null
-      if (this.total === null || this.nameState !== null || this.emailState !== null || this.cardError || !this.couponMatch) return
+      if (this.total === null || this.nameState !== null || this.emailState !== null || !this.couponMatch) return
+      if (this.total !== 0 && this.cardError) return
+
+      // If the order total is zero, we don't need to ask for a payment method;
+      // we just send the order.
+      if (this.total === 0) {
+        const error2 = await this.send({ name: this.name, email: this.email, subtype: '', method: '', })
+        this.submitting = false
+        if (error2) this.message = error2
+        return
+      }
 
       // The form is valid, so ask the card element for a payment method.
       this.submitting = true

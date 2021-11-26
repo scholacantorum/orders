@@ -6,22 +6,22 @@ connected with us.
 <template lang="pug">
 div
   #ticket-confirm
-    | Thank you.  We have received your payment and emailed your
+    | Thank you. We have received your order and emailed your
     | ticket. <span id="ticket-reminder">Please bring it with
     | you</span> (printed or on phone) for admission.
   #connect-head Stay informed of Schola news!
   div
-    b-spinner.connect-done.mt-1(v-show="emailSpinner" small)
-    .connect-done(v-show="emailDone") ✓
-    .connect-link(@click="onEmail") Subscribe to our email list
+    b-spinner.connect-done.mt-1(v-show='emailSpinner', small)
+    .connect-done(v-show='emailDone') ✓
+    .connect-link(@click='onEmail') Subscribe to our email list
   div
-    .connect-done(v-show="facebookDone") ✓
-    .connect-link(@click="onFacebook") Follow us on Facebook
+    .connect-done(v-show='facebookDone') ✓
+    .connect-link(@click='onFacebook') Follow us on Facebook
   div
-    .connect-done(v-show="twitterDone") ✓
-    .connect-link(@click="onTwitter") Follow us on Twitter
+    .connect-done(v-show='twitterDone') ✓
+    .connect-link(@click='onTwitter') Follow us on Twitter
   div
-    b-btn#connect-close(variant="primary" @click="$emit('close')") Close
+    b-btn#connect-close(variant='primary', @click='$emit("close")') Close
 </template>
 
 <script>

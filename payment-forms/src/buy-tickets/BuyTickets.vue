@@ -4,19 +4,20 @@ orderable, and an optional message otherwise.
 -->
 
 <template lang="pug">
-div(v-if="message" v-text="message")
-div(v-else-if="products")
-  Dialog(ref="dialog"
-    :coupon="coupon"
-    :couponMatch="couponMatch"
-    :ordersURL="ordersURL"
-    :products="products"
-    :stripeKey="stripeKey"
-    :title="title"
-    @coupon="onChangeCoupon"
+div(v-if='message', v-text='message')
+div(v-else-if='products')
+  Dialog(
+    ref='dialog',
+    :coupon='coupon',
+    :couponMatch='couponMatch',
+    :ordersURL='ordersURL',
+    :products='products',
+    :stripeKey='stripeKey',
+    :title='title',
+    @coupon='onChangeCoupon'
   )
-  b-btn(variant="primary" @click="onBuyTickets" v-text="buttonLabel")
-  span.buy-tickets-price(v-if="priceLabel" v-text="priceLabel")
+  b-btn(variant='primary', @click='onBuyTickets', v-text='buttonLabel')
+  span.buy-tickets-price(v-if='priceLabel', v-text='priceLabel')
 </template>
 
 <script>
@@ -28,6 +29,7 @@ export default {
     productIDs: Array,
     stripeKey: String,
     title: String,
+    buttonLabel: String,
   },
   components: { Dialog },
   data: () => ({ coupon: '', couponMatch: null, message: null, products: null }),
@@ -35,9 +37,6 @@ export default {
     this.getPrices()
   },
   computed: {
-    buttonLabel() {
-      return this.title.includes('Subscription') ? 'Buy Subscriptions' : 'Buy Tickets'
-    },
     priceLabel() {
       if (!this.products || !this.products.length || !this.products[0].price) return null
       if (this.products.some(p => p.price !== this.products[0].price)) return null

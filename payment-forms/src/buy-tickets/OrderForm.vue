@@ -3,18 +3,31 @@ OrderForm is the ticket order form displayed in the dialog box.
 -->
 
 <template lang="pug">
-b-form(novalidate @submit.prevent="onSubmit")
-  OrderLines(ref="lines"
-    :disabled="submitting" :products="products" :submitted="submitted"
-    @lines="onLines"
+b-form(novalidate, @submit.prevent='onSubmit')
+  OrderLines(
+    ref='lines',
+    :disabled='submitting',
+    :products='products',
+    :submitted='submitted',
+    @lines='onLines'
   )
-  OrderDiscount(ref="discount"
-    :coupon="coupon" :couponMatch="couponMatch" :disabled="submitting"
-    @coupon="onCouponChange"
+  OrderDiscount(
+    ref='discount',
+    v-if='canDiscount',
+    :coupon='coupon',
+    :couponMatch='couponMatch',
+    :disabled='submitting',
+    @coupon='onCouponChange'
   )
-  OrderPayment(ref="pmt"
-    :couponMatch="couponMatch" :send="onSend" :stripeKey="stripeKey" :total="total"
-    @cancel="onCancel" @submitted="onSubmitted" @submitting="onSubmitting"
+  OrderPayment(
+    ref='pmt',
+    :couponMatch='couponMatch',
+    :send='onSend',
+    :stripeKey='stripeKey',
+    :total='total',
+    @cancel='onCancel',
+    @submitted='onSubmitted',
+    @submitting='onSubmitting'
   )
 </template>
 
@@ -42,6 +55,9 @@ export default {
       if (!this.lines) return null
       return this.lines.reduce((t, ol) => t + ol.quantity * (ol.price || 0), 0)
     },
+    canDiscount() {
+      return this.lines && !!this.lines.find(ol => !!ol.price && ol.product !== 'donation')
+    },
   },
   watch: {
     submitting() { this.$emit('submitting', this.submitting) },
@@ -65,10 +81,12 @@ export default {
         body.append(`${prefix}.quantity`, ol.quantity)
         body.append(`${prefix}.price`, ol.price)
       })
-      body.append('payment1.type', 'card')
-      body.append('payment1.subtype', subtype)
-      body.append('payment1.method', method)
-      body.append('payment1.amount', this.total)
+      if (subtype) {
+        body.append('payment1.type', 'card')
+        body.append('payment1.subtype', subtype)
+        body.append('payment1.method', method)
+        body.append('payment1.amount', this.total)
+      }
       const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, body,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       ).catch(err => {
@@ -81,7 +99,7 @@ export default {
       if (result && result.data && result.data.error)
         return result.data.error
       console.error(result)
-      return `We’re sorry, but we're unable to process payment cards at the moment.  Please try again later, or call our office at (650) 254-1700 to order by phone.`
+      return `We’re sorry, but we're unable to process your order at the moment.  Please try again later, or call our office at (650) 254-1700 to order by phone.`
     },
     setAutoFocus() { this.$refs.lines.focus() },
   },
