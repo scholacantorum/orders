@@ -209,6 +209,7 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 	// complete.
 	if len(order.Payments) == 0 {
 		order.Valid = true
+		receipt = true
 	} else {
 		switch order.Payments[0].Type {
 		case model.PaymentCard, model.PaymentCardPresent:
@@ -224,7 +225,7 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 	if len(order.Payments) == 1 {
 		switch order.Payments[0].Type {
 		case model.PaymentCash, model.PaymentCheck, model.PaymentOther:
-			receipt = order.Email != ""
+			receipt = true
 		case model.PaymentCard:
 			success, card, message = stripe.ChargeCard(order, order.Payments[0])
 			tx = db.Begin()
@@ -241,7 +242,7 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 			order.Valid = true
 			tx.SaveOrder(order)
 			tx.SaveCard(card, order.Name, order.Email)
-			receipt = order.Email != ""
+			receipt = true
 			order.Name, order.Email = tx.FetchCard(card)
 			Commit(tx)
 		case model.PaymentCardPresent:
