@@ -84,6 +84,7 @@ func main() {
 func router(w http.ResponseWriter, r *http.Request) {
 	r.RequestURI = r.URL.String() // net/http/cgi doesn't set it
 	w.Header().Set("Access-Control-Allow-Origin", config.Get("allowOrigin"))
+	w.Header().Set("Cache-Control", "no-store")
 	switch shiftPath(r) {
 	case "ofcapi":
 		switch shiftPath(r) {
