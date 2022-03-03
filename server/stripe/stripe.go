@@ -76,8 +76,13 @@ func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, card, car
 			Metadata: map[string]string{"order-number": strconv.Itoa(int(order.ID))},
 		},
 	}
+	if order.SaveForReuse && order.Customer != "" {
+		iparams.Customer = &order.Customer
+		iparams.SetupFutureUsage = stripe.String(string(stripe.PaymentIntentSetupFutureUsageOffSession))
+	}
 	if strings.HasPrefix(pmt.Method, "pm_") {
 		iparams.PaymentMethod = &pmt.Method
+		pmt.StripePM = pmt.Method
 	} else {
 		if method, err = paymentmethod.New(&stripe.PaymentMethodParams{
 			Type: stripe.String(string(stripe.PaymentMethodTypeCard)),
@@ -89,6 +94,7 @@ func ChargeCard(order *model.Order, pmt *model.Payment) (success bool, card, car
 			return false, "", ""
 		}
 		iparams.PaymentMethod = &method.ID
+		pmt.StripePM = method.ID
 	}
 	intent, err = paymentintent.New(iparams)
 	if serr, ok := err.(*stripe.Error); ok && serr.Type == stripe.ErrorTypeCard {

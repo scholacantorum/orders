@@ -43,28 +43,28 @@ const (
 	OrderInPerson = "inperson"
 )
 
-//easyjson:json
 type Order struct {
-	ID       OrderID
-	Token    string
-	Valid    bool
-	Source   OrderSource
-	Name     string
-	Email    string
-	Address  string
-	City     string
-	State    string
-	Zip      string
-	Phone    string
-	Customer string
-	Member   int
-	Created  time.Time
-	CNote    string
-	ONote    string
-	InAccess bool
-	Coupon   string
-	Lines    []*OrderLine
-	Payments []*Payment
+	ID           OrderID
+	Token        string
+	Valid        bool
+	SaveForReuse bool
+	Source       OrderSource
+	Name         string
+	Email        string
+	Address      string
+	City         string
+	State        string
+	Zip          string
+	Phone        string
+	Customer     string
+	Member       int
+	Created      time.Time
+	CNote        string
+	ONote        string
+	InAccess     bool
+	Coupon       string
+	Lines        []*OrderLine
+	Payments     []*Payment
 }
 
 type OrderLineID int
@@ -116,13 +116,14 @@ const (
 )
 
 type Payment struct {
-	ID      PaymentID
-	Type    PaymentType
-	Subtype string
-	Method  string
-	Stripe  string
-	Created time.Time
-	Amount  int
+	ID       PaymentID
+	Type     PaymentType
+	Subtype  string
+	Method   string
+	Stripe   string
+	StripePM string
+	Created  time.Time
+	Amount   int
 }
 
 type Privilege uint8

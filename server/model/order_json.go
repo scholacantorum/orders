@@ -101,6 +101,16 @@ func encodePayment(out *jwriter.Writer, in *Payment, log bool) {
 		}
 		out.String(string(in.Stripe))
 	}
+	if in.StripePM != "" {
+		const prefix string = ",\"stripePM\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.StripePM))
+	}
 	if !in.Created.IsZero() {
 		const prefix string = ",\"created\":"
 		if first {

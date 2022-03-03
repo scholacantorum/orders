@@ -40,6 +40,7 @@ var customerRE = regexp.MustCompile(`^cus_[A-Za-z0-9]+$`)
 //     oNote:  order note from office
 //     inAccess:  flag whether order is in office Access database
 //     coupon:  coupon code used for order
+//     saveForReuse:  order method should be preserved for later charges
 //     [line# begins at 1]
 //     line#.product:  product ID for line #
 //     line#.quantity:  quantity for line #
@@ -59,6 +60,7 @@ func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order
 
 	o = new(model.Order)
 	o.Source = model.OrderSource(r.FormValue("source"))
+	o.SaveForReuse = r.FormValue("saveForReuse") != ""
 	switch o.Source {
 	case "":
 		o.Source = model.OrderFromPublic
@@ -261,6 +263,9 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 		case model.PaymentCash, model.PaymentCheck, model.PaymentOther:
 			receipt = true
 		case model.PaymentCard:
+			if order.SaveForReuse && order.Customer == "" {
+				stripe.FindOrCreateCustomer(order)
+			}
 			success, card, message = stripe.ChargeCard(order, order.Payments[0])
 			tx = db.Begin()
 			if !success {
