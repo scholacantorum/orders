@@ -203,73 +203,52 @@ directly to Stripe, and gives the corresponding token to our phone app.
 
 ```x
               ┌───────────────────────┐      ? = zero or one
-              │        order          │      * = zero or more
+              │        orderT         │      * = zero or more
               └───┬────────────────┬──┘      1 = exactly one
                  +│               *│         + = one or more
            ┌──────┴─────┐     ┌────┴────┐
            │ order_line │     │ payment │
-           └──┬───┬───┬─┘     └────┬────┘
-   *┌─────────┘   │1  └──────┐*   +│
-┌───┴────┐  ┌─────┴────┐  ┌──┴─────┴─────┐
-│ ticket │  │ product  │  │ payment_line │
-└───┬────┘  └─┬─────┬──┘  └──────────────┘
+           └──┬───┬─────┘     └─────────┘
+   *┌─────────┘   │1  
+┌───┴────┐  ┌─────┴────┐
+│ ticket │  │ product  │
+└───┬────┘  └─┬─────┬──┘
    ?│         │    +│
-┌───┴────┐    │  ┌──┴──┐
-│ event  │    │  │ sku │
-└───┬────┘    │  └─────┘
+┌───┴────┐    │  ┌──┴──┐   ┌────────────┐
+│ event  │    │  │ sku │   │ card_email │
+└───┬────┘    │  └─────┘   └────────────┘
    +│        *│
-┌───┴─────────┴─┐              ┌─────────┐
-│ product_event │              │ session │
-└───────────────┘              └─────────┘
+┌───┴─────────┴─┐             ┌─────────┐
+│ product_event │             │ session │
+└───────────────┘             └─────────┘
 ```
 
 There are database tables for order management and for ticket usage tracking.
-(There are also tables for auditing and logging, but those are not detailed
-here.)
 
 ### Ordering
 
 The ordering part of the system has a pretty straightforward database schema,
-which centers around customers, products, SKUs, and orders.
-
-```sql
-CREATE TABLE customer (
-    id       integer PRIMARY KEY,
-    stripeID text    UNIQUE,
-    memberID integer,
-    name     text    NOT NULL,
-    email    text,
-    address  text,
-    city     text,
-    state    text,
-    zip      text
-);
-```
-
-Customers are basically a collection of contact information and identifiers.
-`stripeID` is the ID of the customer in Stripe's database; we continue to store
-credit card and similar information in Stripe, of course.  `memberID` is set
-only for customers who are Schola singers; it gives their ID number in the
-members site database.
+which centers around products, SKUs, orders, and payments.
 
 ```sql
 CREATE TABLE product (
-    id          integer PRIMARY KEY,
-    stripeID    text    NOT NULL UNIQUE,
-    name        text    NOT NULL,
-    ticketCount integer NOT NULL,
-    ticketClass text
+    id           text    PRIMARY KEY,
+    series       text,
+    name         text    NOT NULL,
+    shortname    text    NOT NULL,
+    type         text    NOT NULL,
+    receipt      text,
+    ticket_count integer,
+    ticket_class text
+    options      text
 );
 CREATE TABLE sku (
-    id          integer  PRIMARY KEY,
-    stripeID    text     NOT NULL UNIQUE,
-    product     integer  NOT NULL REFERENCES product,
+    product     text     NOT NULL REFERENCES product,
+    source      text     NOT NULL CHECK (source IN ('public', 'members', 'gala', 'inperson', 'office')),
     coupon      text,
-    salesStart  datetime,
-    salesEnd    datetime,
-    membersOnly boolean  NOT NULL DEFAULT false,
-    price       integer  CHECK (price IS NULL OR price >= 0),
-    UNIQUE (product, coupon, membersOnly)
+    sales_start datetime,
+    sales_end   datetime,
+    price       integer
 );
 ```
 
@@ -278,71 +257,127 @@ more SKUs.  Products represent what the customer gets (e.g., adult admission to
 a particular concert) while SKUs represent how they got it (full price, coupon
 code, early bird discount, etc.).
 
-In the `product` table, `ticketCount` is the number of (virtual) event tickets
-the customer gets as a result of buying one unit of this product.  For a
-non-ticket product, this would be zero.  For a ticket to a specific event, this
-would be one.  For a Flex Pass, this would be the number of events covered by
-the pass (e.g. 4 for a season subscription, 6 for summer sings, etc.).
-`ticketClass`, if specified, is the restriction on who is allowed to use the
+In the `product` table, products are arranged by `series` (e.g., season) and
+`type` (`ticket`, `donation`, etc.).  Each product has two names:  a full `name`
+that stands on its own, and a `shortname` used in contexts where the full name
+is redundant.  If `receipt` is non-NULL, it is the template for a receipt email
+that will be sent to the purchaser.  `ticket_count` is the number of (virtual)
+event tickets the customer gets as a result of buying one unit of this product.
+For a non-ticket product, this would be zero.  For a ticket to a specific event,
+this would be one.  For a Flex Pass, this would be the number of events covered
+by the pass (e.g. 4 for a season subscription, 6 for summer sings, etc.).
+`ticket_class`, if specified, is the restriction on who is allowed to use the
 ticket (e.g. "Senior" or "Student").  It is not specified for unrestricted-use
-tickets or for non-ticket products.
+tickets or for non-ticket products.  Some products have options to choose from
+(e.g., dinner entree or T-shirt size), in which case those are listed in the
+`options`.
 
 In the `sku` table, the `price` is the price of the item (as an integer in
 cents, to avoid rounding problems).  If it is `NULL`, that means the SKU's price
-is variable (e.g. a donation or an auction bid).  The `coupon` is the coupon
-code that the customer has to enter in order to get that price.  Every product
-should have a sku with a `NULL` coupon to set the price when no valid coupon
-code is entered.  The `salesStart` and `salesEnd` columns, when not `NULL`,
-specify the period of time during when regular customers can place orders.
-(Office staff can place orders for anything at any time.)  The `membersOnly`
-flag indicates a product that can only be ordered through the members web site
-(e.g. concert recordings).
+is variable (e.g. a donation or an auction bid).  The `source` is the source
+through which the order must be placed in order to get that price.  The `coupon`
+is the coupon code that the customer has to enter in order to get that price.
+Every product should have a sku with a `NULL` coupon to set the price when no
+valid coupon code is entered.  The `sales_start` and `sales_end` columns, when
+not `NULL`, specify the period of time during when regular customers can place
+orders.  (Office staff can place orders for anything at any time.)
 
 It should be noted that Schola has experimented with a wide variety of sales
 incentives over the years: quantity discounts, percentage discounts, early bird
 discounts, etc.  This schema only accounts for the sales models currently in
 use.  Additional ones can be added on demand.
 
-Note that `product.stripeID` cannot be changed once an order is placed for that
-product, and `sku.stripeID`, `sku.product`, `sku.coupon`, and `sku.membersOnly`
-cannot be changed once an order is placed for that SKU.  Ideally we would treat
-`sku.price` the same way, but that's actually set in Stripe's dashboard, over
-which we have no control.
-
 ```sql
-CREATE TABLE order (
-    id       integer PRIMARY KEY,
-    stripeID text     UNIQUE,
-    customer integer  NOT NULL REFERENCES customer,
-    source   text     NOT NULL CHECK (source IN ('door', 'web', 'other')),
-    tstamp   datetime NOT NULL,
-    payment  text     NOT NULL,
-    note     text
+CREATE TABLE orderT (
+    id        integer  PRIMARY KEY,
+    token     text     UNIQUE,
+    valid     boolean  NOT NULL DEFAULT false,
+    source    text     NOT NULL CHECK (source IN ('public', 'members', 'gala', 'inperson', 'office')),
+    name      text,
+    email     text,
+    address   text,
+    city      text,
+    state     text,
+    zip       text,
+    phone     text,
+    customer  text,
+    member    integer,
+    created   datetime NOT NULL,
+    cnote     text,
+    onote     text,
+    in_access boolean,
+    coupon    text,
 );
 CREATE TABLE order_line (
-    id       integer PRIMARY KEY,
-    orderID  integer NOT NULL REFERENCES orders,
-    sku      integer NOT NULL REFERENCES sku,
-    qty      integer NOT NULL CHECK (qty > 0),
-    amount   integer NOT NULL CHECK (amount >= 0)
+    id          integer PRIMARY KEY,
+    orderid     integer NOT NULL REFERENCES orders,
+    product     text    NOT NULL,
+    quantity    integer NOT NULL,
+    price       integer NOT NULL,
+    guest_name  text,
+    guest_email text,
+    option      text
 );
 ```
 
-In the `order` table, the `stripeID` is Stripe's ID for the order, which is set
-only if the order was paid through Stripe.The `payment` is a text description of
-how the order was paid.  For Stripe purchases, it will be automatically
-populated with the card type and last four digits.  The `note` is for office
-use.
+In the `orderT` table — which has a "T" in the name because "order" is a
+reserved word in SQL — both the `id` and the `token` are unique identifiers of
+the order.  The `id` is a monotonic integer used for database access; the
+`token` is an opaque string embedded in ticket QR codes.  The valid flag
+indicates whether the order was actually placed and paid; it is false when an
+order is in progress.  `source` is the source from which the order was placed.
+`name`, `email`, `address`, `city`, `state`, `zip`, and `phone` are information
+about the customer placing the order.  `customer` is the customer's Stripe ID,
+if any.  `member` is the ID of the customer on the members site, if the customer
+is a member.  `created` is the time the order was created.  `cnote` and `onote`
+are notes on the order from the customer and the office, respectively.
+`in_access` indicates whether information about the order has been transferred
+into the office Access database.  `coupon` is the coupon code used to place the
+order, if any.
 
 Orders comprise one or more order lines, stored in the `order_line` table under
-the same `orderID` and with unique `lineID` values.  Each line represents a
-purchase of a `qty` of a `sku`.  The `amount` is the total number of cents
-charged for the line.  Normally this will be `qty * sku.price`, but it may be
-different for SKUs whose price varies.
+the same `orderid` and with unique `id` values.  Each line represents a purchase
+of a `quantity` of a `product`, paying `price` (in cents) for each unit.  Thus,
+the total amount for the line is always `quantity * price`.  For some products,
+a guest name, guest email address, and/or options are recorded.
 
-This schema makes no provision for canceled or refunded orders.  The extra
-complexity needed to handle them properly is enormous, and they happen too
-rarely to make that worthwhile.
+```sql
+CREATE TABLE payment (
+    id integer PRIMARY KEY,
+    orderid integer NOT NULL REFERENCES orderT,
+    type    text    NOT NULL CHECK (type IN ('card', 'card-present', 'check', 'cash', 'other')),
+    subtype text,
+    method  text,
+    stripe  text,
+    created datetime NOT NULL,
+    initial boolean  NOT NULL,
+    amount  integer  NOT NULL
+)
+```
+
+In the `payment` table, there is one row for each payment or refund on an order.
+The payment is identified by `id` and the order is identified by `orderid`.
+`type` indicates the basic type of payment.  `subtype` is primarily used with
+`card` and `card-present` to indicate how the card number was collected.
+`method` is a textual description of the payment method, used in receipts; for
+example, for `card` payments it includes the card type and last four digits.  If
+the payment is processed through Stripe, `stripe` contains the charge ID or
+refund ID.  `created` is the time when the payment or refund occurred.
+`initial` is true for the first payment on an order, and false for all others.
+`amount` is the amount of the payment (in cents); negative numbers are refunds.
+
+```sql
+CREATE TABLE card_email (
+    card  text PRIMARY KEY,
+    name  text,
+    email text,
+)
+```
+
+In the `card_email` table, Stripe card fingerprints (`card`) are mapped to the
+`name` and/or `email` of the person who most recently placed an order using that
+card.  This allows us to guess their name and email when they present that card
+for subsequent orders.
 
 ### Ticket Usage Tracking
 
@@ -351,22 +386,24 @@ tickets, and admissions.
 
 ```sql
 CREATE TABLE event (
-    id        integer  PRIMARY KEY,
-    membersID integer  UNIQUE,
-    name      text     NOT NULL,
-    start     datetime NOT NULL,
-    capacity  integer
+    id         integer  PRIMARY KEY,
+    members_id integer  UNIQUE,
+    name       text     NOT NULL,
+    series     text     NOT NULL,
+    start      datetime NOT NULL,
+    capacity   integer
 );
 CREATE TABLE product_event (
-    product integer NOT NULL REFERENCES product,
-    event   integer NOT NULL REFERENCES event,
+    product  integer NOT NULL REFERENCES product,
+    event    integer NOT NULL REFERENCES event,
+    priority integer NOT NULL,
     PRIMARY KEY (product, event)
 );
 ```
 
 The `event` table lists events for which tickets are sold and ticket usage is
 tracked.  Note that a concert with two seatings gets two rows in this table.
-The `membersID` is the ID of the event in the members site database, which may
+The `members_id` is the ID of the event in the members site database, which may
 be useful for cross references.  The `capacity`, if not `NULL`, is the capacity
 of the house; ticket sales will be stopped when the maximum is reached.  (But
 see note below regarding Flex Passes.)
@@ -375,28 +412,29 @@ The `product_event` join table indicates which products correspond to tickets
 for which events.  A product may have zero rows in this table (it's something
 other than an event ticket); one row in this table (it's a ticket to a specific
 event); or multiple rows in this table (it's a Flex Pass that can be used for
-multiple events).
+multiple events).  The `priority` field helps determine which ticket on an order
+should be consumed when presented at an event.  Typical usage is:
+
+* 0 for individual tickets targeted at the event itself
+* 10 for individual tickets targeted at the other seating of the same concert
+* 20 for flex passes that include the event
+* 30 for individual tickets for a different concert in the same season
 
 ```sql
 CREATE TABLE ticket (
-    id         integer PRIMARY KEY,
-    token      text    NOT NULL,
-    order_line integer NOT NULL REFERENCES order_line,
-    event      integer REFERENCES event,
+    id         integer  PRIMARY KEY,
+    order_line integer  NOT NULL REFERENCES order_line,
+    event      integer  REFERENCES event,
     used       datetime
 );
 ```
 
 The `ticket` table has an entry for every purchased ticket, i.e., for every
-entry of a single person to a single event.  Each ticket has a unique `id`.
-Each ticket also has a random alphanumeric `token`, which is what gets encoded
-into the bar code for the ticket.  For each `order_line` row, there will be
-`order_line.qty * product.ticketCount` rows in the `ticket` table; those rows
-will have unique `id` values but will all have the same random `token`.  For
-example, if someone purchases two season subscriptions to a season with four
-concert sets, there will be eight rows added to the `ticket` table, each with a
-unique `id` and each with the same random `token`.  (Random alphanumeric tokens
-are used in bar codes instead of integers to prevent them from being spoofed.)
+entry of a single person to a single event.  Each ticket has a unique `id`.  For
+each `order_line` row, there will be `order_line.qty * product.ticket_count`
+rows in the `ticket` table.  For example, if someone purchases two season
+subscriptions to a season with four concert sets, there will be eight rows added
+to the `ticket` table, each with a unique `id`.
 
 The `event` column specifies the event for which the ticket was or will be used.
 For Flex Pass tickets, this column remains `NULL` until the ticket is used or
@@ -415,131 +453,62 @@ effective for events that are not covered by a Flex Pass.
 
 The ordering / ticketing system needs APIs to support sales configuration, order
 processing, ticket validation and recording of usage, and ticket usage
-analytics.
+analytics.  The APIs are broken up into different endpoints based on their
+usage.
 
-### Sales Configuration APIs
+### Office APIs
 
-```x
-GET    /api/product               Get list of all products
-GET    /api/product/$id           Get details of a product
-POST   /api/product               Create a product
-PUT    /api/product/$id           Modify a product
-DELETE /api/product/$id           Delete a product
-GET    /api/product/$id/sku       Get list of all SKUs for a product
-GET    /api/product/$id/sku/$id   Get details of one SKU for a product
-POST   /api/product/$id/sku       Create a SKU for a product
-PUT    /api/product/$id/sku/$id   Modify a SKU for a product
-DELETE /api/product/$id/sku/$id   Delete a SKU for a product
-GET    /api/event                 Get list of all events
-GET    /api/event/$id             Get details of an event
-POST   /api/event                 Create an event
-PUT    /api/event/$id             Modify an event
-DELETE /api/event/$id             Delete an event
-```
-
-These APIs are used to maintain the sales configuration data, i.e., everything
-in the `product`, `sku`, `event`, and `product_event` tables described above.
-(`product_event` information is embedded in the `/api/product` APIs.)  The
-`POST`, `PUT`, and `DELETE` calls require authorization, using an `Auth:` header
-on the HTTPS request.  The `GET` calls return limited information if they are
-called without authorization.  In particular:
-
-* Product GETs omit the `stripeID`.
-* SKU GETs return information only for the `NULL` coupon and the coupon named in
-  the `coupon=` parameter if any.  They omit the `stripeID`.  They do not return
-  information for SKUs whose `salesStart` is in the future or whose `salesEnd`
-  is in the past.
-* Event GETs omit the `membersID` and `maximum`.  The event list GET returns
-  information only for future events.
-
-Consistency checks are performed on all changes.  In particular:
-
-* Nothing can be deleted if there are references to it.
-* `product.stripeID` cannot be changed once an order is placed for that product.
-* `sku.stripeID`, `sku.product`, `sku.coupon`, and `sku.membersOnly` cannot be
-  changed once an order is placed for that SKU.
-* All `stripeIDs` are verified against Stripe's database.
-* `sku.price` is populated from Stripe's database, not from the APIs.
-* `event.capacity` cannot be reduced below the number of tickets already sold.
-
-### Order Processing APIs
+These APIs are used by the Schola Office webapp.
 
 ```x
-GET    /api/order       Get list of orders
-GET    /api/order/$id   Get details of one order
-POST   /api/order       Create an order
-PUT    /api/order/$id   Modify an existing order
-DELETE /api/order/$id   Delete an existing order
+POST /ofcapi/event       Create an event
+POST /ofcapi/login       Authenticate
+GET  /ofcapi/order/$id   Get details of an order
+POST /ofcapi/product     Create a product
+GET  /ofcapi/report      Run a report
 ```
 
-These APIs are used to place and maintain orders (and order lines).  Except for
-`POST`, they all require authorization, using an `Auth:` header on the HTTPS
-request.
+The `login` API is used to log into the office webapp.  (Authentication is
+delegated to the members web site.)  The `report` API is used to tabulate order
+information, and the `order/$id` API gets information about a specific order.
+The other two APIs, while implemented, are not yet used.
 
-The `POST` call creates a new order, and if credit card information is included
-in the request, it charges the credit card.  The new order is automatically
-removed if the credit card charge fails.  `POST` requires authorization if:
+### Payment APIs
 
-* A payment method other than credit card is provided.
-* A source other than `web` is provided.
-* A SKU is provided whose `salesStart` is in the future, whose `salesEnd` is in
-  the past, or whose `membersOnly` flag is set.
-* A ticket is purchased that would exceed the maximum for the event.
-
-Orders normally require a customer name and email address.  The exception is
-orders that have a source `door` and contain only individual tickets for the
-event at which they are purchased.  When a Flex Pass is purchased at the door,
-one ticket from it is automatically marked used for the event at which it was
-purchased.  When an individual ticket for an event is purchased at the door of
-that event, it is automatically marked used.
-
-> Procedural question:  the person who buys a ticket at the door (individual or
-Flex pass) isn't going to have anything for the ticket scanner to scan.  How
-do they get past the ticket scanner?  I'm guessing the door sales person gives
-them some sort of chit (e.g. raffle ticket stub) to use in place of a bar code,
-which is why I'm asserting that the ticket they purchase is automatically marked
-used.  That's not quite "paperless", though.  Other ideas?
-
-The `PUT` call allows editing an existing order.  Only the `note` and `payment`
-fields can be changed, and the `payment` field can be changed only for a
-non-Stripe order.
-
-The `DELETE` call allows deleting an existing order.  If the order was charged
-to a credit card, this will reverse the charge.  This is not a general-purpose
-refund mechanism; it is intended only for use in an "undo" feature, to reverse
-an order that was incorrectly placed moments before.  To avoid abuse, this call
-will only work on orders placed within the previous five minutes.
-
-### Ticket Collection APIs
+These APIs are used by the payment forms displayed on the various Schola web
+sites for buying tickets, donating, registering for the gala, purchasing concert
+recordings, etc.
 
 ```x
-POST   /api/ticket/$token   Mark a ticket as used
-DELETE /api/ticket/$token   Mark a ticket as unused
+POST /payapi/order    Create an order
+GET  /payapi/prices   Get pricing for product(s)
 ```
 
-These calls are used by the ticket scanner.  Both of them require authorization,
-using an `Auth:` header on the HTTPS request.  The `POST` request searches for
-an unused ticket, valid for the current event, with the specified token.
+### Point-of-Sale APIs
 
-The `DELETE` request is intended for use in an "undo" feature, such as if the
-ticket scanner accidentally scans someone's pass the wrong number of times.  It
-will look for a ticket with the specified token that was marked used within the
-last 5 minutes, and it will make it unused again.
-
-Both of these calls, whether successful or not, return a list of all of the
-tickets with the same token, so that the ticket taker can answer questions about
-how many are left unused, when the other ones were used, etc.
-
-### Ticket Usage APIs
+These APIs are used by the webapp and iOS app used at the front of the house at
+a concert for in-person sales and ticket scanning.
 
 ```x
-GET /api/usage.csv
+GET    /posapi/event                      List all events
+GET    /posapi/event/$id/orders           List orders for tickets to an event
+GET    /posapi/event/$id/prices           Get pricing for tickets to an event
+GET    /posapi/event/$id/ticket/$token    Use a ticket at an event
+POST   /posapi/event/$id/ticket/$token    Use a ticket at an event
+POST   /posapi/login                      Authenticate
+POST   /posapi/order                      Create an order
+DELETE /posapi/order/$id                  Delete an order
+POST   /posapi/order/$id/capturePayment   Capture the payment for an order
+POST   /posapi/order/$id/sendReceipt      Send a receipt for an order
+GET    /posapi/stripe/connectTerminal     Get a Stripe terminal connection token
 ```
 
-This call, which requires authorization, will return a CSV file listing all
-tickets along with their ordering and usage information.  This can be imported
-into Excel and used for investigations, charts, etc.
+### Ticket-Taking GUI
 
-Once we have a better idea of what analytics we want on a recurring basis, we
-can add additional APIs that return targeted data for them.  However, trying to
-predict that is a fool's game.
+This entrypoint actually serves a web page rather than an API.  It is the web
+page people see if they scan the QR code on their ticket.  It shows the usage of
+the ticket.
+
+```x
+GET /ticket/$token   Show information about a ticket
+```
