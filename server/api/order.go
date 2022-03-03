@@ -24,6 +24,36 @@ var customerRE = regexp.MustCompile(`^cus_[A-Za-z0-9]+$`)
 // GetOrderFromRequest reads the order details from the request body and returns
 // them.  If it returns nil, the order details were invalid; an appropriate
 // error response has been issued, and the error has been logged.
+//
+// Parameters:
+//     source:  order source
+//     name:  customer name
+//     email:  customer email
+//     address:  customer street address
+//     city:  customer address city
+//     state:  customer address state code
+//     zip:  customer address zip code
+//     phone:  customer phone number
+//     customer:  customer Stripe ID
+//     member:  customer ID on members web site
+//     cNote:  order note from customer
+//     oNote:  order note from office
+//     inAccess:  flag whether order is in office Access database
+//     coupon:  coupon code used for order
+//     [line# begins at 1]
+//     line#.product:  product ID for line #
+//     line#.quantity:  quantity for line #
+//     line#.price:  price (in cents) per unit for line #
+//     line#.guestName:  name of guest for line #
+//     line#.guestEmail:  email address of guest for line #
+//     line#.option:  product option for line #
+//     line#.used:  number of tickets used for line #
+//     line#.usedAt:  event ID of event at which tickets were used for line #
+//     [payment# begins at 1]
+//     payment#.type:  type of payment #
+//     payment#.subtype:  subtype of payment #
+//     payment#.method:  method of payment #
+//     payment#.amount:  amount of payment #
 func GetOrderFromRequest(w http.ResponseWriter, r *http.Request) (o *model.Order) {
 	var err error
 
@@ -164,6 +194,10 @@ ERROR:
 // various APIs.  Each of them makes authorization and validity checks specific
 // to it, and then calls this function to perform the common checks and create
 // the order.
+//
+// Emits an HTTP error status for invalid data or internal error.
+// Emits JSON {"error": "..."} for card declined or other card problem.
+// Emits JSON order for success.
 func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, order *model.Order) {
 	var (
 		privs   model.Privilege
@@ -200,10 +234,10 @@ func CreateOrderCommon(tx db.Tx, w http.ResponseWriter, session *model.Session, 
 		BadRequestError(tx, w, "invalid payment")
 		return
 	}
-	// Assign a token to the order (after the new transaction is opened, to
-	// ensure uniqueness).
+	// Assign a token to the order.
 	order.Token = newOrderToken(tx)
-	// Generate tickets if needed.
+	// Generate tickets if needed.  TODO this shouldn't happen until the
+	// order is successfully charged.
 	generateTickets(tx, order)
 	// If we don't have to charge a card through Stripe, the order is now
 	// complete.
@@ -327,8 +361,8 @@ func resolveSKUs(tx db.Tx, order *model.Order) bool {
 // validateCustomer returns whether the customer data in the order are valid.
 func validateCustomer(tx db.Tx, order *model.Order, session *model.Session) bool {
 
-	// A Stripe customer ID is allowed only for gala sales.  TODO
-	if order.Customer != "" {
+	// A Stripe customer ID is allowed only for gala sales.
+	if order.Customer != "" && order.Source != model.OrderFromGala {
 		return false
 	}
 
