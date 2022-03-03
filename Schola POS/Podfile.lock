@@ -1,21 +1,27 @@
 PODS:
-  - Stripe (15.0.1)
-  - StripeTerminal (1.0.3)
+  - Stripe (21.7.0):
+    - Stripe/Stripe3DS2 (= 21.7.0)
+    - StripeCore (= 21.7.0)
+  - Stripe/Stripe3DS2 (21.7.0):
+    - StripeCore (= 21.7.0)
+  - StripeCore (21.7.0)
+  - StripeTerminal (2.0.1)
 
 DEPENDENCIES:
   - Stripe
-  - StripeTerminal (= 1.0.3)
+  - StripeTerminal (~> 2.0)
 
 SPEC REPOS:
-  https://github.com/CocoaPods/Specs.git:
-    - Stripe
   trunk:
+    - Stripe
+    - StripeCore
     - StripeTerminal
 
 SPEC CHECKSUMS:
-  Stripe: 2c4d0a88817361a102886315ff452d90f65e898b
-  StripeTerminal: ec7ecf250d87c6a8218234db6d35f9c46b81c237
+  Stripe: 90596971ef49bade169f68bc59369a796b30a045
+  StripeCore: c09b492efc3b269a6ff875ad738ca366db97e03b
+  StripeTerminal: c0f7f64bdd1505d3133f27b4e03b9a43452e710c
 
-PODFILE CHECKSUM: 3f2fb3533a29723728e9561bb1427b15963936cb
+PODFILE CHECKSUM: 21a71e04c3e4af4d3ba187e9ec8321cde7d2ec75
 
-COCOAPODS: 1.8.4
+COCOAPODS: 1.10.1

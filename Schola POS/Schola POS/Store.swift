@@ -44,6 +44,7 @@ class Store {
     var sold = 0
     var cash = 0
     var check = 0
+    var testmode = false
 
     func logout() {
         username = ""
@@ -58,7 +59,8 @@ class Store {
         sold = 0
         cash = 0
         check = 0
-        cardReaderWatcher.disconnect()
+        testmode = false
+        cardReaderHandler.disconnect()
         logoutCallback()
     }
 }

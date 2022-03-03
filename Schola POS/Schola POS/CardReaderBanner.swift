@@ -12,7 +12,7 @@ import StripeTerminal
 let warningColor = UIColor(red: 1.0, green: 0.8, blue: 0.4, alpha: 1.0)
 let bannerHeight: CGFloat = 45.0
 
-class CardReaderBanner: UIViewController, CardReaderWatcherDelegate {
+class CardReaderBanner: UIViewController, CardReaderStatusDelegate {
 
     var reconnect: () -> Void
     var status = ConnectionStatus.notConnected
@@ -42,13 +42,13 @@ class CardReaderBanner: UIViewController, CardReaderWatcherDelegate {
             stateLabel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             heightConstraint,
         ])
-        cardReaderWatcher.setDelegate(self)
+        cardReaderHandler.setStatusDelegate(self)
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap(_:))))
     }
 
-    func cardReader(status: ConnectionStatus, lowBattery: Bool) {
-        self.status = status
-        self.lowBattery = lowBattery
+    func onCardReaderStatusChange(_ status: CardReaderStatus) {
+        self.status = status.connectionStatus
+        self.lowBattery = status.batteryStatus == BatteryStatus.low || status.batteryStatus == BatteryStatus.critical
         setStateLabel()
     }
 

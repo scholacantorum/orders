@@ -23,7 +23,8 @@ class Main: UIViewController {
         // store.allow.card = true
         // store.allow.cash = true
         // store.allow.willcall = true
-        // STPPaymentConfiguration.shared().publishableKey = "pk_test_QPwvhWbGaakWn7DGcco8J5Nd"
+        // store.testmode = true
+        // STPAPIClient.shared.publishableKey = "pk_test_QPwvhWbGaakWn7DGcco8J5Nd"
         // store.event = Event(id: "2019-07-29", name: "Summer Sing", start: "2019-07-29T19:30:00", freeEntries: ["Student"])
         // store.products = [
         //     Product(id: "ticket-2019-07-29", name: "July 29", message: nil, price: 1700, ticketCount: 1),

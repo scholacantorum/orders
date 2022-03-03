@@ -107,8 +107,8 @@ class SalesPaymentCard: UIViewController, STPPaymentCardTextFieldDelegate {
         payNowButton.setTitle("Paying...", for: .normal)
         payNowButton.isEnabled = false
         payNowButton.backgroundColor = scholaBlueDisabled
-        let params = STPPaymentMethodParams(card: STPPaymentMethodCardParams(cardSourceParams: cardEntry.cardParams), billingDetails: nil, metadata: nil)
-        STPAPIClient.shared().createPaymentMethod(with: params) { method, error in
+        let params = STPPaymentMethodParams(card: cardEntry.cardParams, billingDetails: nil, metadata: nil)
+        STPAPIClient.shared.createPaymentMethod(with: params) { method, error in
             DispatchQueue.main.async {
                 if let error = error {
                     self.payNowButton.setTitle("Pay Now", for: .normal)
@@ -133,7 +133,9 @@ class SalesPaymentCard: UIViewController, STPPaymentCardTextFieldDelegate {
                         }
                         for line in self.order.lines {
                             store.admitted += line.used ?? 0
-                            store.sold += line.quantity
+                            if line.product != "donation" {
+                                store.sold += line.quantity
+                            }
                         }
                         if self.order.email ?? "" != "" {
                             self.navigationController!.popToRootViewController(animated: true)

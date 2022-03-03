@@ -25,7 +25,7 @@ protocol ChooseCardReaderDelegate {
     func cardReaderReady()
 }
 
-class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSource, UITableViewDelegate, ChooseCardReaderDelegate {
+class ChooseCardReader: UIViewController, UITableViewDataSource, UITableViewDelegate, ChooseCardReaderDelegate, CardReaderDiscoveryDelegate {
 
     var tableView: UITableView!
     var spinner: UIActivityIndicatorView!
@@ -46,7 +46,8 @@ class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSour
         // store.allow.card = true
         // store.allow.cash = true
         // store.allow.willcall = true
-        // STPPaymentConfiguration.shared().publishableKey = "pk_test_QPwvhWbGaakWn7DGcco8J5Nd"
+        // store.testmode = true
+        // STPAPIClient.shared.publishableKey = "pk_test_QPwvhWbGaakWn7DGcco8J5Nd"
         // store.event = Event(id: "2019-07-29", name: "Summer Sing", start: "2019-07-29T19:30:00", freeEntries: ["Student"])
         // store.products = [
         //     Product(id: "ticket-2019-07-29", name: "July 29", message: nil, price: 1700, ticketCount: 1),
@@ -159,21 +160,20 @@ class ChooseCardReader: UIViewController, DiscoveryDelegate, UITableViewDataSour
             return
         }
         spinner.startAnimating()
-        discoverCancel = Terminal.shared.discoverReaders(DiscoveryConfiguration(deviceType: .chipper2X, discoveryMethod: .bluetoothScan, simulated: false), delegate: self) { error in
-            if let error = error {
-                print("Error discovering card readers: \(error)")
-                let alert = UIAlertController(title: "Card Reader Error", message: error.localizedDescription, preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                self.present(alert, animated: true, completion: nil)
-                self.spinner.stopAnimating()
-                return
-            }
-        }
+        cardReaderHandler.discover(self)
     }
 
-    func terminal(_ terminal: Terminal, didUpdateDiscoveredReaders readers: [Reader]) {
+    func onAvailableReaders(_ readers: [Reader]) {
         self.readers = readers
         tableView.reloadData()
+    }
+    
+    func onReaderDiscoveryError(_ error: Error) {
+        print("Error discovering card readers: \(error)")
+        let alert = UIAlertController(title: "Card Reader Error", message: error.localizedDescription, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        self.present(alert, animated: true, completion: nil)
+        self.spinner.stopAnimating()
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

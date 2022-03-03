@@ -40,6 +40,9 @@ class SalesSummary: UIViewController {
                     break
                 }
             }
+            if line.product == "donation" {
+                label.text = "Donation"
+            }
             vbox.addSubview(label)
             constraints.append(contentsOf: [
                 label.leftAnchor.constraint(equalTo: vbox.leftAnchor, constant: 9.0),

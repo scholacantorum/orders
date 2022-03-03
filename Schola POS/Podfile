@@ -7,6 +7,6 @@ target 'Schola POS' do
 
   # Pods for Schola POS
   pod 'Stripe'
-  pod 'StripeTerminal', '1.0.3'
+  pod 'StripeTerminal', '~> 2.0'
 
 end

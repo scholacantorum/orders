@@ -31,7 +31,7 @@
 		88E2A09422ECBBA500D95DBA /* UseOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09322ECBBA500D95DBA /* UseOrder.swift */; };
 		88E2A09622ECDCB500D95DBA /* UseTicketClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09522ECDCB500D95DBA /* UseTicketClass.swift */; };
 		88E2A09822ED06D200D95DBA /* ScanTicket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09722ED06D200D95DBA /* ScanTicket.swift */; };
-		88E2A09A22EDCE9300D95DBA /* CardReaderWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09922EDCE9300D95DBA /* CardReaderWatcher.swift */; };
+		88E2A09A22EDCE9300D95DBA /* CardReaderHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09922EDCE9300D95DBA /* CardReaderHandler.swift */; };
 		88E2A09C22EDCF4900D95DBA /* ChooseCardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09B22EDCF4900D95DBA /* ChooseCardReader.swift */; };
 		88E2A09E22EDE89900D95DBA /* ConnectCardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E2A09D22EDE89900D95DBA /* ConnectCardReader.swift */; };
 		D69DA39BABB0070D167B7F80 /* Pods_Schola_POS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D91ADB4A64AAAE54B78EAB67 /* Pods_Schola_POS.framework */; };
@@ -64,7 +64,7 @@
 		88E2A09322ECBBA500D95DBA /* UseOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UseOrder.swift; sourceTree = "<group>"; };
 		88E2A09522ECDCB500D95DBA /* UseTicketClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UseTicketClass.swift; sourceTree = "<group>"; };
 		88E2A09722ED06D200D95DBA /* ScanTicket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanTicket.swift; sourceTree = "<group>"; };
-		88E2A09922EDCE9300D95DBA /* CardReaderWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardReaderWatcher.swift; sourceTree = "<group>"; };
+		88E2A09922EDCE9300D95DBA /* CardReaderHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardReaderHandler.swift; sourceTree = "<group>"; };
 		88E2A09B22EDCF4900D95DBA /* ChooseCardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooseCardReader.swift; sourceTree = "<group>"; };
 		88E2A09D22EDE89900D95DBA /* ConnectCardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectCardReader.swift; sourceTree = "<group>"; };
 		C696EE5850F569F576DAFBAA /* Pods-Schola POS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Schola POS.release.xcconfig"; path = "Target Support Files/Pods-Schola POS/Pods-Schola POS.release.xcconfig"; sourceTree = "<group>"; };
@@ -120,7 +120,7 @@
 				882D573522E2C7A100FFEB6B /* LaunchScreen.storyboard */,
 				88E2A07322E80B4000D95DBA /* Store.swift */,
 				88E2A07122E7EC6900D95DBA /* Backend.swift */,
-				88E2A09922EDCE9300D95DBA /* CardReaderWatcher.swift */,
+				88E2A09922EDCE9300D95DBA /* CardReaderHandler.swift */,
 				88E2A07522E8ADB300D95DBA /* TopNavigation.swift */,
 				882D572E22E2C79F00FFEB6B /* Login.swift */,
 				88E2A07722E8AF7100D95DBA /* EventChooser.swift */,
@@ -183,7 +183,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1020;
-				LastUpgradeCheck = 1020;
+				LastUpgradeCheck = 1250;
 				ORGANIZATIONNAME = "Schola Cantorum";
 				TargetAttributes = {
 					882D572822E2C79F00FFEB6B = {
@@ -287,7 +287,7 @@
 				88E2A08A22EAAF5600D95DBA /* CardReaderBanner.swift in Sources */,
 				88E2A09C22EDCF4900D95DBA /* ChooseCardReader.swift in Sources */,
 				88E2A08822EAA68500D95DBA /* Main.swift in Sources */,
-				88E2A09A22EDCE9300D95DBA /* CardReaderWatcher.swift in Sources */,
+				88E2A09A22EDCE9300D95DBA /* CardReaderHandler.swift in Sources */,
 				88E2A09022EBD92A00D95DBA /* SalesPaymentCard.swift in Sources */,
 				88E2A07422E80B4000D95DBA /* Store.swift in Sources */,
 				88E2A09422ECBBA500D95DBA /* UseOrder.swift in Sources */,
@@ -336,6 +336,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -397,6 +398,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;

@@ -190,8 +190,19 @@ class SalesPaymentCheck: UIViewController {
         confirmButton.isEnabled = false
         confirmButton.setTitle("Saving...", for: .normal)
         let donation = received*100 - order.payments[0].amount
+        var donationLine: OrderLine!
+        for line in order.lines {
+            if line.product == "donation" {
+                donationLine = line
+                break
+            }
+        }
         if donation > 0 {
-            order.lines.append(OrderLine(product: "donation", quantity: 1, used: nil, usedAt: nil, price: donation))
+            if donationLine == nil {
+                donationLine = OrderLine(product: "donation", quantity: 1, used: nil, usedAt: nil, price: 0)
+                order.lines.append(donationLine)
+            }
+            donationLine.price += donation
             order.payments[0].amount += donation
         }
         backend.placeOrder(order: order) { placed, error in
@@ -199,7 +210,10 @@ class SalesPaymentCheck: UIViewController {
                 if let error = error {
                     if donation >= 0 { // remove donation from failed order
                         self.order.payments[0].amount -= donation
-                        self.order.lines.removeLast()
+                        donationLine.price -= donation
+                        if donationLine.price == 0 {
+                            self.order.lines.removeLast()
+                        }
                     }
                     let alert = UIAlertController(title: nil, message: error, preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default))

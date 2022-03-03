@@ -70,6 +70,25 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
         NotificationCenter.default.addObserver(self, selector: #selector(textChange(_:)), name: UITextField.textDidChangeNotification, object: view)
         return view
     }()
+    lazy var donationHBox = UIView()
+    lazy var donationLabel: UILabel = {
+        let view = UILabel()
+        view.text = "Donation"
+        view.font = UIFont.systemFont(ofSize: 24.0)
+        return view
+    }()
+    lazy var donationTextField: UITextField = {
+        let view = UITextField()
+        view.keyboardType = .numberPad
+        view.enablesReturnKeyAutomatically = true
+        view.returnKeyType = .done
+        view.borderStyle = .roundedRect
+        view.font = UIFont.systemFont(ofSize: 24.0)
+        view.textAlignment = .right
+        view.text = "0"
+        NotificationCenter.default.addObserver(self, selector: #selector(textChange(_:)), name: UITextField.textDidChangeNotification, object: view)
+        return view
+    }()
     lazy var buttonBar = UIView()
     lazy var cashButton: UIButton = {
         let view = UIButton()
@@ -143,6 +162,23 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
             topAnchor = qtyView.bottomAnchor
         }
 
+        view.addSubview(donationHBox)
+        donationHBox.addSubview(donationLabel)
+        donationHBox.addSubview(donationTextField)
+        constraints.append(contentsOf: [
+            donationHBox.topAnchor.constraint(equalTo: topAnchor, constant: 18.0),
+            donationHBox.leftAnchor.constraint(equalTo: view.leftAnchor),
+            donationHBox.rightAnchor.constraint(equalTo: view.rightAnchor),
+            donationHBox.heightAnchor.constraint(equalToConstant: 31.0),
+            donationTextField.topAnchor.constraint(equalTo: donationHBox.topAnchor),
+            donationTextField.rightAnchor.constraint(equalTo: donationHBox.rightAnchor, constant: -9.0),
+            donationTextField.widthAnchor.constraint(equalToConstant: 114.0),
+            donationTextField.heightAnchor.constraint(equalToConstant: 31.0),
+            donationLabel.leftAnchor.constraint(equalTo: donationHBox.leftAnchor, constant: 9.0),
+            donationLabel.centerYAnchor.constraint(equalTo: donationTextField.centerYAnchor),
+        ])
+        topAnchor = donationHBox.bottomAnchor
+        
         view.addSubview(totalBorder)
         view.addSubview(totalLabel)
         constraints.append(contentsOf: [
@@ -257,15 +293,12 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
     }
 
     func ticketQuantityChange(product: Product, sellQty: Int, useQty: Int) {
-        total = 0
         for (index, prod) in store.products.enumerated() {
             if prod.id == product.id {
                 sellqty[index] = sellQty
                 useqty[index] = useQty
             }
-            total += prod.price * sellqty[index]
         }
-        totalLabel.text = "TOTAL   $\(total/100)"
         enableDisable()
     }
 
@@ -289,6 +322,7 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
         var showNameEmail = false
         var enableCash = false
         var enableCheckCard = false
+        total = 0
         for (index, prod) in store.products.enumerated() {
             if useqty[index] < prod.ticketCount*sellqty[index] {
                 showNameEmail = true
@@ -299,7 +333,15 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
                     enableCheckCard = true
                 }
             }
+            total += prod.price * sellqty[index]
         }
+        let donation = Int(donationTextField.text ?? "") ?? 0
+        if donation > 0 {
+            enableCash = true
+            enableCheckCard = true
+            total += donation*100
+        }
+        totalLabel.text = "TOTAL   $\(total/100)"
         if showNameEmail {
             addNameEmail()
             if !namePred.evaluate(with: nameTextField.text ?? "") {
@@ -359,6 +401,11 @@ class SellTickets: UIViewController, TicketQuantityDelegate, UITextFieldDelegate
                 lines.append(OrderLine(product: prod.id, quantity: sellqty[index], used: useqty[index], usedAt: store.event.id, price: prod.price))
                 payment.amount += sellqty[index] * prod.price
             }
+        }
+        let donation = Int(donationTextField.text ?? "") ?? 0
+        if donation > 0 {
+            lines.append(OrderLine(product: "donation", quantity: 1, used: nil, usedAt: nil, price: donation*100))
+            payment.amount += donation*100
         }
         return Order(id: nil, source: "inperson", name: name, email: email, payments: [payment], lines: lines, error: nil)
     }

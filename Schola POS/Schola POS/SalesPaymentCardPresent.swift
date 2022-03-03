@@ -9,7 +9,8 @@
 import UIKit
 import StripeTerminal
 
-class SalesPaymentCardPresent: UIViewController, ReaderDisplayDelegate {
+class SalesPaymentCardPresent: UIViewController, CardReaderDisplayDelegate {
+    
 
     var order: Order!
     var intent: PaymentIntent!
@@ -126,7 +127,9 @@ class SalesPaymentCardPresent: UIViewController, ReaderDisplayDelegate {
     }
 
     func collectPayment() {
-        collectCancel = Terminal.shared.collectPaymentMethod(intent, delegate: self) { intent, error in
+        cardReaderHandler.setDisplayDelegate(self)
+        collectCancel = Terminal.shared.collectPaymentMethod(intent) { intent, error in
+            cardReaderHandler.setDisplayDelegate(nil)
             DispatchQueue.main.async {
                 if let error = error as NSError? {
                     if error.code == 2020 {
@@ -167,7 +170,9 @@ class SalesPaymentCardPresent: UIViewController, ReaderDisplayDelegate {
                 self.intent = intent
                 for line in self.order.lines {
                     store.admitted += line.used ?? 0
-                    store.sold += line.quantity
+                    if line.product != "donation" {
+                        store.sold += line.quantity
+                    }
                 }
                 self.capturePayment()
             }
@@ -198,13 +203,13 @@ class SalesPaymentCardPresent: UIViewController, ReaderDisplayDelegate {
         }
     }
 
-    func terminal(_ terminal: Terminal, didRequestReaderInput inputOptions: ReaderInputOptions = []) {
-        self.messageLabel.text = Terminal.stringFromReaderInputOptions(inputOptions)
+    func onRequestReaderInput(_ options: String) {
+        self.messageLabel.text = options
         self.messageLabel.textColor = warningColor
     }
-
-    func terminal(_ terminal: Terminal, didRequestReaderDisplayMessage displayMessage: ReaderDisplayMessage) {
-        self.messageLabel.text = Terminal.stringFromReaderDisplayMessage(displayMessage)
+    
+    func onDisplayMessage(_ message: String) {
+        self.messageLabel.text = message
         self.messageLabel.textColor = warningColor
     }
 

@@ -117,7 +117,8 @@ class Backend: ConnectionTokenProvider {
             store.auth = result.token
             store.allow = allow
             store.baseURL = baseurl
-            STPPaymentConfiguration.shared().publishableKey = result.stripePublicKey
+            store.testmode = testmode
+            STPAPIClient.shared.publishableKey = result.stripePublicKey
             handler(nil)
         }
         task.resume()
