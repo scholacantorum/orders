@@ -3,20 +3,40 @@ Dialog is the dialog box that opens when someone clicks "Buy Tickets".
 -->
 
 <template lang="pug">
-b-form#gala-form(novalidate @submit.prevent="onSubmit")
+b-form#gala-form(novalidate, @submit.prevent='onSubmit')
   hr.w-100
-  a#gala-register(name="register") Registration
-  div.mb-3(v-if="success") Thank you for your registration.  A receipt has been emailed to you.  We look forward to seeing you at the gala.
+  a#gala-register(name='register') Registration
+  .mb-3(v-if='success') Thank you for your registration. A receipt has been emailed to you. We look forward to seeing you at the gala.
   template(v-else)
-    b-form-group(label="Register" label-for="gala-qty" label-cols="auto" label-class="mt-1" :state="qtyError ? false : null" :invalid-feedback="qtyError")
-      b-form-input#gala-qty.d-inline(type="number" number min="1" v-model="qty")
-      span(v-text="qtyLabel")
+    b-form-group(
+      label='Register',
+      label-for='gala-qty',
+      label-cols='auto',
+      label-class='mt-1',
+      :state='qtyError ? false : null',
+      :invalid-feedback='qtyError'
+    )
+      b-form-input#gala-qty.d-inline(type='number', number, min='1', v-model='qty')
+      span(v-text='qtyLabel')
       b-form-text Register 10 seats to fill a table.
-    GalaRegisterGuest(v-for="(guest, i) in guests" :key="i" :number="i" :entreeOptions="entreeOptions" v-model="guests[i]")
-    b-form-group(label="Any special requests?" label-for="gala-requests" label-class="font-weight-bold")
-      b-form-textarea#gala-requests(placeholder="Seating preferences, dietary restrictions, etc." v-model="requests")
-    b-form-group.mb-0(label="Payment Information" label-class="font-weight-bold")
-    OrderPayment(ref="pmt" :send="onSend" :stripeKey="stripeKey" :total="total")
+    GalaRegisterGuest(
+      v-for='(guest, i) in guests',
+      :key='i',
+      :number='i',
+      :entreeOptions='entreeOptions',
+      v-model='guests[i]'
+    )
+    b-form-group(
+      label='Any special requests?',
+      label-for='gala-requests',
+      label-class='font-weight-bold'
+    )
+      b-form-textarea#gala-requests(
+        placeholder='Seating preferences, dietary restrictions, etc.',
+        v-model='requests'
+      )
+    b-form-group.mb-0(label='Payment Information', label-class='font-weight-bold')
+    OrderPayment(ref='pmt', :send='onSend', :stripeKey='stripeKey', :total='total')
 </template>
 
 <script>
@@ -107,7 +127,7 @@ export default {
       body.append('payment1.subtype', subtype)
       body.append('payment1.method', method)
       body.append('payment1.amount', this.total)
-      const result = await this.$axios.post(`${this.ordersURL}/payapi/order`, body,
+      const result = await this.$axios.post(`https://gala.scsv.work/register`, body,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       ).catch(err => {
         return err
@@ -136,7 +156,7 @@ export default {
   display flex
   flex-direction column
   margin 6px 12px
-  @media (min-width: 624px)
+  @media (min-width 624px)
     margin 6px auto
     max-width 600px
 #gala-qty
