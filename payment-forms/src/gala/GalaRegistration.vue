@@ -18,7 +18,7 @@ b-form#gala-form(novalidate, @submit.prevent='onSubmit')
     )
       b-form-input#gala-qty.d-inline(type='number', number, min='1', v-model='qty')
       span(v-text='qtyLabel')
-      b-form-text Register 10 seats to fill a table.
+      b-form-text Register 8 seats to fill a table.
     GalaRegisterGuest(
       v-for='(guest, i) in guests',
       :key='i',
