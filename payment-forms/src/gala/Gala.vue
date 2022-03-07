@@ -4,7 +4,7 @@ a thank-you when registration is complete.
 -->
 
 <template lang="pug">
-GalaRegistration(v-if="product" :product="product" :ordersURL="ordersURL" :stripeKey="stripeKey")
+GalaRegistration(v-if="product" :product="product" :ordersURL="ordersURL" :stripeKey="stripeKey" :galaRegURL="galaRegURL")
 #gala-message(v-else-if="productError" v-text="productError")
 </template>
 
@@ -15,6 +15,7 @@ export default {
   components: { GalaRegistration },
   props: {
     ordersURL: String,
+    galaRegURL: String,
     stripeKey: String,
     productID: String,
   },

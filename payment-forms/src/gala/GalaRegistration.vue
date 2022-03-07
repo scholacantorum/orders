@@ -36,7 +36,14 @@ b-form#gala-form(novalidate, @submit.prevent='onSubmit')
         v-model='requests'
       )
     b-form-group.mb-0(label='Payment Information', label-class='font-weight-bold')
-    OrderPayment(ref='pmt', :send='onSend', :stripeKey='stripeKey', :total='total')
+    OrderPayment(
+      ref='pmt',
+      :send='onSend',
+      :stripeKey='stripeKey',
+      :total='total',
+      :name='guests[0].name',
+      :email='guests[0].email'
+    )
 </template>
 
 <script>
@@ -47,6 +54,7 @@ export default {
   components: { GalaRegisterGuest, OrderPayment },
   props: {
     ordersURL: String,
+    galaRegURL: String,
     product: Object,
     stripeKey: String,
   },
@@ -66,13 +74,6 @@ export default {
         options.push({ text, value })
       })
       return options
-    },
-    guestEmails() {
-      // I don't really care about the concatenation of guest emails, but this
-      // value will change whenever a guest's email is changed, which means
-      // whenever the validity of the guests might have changed, so I can watch
-      // it for that.
-      return this.guests.reduce((acc, g) => acc + g.email, '')
     },
     qtyLabel() {
       if (typeof (this.qty) === 'number' && this.qty === 1)
@@ -114,6 +115,7 @@ export default {
       body.append('city', city)
       body.append('state', state)
       body.append('zip', zip)
+      body.append('cNote', this.requests)
       this.guests.forEach((guest, i) => {
         const prefix = `line${i + 1}.`
         body.append(prefix + 'product', this.product.id)
@@ -127,7 +129,7 @@ export default {
       body.append('payment1.subtype', subtype)
       body.append('payment1.method', method)
       body.append('payment1.amount', this.total)
-      const result = await this.$axios.post(`https://gala.scsv.work/register`, body,
+      const result = await this.$axios.post(this.galaRegURL, body,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       ).catch(err => {
         return err

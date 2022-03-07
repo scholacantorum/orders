@@ -51,73 +51,111 @@ using the customer name and email from our form fields.
 -->
 
 <template lang="pug">
-#gala-payment(v-show="canPR !== null")
-  #gala-use-pr-div(v-if="canPR")
-    label#gala-use-pr-label(for="gala-use-pr")
+#gala-payment(v-show='canPR !== null')
+  #gala-use-pr-div(v-if='canPR')
+    label#gala-use-pr-label(for='gala-use-pr')
       | Use payment info saved {{ deviceOrBrowser }}?
-    b-form-checkbox#gala-use-pr(v-model="usePR" switch)
-  div(v-show="!usePR")
+    b-form-checkbox#gala-use-pr(v-model='usePR', switch)
+  div(v-show='!usePR')
     b-form-group.mb-1(
-      label="Your name" label-sr-only
-      :state="nameState" invalid-feedback="Please enter your name."
-    )
-      b-form-input(v-model.trim="name" placeholder="Your name" autocomplete="name" :disabled="submitting")
-    b-form-group.mb-1(
-      label="Email address" label-sr-only
-      :state="emailState"
-      :invalid-feedback="email ? 'This is not a valid email address.' : 'Please enter your email address.'"
+      label='Your name',
+      label-sr-only,
+      :state='nameState',
+      invalid-feedback='Please enter your name.'
     )
       b-form-input(
-        v-model.trim="email" type="email" placeholder="Email address" autocomplete="email" :disabled="submitting"
-        @focus="emailFocused=true" @blur="emailFocused=false"
+        v-model.trim='name',
+        placeholder='Your name',
+        autocomplete='name',
+        :disabled='submitting'
       )
     b-form-group.mb-1(
-      label="Billing address" label-sr-only
-      :state="addressState" invalid-feedback="Please enter your address."
+      label='Email address',
+      label-sr-only,
+      :state='emailState',
+      :invalid-feedback='email ? "This is not a valid email address." : "Please enter your email address."'
     )
       b-form-input(
-        v-model.trim="address" placeholder="Billing address" autocomplete="street-address" :disabled="submitting"
+        v-model.trim='email',
+        type='email',
+        placeholder='Email address',
+        autocomplete='email',
+        :disabled='submitting',
+        @focus='emailFocused = true',
+        @blur='emailFocused = false'
       )
-    div(style="display:flex")
-      b-form-group.mb-1(style="flex:auto"
-        label="City" label-sr-only
-        :state="cityState" invalid-feedback="Please enter your city."
+    b-form-group.mb-1(
+      label='Billing address',
+      label-sr-only,
+      :state='addressState',
+      invalid-feedback='Please enter your address.'
+    )
+      b-form-input(
+        v-model.trim='address',
+        placeholder='Billing address',
+        autocomplete='street-address',
+        :disabled='submitting'
+      )
+    div(style='display: flex')
+      b-form-group.mb-1(
+        style='flex: auto',
+        label='City',
+        label-sr-only,
+        :state='cityState',
+        invalid-feedback='Please enter your city.'
       )
         b-form-input(
-          v-model.trim="city" placeholder="City" autocomplete="address-level2" :disabled="submitting"
+          v-model.trim='city',
+          placeholder='City',
+          autocomplete='address-level2',
+          :disabled='submitting'
         )
-      b-form-group.mb-1(style="flex:none;width:50px;margin:0 4px"
-        label="State" label-sr-only
-        :state="stateState"
-        :invalid-feedback="state ? 'This is not a valid state .' : 'Please enter your state.'"
+      b-form-group.mb-1(
+        style='flex: none; width: 50px; margin: 0 4px',
+        label='State',
+        label-sr-only,
+        :state='stateState',
+        :invalid-feedback='state ? "This is not a valid state ." : "Please enter your state."'
       )
         b-form-input(
-          v-model.trim="state" placeholder="St" autocomplete="address-level1" :disabled="submitting"
-          @focus="stateFocused=true" @blur="stateFocused=false"
+          v-model.trim='state',
+          placeholder='St',
+          autocomplete='address-level1',
+          :disabled='submitting',
+          @focus='stateFocused = true',
+          @blur='stateFocused = false'
         )
-      b-form-group.mb-1(style="flex:none;width:80px"
-        label="ZIP Code" label-sr-only
-        :state="zipState"
-        :invalid-feedback="zip ? 'This is not a valid ZIP code.' : 'Please enter your ZIP code.'"
+      b-form-group.mb-1(
+        style='flex: none; width: 80px',
+        label='ZIP Code',
+        label-sr-only,
+        :state='zipState',
+        :invalid-feedback='zip ? "This is not a valid ZIP code." : "Please enter your ZIP code."'
       )
         b-form-input(
-          v-model.trim="zip" placeholder="ZIP" autocomplete="postal-code" :disabled="submitting"
-          @focus="zipFocused=true" @blur="zipFocused=false"
+          v-model.trim='zip',
+          placeholder='ZIP',
+          autocomplete='postal-code',
+          :disabled='submitting',
+          @focus='zipFocused = true',
+          @blur='zipFocused = false'
         )
     b-form-group.mb-1(
-      label="Card number" label-sr-only
-      :state="cardError ? false : null" :invalid-feedback="cardError"
+      label='Card number',
+      label-sr-only,
+      :state='cardError ? false : null',
+      :invalid-feedback='cardError'
     )
-      #gala-card.form-control(ref="card")
+      #gala-card.form-control(ref='card')
   #gala-footer
-    #gala-message(v-if="message" v-text="message")
+    #gala-message(v-if='message', v-text='message')
     #gala-buttons
-      #gala-prbutton(v-show="usePR" ref="prbutton")
-      b-btn#gala-pay-now(v-if="!usePR && submitting" type="submit" variant="primary" disabled)
+      #gala-prbutton(v-show='usePR', ref='prbutton')
+      b-btn#gala-pay-now(v-if='!usePR && submitting', type='submit', variant='primary', disabled)
         b-spinner.mr-1(small)
         | Paying...
-      b-btn#gala-pay-now(v-if="!usePR && !submitting" type="submit" variant="primary")
-        | Pay {{ total ? `$${total/100}` : 'Now' }}
+      b-btn#gala-pay-now(v-if='!usePR && !submitting', type='submit', variant='primary')
+        | Pay {{ total ? `$${total / 100}` : "Now" }}
 </template>
 
 <script>
@@ -128,6 +166,8 @@ export default {
     send: Function,
     stripeKey: String,
     total: Number,
+    name: String,
+    email: String,
   },
   data: () => ({
     address: '',         // customer billing address from form
@@ -137,10 +177,8 @@ export default {
     cardFocus: false,    // card element currently has focus
     city: '',            // customer city from form
     elements: null,      // Stripe elements collection
-    email: '',           // customer email address from form
     emailFocused: false, // email address input has focus
     message: null,       // error message after failed submission
-    name: '',            // customer name from form
     payreq: null,        // Stripe payment request object
     prbutton: null,      // Stripe payment request button element
     state: '',           // customer address state from form
@@ -153,11 +191,11 @@ export default {
   }),
   async mounted() {
     // eslint-disable-next-line
-    if (!stripe) stripe = Stripe(this.stripeKey);
+    if (!stripe) stripe = Stripe(this.stripeKey)
 
     // Create the Stripe card element and set it up.
-    this.elements = stripe.elements();
-    this.card = this.elements.create('card', { style: { base: { fontSize: '16px', lineHeight: 1.5 } }, hidePostalCode: true });
+    this.elements = stripe.elements()
+    this.card = this.elements.create('card', { style: { base: { fontSize: '16px', lineHeight: 1.5 } }, hidePostalCode: true })
     this.card.on('change', this.onCardChange)
     this.card.on('focus', () => { this.cardFocus = true })
     this.card.on('blur', () => { this.cardFocus = false })

@@ -26,6 +26,8 @@ func FindOrCreateCustomer(order *model.Order) (err error) {
 		clistp *stripe.CustomerListParams
 		iter   *customer.Iter
 	)
+	stripe.LogLevel = 1 // log only errors
+	stripe.Key = config.Get("stripeSecretKey")
 	// Look for an existing customer first.
 	clistp = new(stripe.CustomerListParams)
 	clistp.Filters.AddFilter("email", "", order.Email)

@@ -16,6 +16,7 @@ window.addEventListener('load', () => {
       return h(Gala, {
         props: {
           ordersURL: elm.getAttribute('data-orders-url'),
+          galaRegURL: elm.getAttribute('data-gala-reg-url'),
           stripeKey: elm.getAttribute('data-stripe-key'),
           productID,
         }
