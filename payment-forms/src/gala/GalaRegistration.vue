@@ -141,7 +141,7 @@ export default {
       if (result && result.data && result.data.error)
         return result.data.error
       console.error(result)
-      return `We’re sorry, but we're unable to process payment cards at the moment.  Please try again later, or call our office at (650) 254-1700 to donate by phone.`
+      return `We’re sorry, but we're unable to process payment cards at the moment.  Please try again later, or call our office at (650) 254-1700 to register by phone.`
     },
     onSubmit() { this.$refs.pmt.submit() },
   },

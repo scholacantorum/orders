@@ -237,7 +237,7 @@ export default {
       if (this.cardChange && this.cardChange.error) return this.cardChange.error.message
       if (!this.submitted) return null
       if (!this.cardChange || this.cardChange.empty) return 'Please enter your card number.'
-      if (!this.cardFocus && !this.cardChange.complete) return 'This card number is incomplete.'
+      if (!this.cardFocus && !this.cardChange.complete) return 'The card information is incomplete.'
       // Incomplete entries in one of the card fields are reflected in
       // cardChange.error on blur.  This last if catches cases where one of the
       // card fields is left blank.
