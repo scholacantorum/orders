@@ -42,6 +42,7 @@ func EmitReceipt(order *model.Order, synch bool) {
 		cmd      *exec.Cmd
 		pipe     io.WriteCloser
 		typename string
+		havetext bool
 		ticket   bool
 		emailTo  []string
 		err      error
@@ -51,8 +52,12 @@ func EmitReceipt(order *model.Order, synch bool) {
 		return
 	}
 	// Is this "Donation #23" or "Order #23"?  And does it need the QR code
-	// for scanning at entry to an event?
+	// for scanning at entry to an event?  Also, is there any receipt text
+	// at all?
 	for _, ol := range order.Lines {
+		if ol.Product.Receipt != "" {
+			havetext = true
+		}
 		switch ol.Product.Type {
 		case model.ProdDonation:
 			if typename == "" {
@@ -64,6 +69,12 @@ func EmitReceipt(order *model.Order, synch bool) {
 		default:
 			typename = "Order"
 		}
+	}
+	if !havetext {
+		// The product(s) on the order don't have any receipt text.
+		// This happens for gala products, whose receipts are generated
+		// and sent by the gala software.
+		return
 	}
 	// Start a multipart email with appropriate headers.  One part will be
 	// the HTML text of the email.  Another part will be the Schola logo
