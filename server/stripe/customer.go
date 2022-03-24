@@ -49,6 +49,8 @@ func FindOrCreateCustomer(order *model.Order) (err error) {
 
 // UpdateCustomer updates the name and email of an existing customer.
 func UpdateCustomer(id, name, email string) (success bool) {
+	stripe.LogLevel = 1 // log only errors
+	stripe.Key = config.Get("stripeSecretKey")
 	var cparams = stripe.CustomerParams{Description: &name, Email: &email}
 	if _, err := customer.Update(id, &cparams); err != nil {
 		log.Printf("stripe update customer: %s", err)
