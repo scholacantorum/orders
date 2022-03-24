@@ -8,7 +8,6 @@ import (
 
 	"github.com/stripe/stripe-go"
 	"github.com/stripe/stripe-go/charge"
-	"github.com/stripe/stripe-go/customer"
 	"github.com/stripe/stripe-go/paymentintent"
 	"github.com/stripe/stripe-go/paymentmethod"
 	"github.com/stripe/stripe-go/terminal/connectiontoken"
@@ -16,42 +15,6 @@ import (
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/model"
 )
-
-// FindOrCreateCustomer finds a customer with the name and email in the
-// specified order.  If no matching customer was found, it creates one.  It sets
-// the customer ID in the order.
-func FindOrCreateCustomer(order *model.Order) (err error) {
-	var (
-		cust   *stripe.Customer
-		clistp *stripe.CustomerListParams
-		iter   *customer.Iter
-	)
-	stripe.LogLevel = 1 // log only errors
-	stripe.Key = config.Get("stripeSecretKey")
-	// Look for an existing customer first.
-	clistp = new(stripe.CustomerListParams)
-	clistp.Filters.AddFilter("email", "", order.Email)
-	iter = customer.List(clistp)
-	for iter.Next() {
-		c := iter.Customer()
-		if c.Description != order.Name || c.Email != order.Email {
-			continue
-		}
-		if c.Metadata["monthly-donation-amount"] != "" {
-			continue
-		}
-		order.Customer = c.ID
-		return nil
-	}
-	// Create a new customer if none was found.
-	var cparams = stripe.CustomerParams{Description: &order.Name, Email: &order.Email}
-	if cust, err = customer.New(&cparams); err != nil {
-		log.Printf("stripe create customer: %s", err)
-		return err
-	}
-	order.Customer = cust.ID
-	return nil
-}
 
 // ChargeCard charges the user's card specified in the payment.  If the charge
 // succeeds, the payment Subtype, Method, and Stripe fields are updated, and the
