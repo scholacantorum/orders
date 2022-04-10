@@ -157,7 +157,12 @@ func router(w http.ResponseWriter, r *http.Request) {
 		case "customer":
 			switch customerID := shiftPath(r); customerID {
 			case "":
-				api.NotFoundError(txh, w)
+				switch r.Method {
+				case http.MethodPost:
+					payapi.CreateCustomer(txh, w, r)
+				default:
+					methodNotAllowedError(txh, w)
+				}
 			default:
 				switch r.Method {
 				case http.MethodPost:

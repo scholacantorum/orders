@@ -6,10 +6,56 @@ import (
 
 	"github.com/stripe/stripe-go"
 	"github.com/stripe/stripe-go/customer"
+	"github.com/stripe/stripe-go/setupintent"
 
 	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/model"
 )
+
+// CreateCustomer creates a customer with the specified name and email, and the
+// specified card source as its default for payments.  It returns the customer
+// ID, payment method ID for future payments, and card description if
+// successful, and a problem string if there's an issue with the card.
+func CreateCustomer(name, email, card string) (custid, pmtmeth, desc, problem string) {
+	var (
+		cust *stripe.Customer
+		si   *stripe.SetupIntent
+		err  error
+	)
+	stripe.LogLevel = 1 // log only errors
+	stripe.Key = config.Get("stripeSecretKey")
+	var cparams = stripe.CustomerParams{
+		Description: &name,
+		Email:       &email,
+	}
+	if cust, err = customer.New(&cparams); err != nil {
+		log.Printf("stripe create customer: %s", err)
+		return
+	}
+	var siparams = stripe.SetupIntentParams{
+		Confirm:       stripe.Bool(true),
+		Customer:      &cust.ID,
+		PaymentMethod: &card,
+		Usage:         stripe.String(string(stripe.SetupIntentUsageOffSession)),
+	}
+	siparams.AddExpand("payment_method")
+	if si, err = setupintent.New(&siparams); err != nil {
+		if serr, ok := err.(*stripe.Error); ok && serr.Type == stripe.ErrorTypeCard {
+			return "", "", "", serr.Msg
+		}
+		log.Printf("stripe create setup intent: %s", err)
+		return
+	}
+	if si.Status != stripe.SetupIntentStatusSucceeded {
+		return "", "", "", "card not authorized for delayed charges"
+	}
+	desc = brandMap[si.PaymentMethod.Card.Brand]
+	if desc == "" {
+		desc = "card "
+	}
+	desc += si.PaymentMethod.Card.Last4
+	return cust.ID, si.PaymentMethod.ID, desc, ""
+}
 
 // FindOrCreateCustomer finds a customer with the name and email in the
 // specified order.  If no matching customer was found, it creates one.  It sets
@@ -47,14 +93,40 @@ func FindOrCreateCustomer(order *model.Order) (err error) {
 	return nil
 }
 
-// UpdateCustomer updates the name and email of an existing customer.
-func UpdateCustomer(id, name, email string) (success bool) {
+// UpdateCustomer updates the name, email, and optionally payment card of an
+// existing customer.
+func UpdateCustomer(id, name, email, card string) (success bool, desc string) {
 	stripe.LogLevel = 1 // log only errors
 	stripe.Key = config.Get("stripeSecretKey")
 	var cparams = stripe.CustomerParams{Description: &name, Email: &email}
 	if _, err := customer.Update(id, &cparams); err != nil {
 		log.Printf("stripe update customer: %s", err)
-		return false
+		return false, ""
 	}
-	return true
+	if card == "" {
+		return true, ""
+	}
+	var siparams = stripe.SetupIntentParams{
+		Confirm:       stripe.Bool(true),
+		Customer:      &id,
+		PaymentMethod: &card,
+		Usage:         stripe.String(string(stripe.SetupIntentUsageOffSession)),
+	}
+	siparams.AddExpand("payment_method")
+	var si *stripe.SetupIntent
+	var err error
+	if si, err = setupintent.New(&siparams); err != nil {
+		log.Printf("stripe create setup intent: %s", err)
+		return false, ""
+	}
+	if si.Status != stripe.SetupIntentStatusSucceeded {
+		log.Printf("card not authorized for delayed charges")
+		return false, ""
+	}
+	desc = brandMap[si.PaymentMethod.Card.Brand]
+	if desc == "" {
+		desc = "card "
+	}
+	desc += si.PaymentMethod.Card.Last4
+	return true, desc
 }
