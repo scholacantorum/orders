@@ -416,12 +416,10 @@ func validateOrderDetails(tx db.Tx, order *model.Order, privs model.Privilege) b
 
 		// Additional constraints by product type:
 		switch line.Product.Type {
-		case model.ProdAuctionItem:
-			// Auction items aren't supported yet.
-			return false // TODO
-		case model.ProdDonation, model.ProdRecording, model.ProdSheetMusic, model.ProdRegistration:
-			// Donations, concert recordings, sheet music, and event
-			// registrations must have a quantity of 1.
+		case model.ProdDonation, model.ProdRecording, model.ProdSheetMusic, model.ProdRegistration, model.ProdAuctionItem:
+			// Donations, concert recordings, sheet music, auction
+			// items, and event registrations must have a quantity
+			// of 1.
 			if line.Quantity != 1 || line.Used != 0 || line.UsedAt != "" {
 				return false
 			}

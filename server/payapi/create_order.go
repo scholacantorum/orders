@@ -7,6 +7,7 @@ import (
 
 	"scholacantorum.org/orders/api"
 	"scholacantorum.org/orders/auth"
+	"scholacantorum.org/orders/config"
 	"scholacantorum.org/orders/db"
 	"scholacantorum.org/orders/model"
 )
@@ -79,6 +80,12 @@ func CreateOrder(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		order.Member = session.Member
+	case model.OrderFromGala:
+		if r.FormValue("auth") != config.Get("galaAPIKey") {
+			log.Printf("ERROR: invalid auth key for gala order")
+			api.ForbiddenError(tx, w)
+			return
+		}
 	default:
 		log.Printf("ERROR: invalid source %s", order.ToJSON(true))
 		api.BadRequestError(tx, w, "invalid source")
