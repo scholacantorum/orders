@@ -124,7 +124,18 @@ func main() {
 	}
 	// Make a map of lines by product.
 	for _, ol := range order.Lines {
-		lines[ol.Product.ID] = ol
+		if existing, ok := lines[ol.Product.ID]; ok {
+			// Multiple lines with the same product will be
+			// coalesced.
+			if existing.Price != ol.Price {
+				log.Fatal("can't handle order with multiple lines for same product but different prices")
+			}
+			clone := *existing
+			clone.Quantity += ol.Quantity
+			lines[ol.Product.ID] = &clone
+		} else {
+			lines[ol.Product.ID] = ol
+		}
 	}
 	// Walk the list of rows in the spreadsheet, looking for ones that
 	// belong to this order.  We walk from the bottom up so that deletions
