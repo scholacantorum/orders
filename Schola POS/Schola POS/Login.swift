@@ -111,7 +111,7 @@ class Login: UIViewController, UITextFieldDelegate {
     }()
     lazy var versionLabel: UILabel = {
         let view = UILabel()
-        view.text = "Version 2021-12-19"
+        view.text = "Version 2023-08-02"
         view.textColor = UIColor.gray
         return view
     }()
