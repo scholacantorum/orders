@@ -6,8 +6,9 @@ connected with us.
 <template lang="pug">
 div
   #ticket-confirm
-    | Thank you. We have received your order and emailed your
-    | ticket. <span id="ticket-reminder">Please bring it with
+    | Thank you. We have received your order.
+    | Your ticket has been emailed to <pre>{{ orderEmail }}</pre>.
+    | <span id="ticket-reminder">Please bring it with
     | you</span> (printed or on phone) for admission.
   #connect-head Stay informed of Schola news!
   div
@@ -28,6 +29,7 @@ div
 export default {
   props: {
     orderID: Number,
+    orderEmail: String,
   },
   data: () => ({
     emailDone: false,

@@ -93,7 +93,7 @@ export default {
         return err
       })
       if (result && result.data && result.data.id) {
-        this.$emit('success', result.data.id)
+        this.$emit('success', {id: result.data.id, email: result.data.email})
         return null
       }
       if (result && result.data && result.data.error)
