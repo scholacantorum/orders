@@ -16,6 +16,12 @@ import (
 	"scholacantorum.org/orders/model"
 )
 
+// A CardError is an error from Stripe saying that something is wrong with the
+// supplied card information (as opposed to unable to connect to Stripe, etc.)
+type CardError string
+
+func (ce CardError) Error() string { return string(ce) }
+
 // ChargeCard charges the user's card specified in the payment.  If the charge
 // succeeds, the payment Subtype, Method, and Stripe fields are updated, and the
 // function returns (true, card, ""), where card is the Stripe fingerprint for
@@ -172,9 +178,7 @@ func CreatePaymentIntent(order *model.Order) bool {
 // CancelPaymentIntent cancels the payment intent for an order.  It is used when
 // cleaning up after an order processing failure.
 func CancelPaymentIntent(id string) error {
-	var (
-		err error
-	)
+	var err error
 	stripe.LogLevel = 1 // log only errors
 	stripe.Key = config.Get("stripeSecretKey")
 	_, err = paymentintent.Cancel(id, nil)

@@ -95,18 +95,18 @@ func FindOrCreateCustomer(order *model.Order) (err error) {
 
 // UpdateCustomer updates the name, email, and optionally payment card of an
 // existing customer.
-func UpdateCustomer(id, name, email, card string) (success bool, desc string) {
+func UpdateCustomer(id, name, email, card string) (desc string, err error) {
 	stripe.LogLevel = 1 // log only errors
 	stripe.Key = config.Get("stripeSecretKey")
-	var cparams = stripe.CustomerParams{Description: &name, Email: &email}
-	if _, err := customer.Update(id, &cparams); err != nil {
+	cparams := stripe.CustomerParams{Description: &name, Email: &email}
+	if _, err = customer.Update(id, &cparams); err != nil {
 		log.Printf("stripe update customer: %s", err)
-		return false, ""
+		return "", err
 	}
 	if card == "" {
-		return true, ""
+		return "", nil
 	}
-	var siparams = stripe.SetupIntentParams{
+	siparams := stripe.SetupIntentParams{
 		Confirm:       stripe.Bool(true),
 		Customer:      &id,
 		PaymentMethod: &card,
@@ -114,19 +114,21 @@ func UpdateCustomer(id, name, email, card string) (success bool, desc string) {
 	}
 	siparams.AddExpand("payment_method")
 	var si *stripe.SetupIntent
-	var err error
 	if si, err = setupintent.New(&siparams); err != nil {
 		log.Printf("stripe create setup intent: %s", err)
-		return false, ""
+		if ce, ok := err.(*stripe.Error); ok && ce.Type == stripe.ErrorTypeCard {
+			return "", CardError(ce.Msg)
+		}
+		return "", err
 	}
 	if si.Status != stripe.SetupIntentStatusSucceeded {
 		log.Printf("card not authorized for delayed charges")
-		return false, ""
+		return "", CardError("card not authorized for delayed charges")
 	}
 	desc = brandMap[si.PaymentMethod.Card.Brand]
 	if desc == "" {
 		desc = "card "
 	}
 	desc += si.PaymentMethod.Card.Last4
-	return true, desc
+	return desc, nil
 }

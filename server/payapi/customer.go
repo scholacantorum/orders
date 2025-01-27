@@ -59,19 +59,19 @@ func CreateCustomer(tx db.Tx, w http.ResponseWriter, r *http.Request) {
 //     name:  new customer name
 //     email:  new customer email
 func UpdateCustomer(tx db.Tx, w http.ResponseWriter, r *http.Request, customerID string) {
-	var ok bool
-	var desc string
-
 	if r.FormValue("auth") != config.Get("galaAPIKey") {
 		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	name, email, card := r.FormValue("name"), r.FormValue("email"), r.FormValue("card")
-	if ok, desc = stripe.UpdateCustomer(customerID, name, email, card); !ok {
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+	if desc, err := stripe.UpdateCustomer(customerID, name, email, card); err != nil {
+		if ce, ok := err.(stripe.CardError); ok {
+			http.Error(w, ce.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		}
 		return
-	}
-	if desc == "" {
+	} else if desc == "" {
 		w.WriteHeader(http.StatusNoContent)
 	} else {
 		io.WriteString(w, desc)
