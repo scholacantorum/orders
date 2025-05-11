@@ -80,7 +80,7 @@ func EmitReceipt(order *model.Order, synch bool) {
 	// the HTML text of the email.  Another part will be the Schola logo
 	// header.  The QR code, if included, will be a third part.
 	mw = multipart.NewWriter(&buf)
-	fmt.Fprint(&buf, "From: Schola Cantorum <admin@scholacantorum.org>\r\n")
+	fmt.Fprint(&buf, "From: Schola Cantorum <sales@admin.scholacantorum.org>\r\n")
 	fmt.Fprintf(&buf, "To: %s <%s>\r\n", order.Name, order.Email)
 	fmt.Fprint(&buf, "Reply-To: info@scholacantorum.org\r\n")
 	fmt.Fprintf(&buf, "Subject: Schola Cantorum %s #%d\r\n", typename, order.ID)
