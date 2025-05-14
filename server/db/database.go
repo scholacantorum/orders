@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/scholacantorum/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 var dbh *sql.DB
@@ -17,8 +17,8 @@ func Open(path string) {
 		url string
 		err error
 	)
-	url = "file:" + path + "?mode=rw&_busy_timeout=1000&_txlock=immediate&_foreign_keys=1&_journal_mode=TRUNCATE"
-	if dbh, err = sql.Open("sqlite3", url); err != nil {
+	url = "file:" + path + "?mode=rw&_pragma=busy_timeout%3D1000&_txlock=immediate&_pragma=foreign_keys%3Don1&_pragma=journal_mode%3DTRUNCATE"
+	if dbh, err = sql.Open("sqlite", url); err != nil {
 		panic(err)
 	}
 }
