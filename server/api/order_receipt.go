@@ -170,7 +170,7 @@ Phone: (650) 254-1700</p></div></body><html>
 
 	// Add the Schola logo.
 	hdr = make(textproto.MIMEHeader)
-	hdr.Set("Content-Type", "image/gif")
+	hdr.Set("Content-Type", "image/png")
 	hdr.Set("Content-Transfer-Encoding", "base64")
 	hdr.Set("Content-ID", "<SCHOLA_LOGO>")
 	img, _ = mw.CreatePart(hdr)
